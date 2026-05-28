@@ -176,6 +176,27 @@ def dashboard(request):
             messages.success(request, f'Switched to workspace "{workspace.name}".')
         return redirect('dashboard')
 
+    if request.method == 'POST' and request.POST.get('action') == 'delete_document' and current_workspace:
+        document_id = request.POST.get('document_id')
+        document = Document.objects.filter(
+            id=document_id,
+            tenant=current_workspace.tenant,
+            workspace=current_workspace,
+        ).first()
+        if not document:
+            messages.error(request, 'Document not found.')
+            return redirect('dashboard')
+        filename = document.filename
+        try:
+            if document.file:
+                document.file.delete(save=False)
+            document.delete()
+            messages.success(request, f'Deleted {filename}.')
+        except Exception as exc:
+            logger.exception('Dashboard delete failed for user=%s workspace=%s document=%s', request.user.id, current_workspace.id, document_id)
+            messages.error(request, f'Delete failed: {exc}')
+        return redirect('dashboard')
+
     if request.method == 'POST' and request.POST.get('action') == 'ask_question' and current_workspace:
         chat_question = (request.POST.get('question') or '').strip()
         selected_document_id = (request.POST.get('document_id') or '').strip()

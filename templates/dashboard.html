@@ -175,6 +175,12 @@
           {% if row.preview %}
             <pre>{{ row.preview }}</pre>
           {% endif %}
+          <form method="post" style="margin-top: 10px;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="delete_document">
+            <input type="hidden" name="document_id" value="{{ row.document.id }}">
+            <button type="submit" style="background: #991b1b;">Delete</button>
+          </form>
         </div>
       {% empty %}
         <p>No documents uploaded yet.</p>
