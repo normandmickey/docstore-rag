@@ -80,6 +80,42 @@
     </div>
 
     <div class="card">
+      <h2>Chat with documents</h2>
+      {% if current_workspace %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="ask_question">
+        <label>Ask a question</label>
+        <input type="text" name="question" value="{{ chat_question }}" placeholder="e.g. What does this document say about authentication?">
+        <label>Limit to one document (optional)</label>
+        <select name="document_id">
+          <option value="">All documents in this workspace</option>
+          {% for row in document_rows %}
+            <option value="{{ row.document.id }}">{{ row.document.filename }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Ask</button>
+      </form>
+      {% if chat_answer %}
+        <h3>Answer</h3>
+        <pre>{{ chat_answer }}</pre>
+      {% endif %}
+      {% if chat_results %}
+        <h3>Retrieved context</h3>
+        {% for result in chat_results %}
+          <div class="row">
+            <strong>{{ result.document.filename }}</strong><br>
+            <span class="meta">Chunk {{ result.chunk_index }} · Distance {{ result.distance|floatformat:4 }}</span>
+            <pre>{{ result.text }}</pre>
+          </div>
+        {% endfor %}
+      {% endif %}
+      {% else %}
+      <p>No active workspace is set for this session yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="card">
       <h2>Your documents</h2>
       {% for row in document_rows %}
         <div class="row">

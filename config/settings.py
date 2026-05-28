@@ -116,6 +116,7 @@ CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', os.getenv('REDIS_URL', 'redis
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
 
 DEFAULT_EMBEDDING_MODEL = os.getenv('DEFAULT_EMBEDDING_MODEL', 'text-embedding-3-large')
+DEFAULT_CHAT_MODEL = os.getenv('DEFAULT_CHAT_MODEL', 'gpt-4.1-mini')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL', '')
 

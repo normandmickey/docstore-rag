@@ -1,12 +1,9 @@
-from pgvector.django import CosineDistance
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from documents.models import Chunk
-from providers import embed_texts
-from audit.models import RetrievalLog
 from control.models import Tenant, Workspace
+from .service import retrieve_chunks
 
 
 class SearchSerializer(serializers.Serializer):
@@ -27,22 +24,11 @@ class SearchView(APIView):
         query = data['query'].strip()
         top_k = data['top_k']
 
-        query_vector = embed_texts([query])[0]
-        results = list(
-            Chunk.objects.filter(tenant=tenant, workspace=workspace, embedding__isnull=False)
-            .select_related('document')
-            .annotate(distance=CosineDistance('embedding', query_vector))
-            .order_by('distance')[:top_k]
-        )
-
-        RetrievalLog.objects.create(
+        results = retrieve_chunks(
             tenant=tenant,
             workspace=workspace,
-            query_text=query,
+            query=query,
             top_k=top_k,
-            result_count=len(results),
-            latency_ms=0,
-            metadata_json={'mode': 'keyword_stub'},
         )
 
         return Response({

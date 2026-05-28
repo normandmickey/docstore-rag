@@ -16,3 +16,36 @@ def embed_texts(texts, model=None):
         input=texts,
     )
     return [item.embedding for item in response.data]
+
+
+def answer_with_context(question, context_blocks, model=None):
+    client = get_openai_client()
+    joined_context = "\n\n".join(context_blocks)
+    response = client.responses.create(
+        model=model or getattr(settings, 'DEFAULT_CHAT_MODEL', 'gpt-4.1-mini'),
+        input=[
+            {
+                'role': 'system',
+                'content': [
+                    {
+                        'type': 'input_text',
+                        'text': (
+                            'Answer the user using only the provided document context when possible. '
+                            'Be concise and practical. If the answer is not fully supported by the context, '
+                            'say what is missing. End with a short Sources section that references the provided labels.'
+                        ),
+                    }
+                ],
+            },
+            {
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'input_text',
+                        'text': f'Question:\n{question}\n\nContext:\n{joined_context}',
+                    }
+                ],
+            },
+        ],
+    )
+    return response.output_text

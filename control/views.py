@@ -10,6 +10,7 @@ from django.utils.text import slugify
 from documents.models import Document
 from ingestion.models import IngestionJob
 from ingestion.tasks import ingest_document_task
+from retrieval.service import answer_question
 
 from .forms import SignUpForm
 from .models import Tenant, TenantMembership, Workspace
@@ -76,6 +77,9 @@ def dashboard(request):
     current_workspace_id = request.session.get('current_workspace_id')
     current_workspace = None
     documents = Document.objects.none()
+    chat_answer = ''
+    chat_question = ''
+    chat_results = []
 
     if current_tenant_id and current_workspace_id:
         current_workspace = Workspace.objects.select_related('tenant').filter(
@@ -110,6 +114,25 @@ def dashboard(request):
             request.session['current_workspace_id'] = workspace.id
             messages.success(request, f'Switched to workspace "{workspace.name}".')
         return redirect('dashboard')
+
+    if request.method == 'POST' and request.POST.get('action') == 'ask_question' and current_workspace:
+        chat_question = (request.POST.get('question') or '').strip()
+        selected_document_id = (request.POST.get('document_id') or '').strip()
+        document_scope = int(selected_document_id) if selected_document_id.isdigit() else None
+        if chat_question:
+            try:
+                chat_answer, chat_results = answer_question(
+                    tenant=current_workspace.tenant,
+                    workspace=current_workspace,
+                    query=chat_question,
+                    top_k=5,
+                    document_id=document_scope,
+                )
+            except Exception as exc:
+                logger.exception('Dashboard chat failed for user=%s workspace=%s', request.user.id, current_workspace.id)
+                messages.error(request, f'Chat failed: {exc}')
+        else:
+            messages.error(request, 'Ask a question first.')
 
     if request.method == 'POST' and request.FILES.get('file') and current_workspace:
         upload = request.FILES['file']
@@ -176,5 +199,8 @@ def dashboard(request):
             'current_workspace': current_workspace,
             'available_workspaces': available_workspaces,
             'document_rows': document_rows,
+            'chat_question': chat_question,
+            'chat_answer': chat_answer,
+            'chat_results': chat_results,
         },
     )
