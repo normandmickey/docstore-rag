@@ -36,6 +36,7 @@ def ingest_document_task(self, ingestion_job_id):
         else:
             extracted_text = version.extraction_metadata_json.get('raw_text', '')
 
+        extracted_text = (extracted_text or '').replace('\x00', ' ')
         chunks = naive_chunks(extracted_text, chunk_size=job.workspace.default_chunk_size or 800)
         Chunk.objects.filter(document_version=version).delete()
         for idx, chunk_text in enumerate(chunks):
