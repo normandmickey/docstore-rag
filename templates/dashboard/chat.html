@@ -20,7 +20,14 @@
   {% if chat_results %}
     <h3>Retrieved context</h3>
     {% for result in chat_results %}
-      <div class="row"><strong>{{ result.document.filename }}</strong><br><span class="meta">Chunk {{ result.chunk_index }} · Distance {{ result.distance|floatformat:4 }}</span><pre>{{ result.text }}</pre></div>
+      <div class="row">
+        <strong>{{ result.document.filename }}</strong><br>
+        <span class="meta">Chunk {{ result.chunk_index }} · Distance {{ result.distance|floatformat:4 }}</span><br>
+        {% if result.document.file %}
+          <a href="{{ result.document.file.url }}" target="_blank" rel="noopener noreferrer">Open document</a>
+        {% endif %}
+        <pre>{{ result.text }}</pre>
+      </div>
     {% endfor %}
   {% endif %}
   {% endif %}
