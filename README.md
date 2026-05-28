@@ -327,6 +327,27 @@ curl -X POST https://docstore.oddsmith.net/api/v1/search/ \
   }'
 ```
 
+```python
+import requests
+
+resp = requests.post(
+    "https://docstore.oddsmith.net/api/v1/search/",
+    headers={
+        "Authorization": "Bearer ds_YOUR_KEY",
+        "Content-Type": "application/json",
+    },
+    json={
+        "tenant_id": 1,
+        "workspace_id": 1,
+        "query": "What does this workspace say about authentication?",
+        "top_k": 5,
+    },
+    timeout=60,
+)
+resp.raise_for_status()
+print(resp.json())
+```
+
 ### Chat
 
 ```bash
@@ -339,6 +360,30 @@ curl -X POST https://docstore.oddsmith.net/api/v1/chat/ \
     "question": "Summarize the policy described in these docs.",
     "top_k": 5
   }'
+```
+
+```python
+import requests
+
+resp = requests.post(
+    "https://docstore.oddsmith.net/api/v1/chat/",
+    headers={
+        "Authorization": "Bearer ds_YOUR_KEY",
+        "Content-Type": "application/json",
+    },
+    json={
+        "tenant_id": 1,
+        "workspace_id": 1,
+        "question": "Summarize the policy described in these docs.",
+        "top_k": 5,
+    },
+    timeout=120,
+)
+resp.raise_for_status()
+data = resp.json()
+print(data["answer"])
+for source in data["sources"]:
+    print(source["document"], source["chunk_index"])
 ```
 
 Optional document-scoped chat:
@@ -354,6 +399,28 @@ curl -X POST https://docstore.oddsmith.net/api/v1/chat/ \
     "document_id": 42,
     "top_k": 5
   }'
+```
+
+```python
+import requests
+
+resp = requests.post(
+    "https://docstore.oddsmith.net/api/v1/chat/",
+    headers={
+        "Authorization": "Bearer ds_YOUR_KEY",
+        "Content-Type": "application/json",
+    },
+    json={
+        "tenant_id": 1,
+        "workspace_id": 1,
+        "question": "What does this specific document say about onboarding?",
+        "document_id": 42,
+        "top_k": 5,
+    },
+    timeout=120,
+)
+resp.raise_for_status()
+print(resp.json())
 ```
 
 ### URL ingest
@@ -375,6 +442,32 @@ curl -X POST https://docstore.oddsmith.net/api/v1/urls/ingest/ \
   }'
 ```
 
+```python
+import requests
+
+resp = requests.post(
+    "https://docstore.oddsmith.net/api/v1/urls/ingest/",
+    headers={
+        "Authorization": "Bearer ds_YOUR_KEY",
+        "Content-Type": "application/json",
+    },
+    json={
+        "tenant_id": 1,
+        "workspace_id": 1,
+        "urls": [
+            "https://example.com/docs/start",
+            "https://example.com/help/article",
+        ],
+        "collection": "docs",
+        "crawl_mode": "single",
+        "max_pages": 10,
+    },
+    timeout=180,
+)
+resp.raise_for_status()
+print(resp.json())
+```
+
 ### Document delete / restore / purge
 
 Soft delete:
@@ -390,6 +483,26 @@ curl -X POST https://docstore.oddsmith.net/api/v1/documents/delete/ \
   }'
 ```
 
+```python
+import requests
+
+resp = requests.post(
+    "https://docstore.oddsmith.net/api/v1/documents/delete/",
+    headers={
+        "Authorization": "Bearer ds_YOUR_KEY",
+        "Content-Type": "application/json",
+    },
+    json={
+        "tenant_id": 1,
+        "workspace_id": 1,
+        "document_ids": [12, 13],
+    },
+    timeout=60,
+)
+resp.raise_for_status()
+print(resp.json())
+```
+
 Restore:
 
 ```bash
@@ -403,6 +516,26 @@ curl -X POST https://docstore.oddsmith.net/api/v1/documents/restore/ \
   }'
 ```
 
+```python
+import requests
+
+resp = requests.post(
+    "https://docstore.oddsmith.net/api/v1/documents/restore/",
+    headers={
+        "Authorization": "Bearer ds_YOUR_KEY",
+        "Content-Type": "application/json",
+    },
+    json={
+        "tenant_id": 1,
+        "workspace_id": 1,
+        "document_ids": [12, 13],
+    },
+    timeout=60,
+)
+resp.raise_for_status()
+print(resp.json())
+```
+
 Purge:
 
 ```bash
@@ -414,6 +547,26 @@ curl -X POST https://docstore.oddsmith.net/api/v1/documents/purge/ \
     "workspace_id": 1,
     "document_ids": [12, 13]
   }'
+```
+
+```python
+import requests
+
+resp = requests.post(
+    "https://docstore.oddsmith.net/api/v1/documents/purge/",
+    headers={
+        "Authorization": "Bearer ds_YOUR_KEY",
+        "Content-Type": "application/json",
+    },
+    json={
+        "tenant_id": 1,
+        "workspace_id": 1,
+        "document_ids": [12, 13],
+    },
+    timeout=60,
+)
+resp.raise_for_status()
+print(resp.json())
 ```
 
 ## Good Next Steps
