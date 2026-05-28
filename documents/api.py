@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from control.models import Tenant, Workspace
+from .models import Document
 from .upload_service import create_or_reuse_document
 
 
