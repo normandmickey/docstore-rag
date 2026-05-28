@@ -112,3 +112,30 @@ class ExternalAccount(models.Model):
 
     def __str__(self):
         return f'{self.user} :: {self.provider} :: {self.email or self.external_user_id or "connected"}'
+
+
+class InviteToken(models.Model):
+    ROLE_OWNER = TenantMembership.ROLE_OWNER
+    ROLE_ADMIN = TenantMembership.ROLE_ADMIN
+    ROLE_MEMBER = TenantMembership.ROLE_MEMBER
+    ROLE_CHOICES = TenantMembership.ROLE_CHOICES
+
+    email = models.EmailField(blank=True, default='')
+    token = models.CharField(max_length=128, unique=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='invite_tokens', null=True, blank=True)
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='invite_tokens', null=True, blank=True)
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_MEMBER)
+    note = models.CharField(max_length=255, blank=True, default='')
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_invite_tokens')
+    claimed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='claimed_invite_tokens')
+    claimed_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.email or self.token[:12]

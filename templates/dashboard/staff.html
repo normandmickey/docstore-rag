@@ -1,0 +1,101 @@
+{% extends 'dashboard/base.html' %}
+
+{% block title %}Staff · Docstore{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h2>Staff overview</h2>
+  <div class="grid">
+    <div class="stat"><strong>{{ staff_stats.users_count }}</strong><br><span class="meta">Users</span></div>
+    <div class="stat"><strong>{{ staff_stats.tenants_count }}</strong><br><span class="meta">Tenants</span></div>
+    <div class="stat"><strong>{{ staff_stats.workspaces_count }}</strong><br><span class="meta">Workspaces</span></div>
+    <div class="stat"><strong>{{ staff_stats.documents_count }}</strong><br><span class="meta">Documents</span></div>
+    <div class="stat"><strong>{{ staff_stats.api_keys_count }}</strong><br><span class="meta">API keys</span></div>
+    <div class="stat"><strong>{{ staff_stats.connectors_count }}</strong><br><span class="meta">Connectors</span></div>
+    <div class="stat"><strong>{{ staff_stats.active_invites_count }}</strong><br><span class="meta">Open invites</span></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Create invite</h2>
+  <p class="meta">Docstore is invite only. Create a signup link for a specific tenant/workspace or leave tenant blank for a standalone invite.</p>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create_invite">
+    <label>Email (optional)</label>
+    <input type="text" name="email" placeholder="name@example.com">
+
+    <label>Tenant (optional)</label>
+    <select name="tenant_id">
+      <option value="">Create standalone invite</option>
+      {% for tenant in tenants %}
+        <option value="{{ tenant.id }}">{{ tenant.name }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Workspace ID (optional)</label>
+    <input type="text" name="workspace_id" placeholder="Optional workspace id inside chosen tenant">
+
+    <label>Role</label>
+    <select name="role">
+      {% for value, label in role_choices %}
+        <option value="{{ value }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+
+    <label>Note</label>
+    <input type="text" name="note" placeholder="Optional note for internal tracking">
+
+    <button type="submit">Create invite link</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Recent invites</h2>
+  {% for invite in recent_invites %}
+    <div class="row">
+      <strong>{{ invite.email|default:'Link-only invite' }}</strong>
+      <div class="meta">tenant={% if invite.tenant %}{{ invite.tenant.name }}{% else %}standalone{% endif %} · workspace={% if invite.workspace %}{{ invite.workspace.name }}{% else %}default{% endif %} · role={{ invite.role }} · active={{ invite.active }} · claimed_by={{ invite.claimed_by|default:'—' }}</div>
+      <div class="meta">created {{ invite.created_at }}{% if invite.created_by %} by {{ invite.created_by.username }}{% endif %}</div>
+      {% if invite.note %}<div class="meta">{{ invite.note }}</div>{% endif %}
+      {% if invite.active and not invite.claimed_at %}
+        <div style="margin-top: 10px;">
+          <code>{{ request.scheme }}://{{ request.get_host }}/signup/?invite={{ invite.token }}</code>
+        </div>
+        <form method="post" style="margin-top: 10px;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="disable_invite">
+          <input type="hidden" name="invite_id" value="{{ invite.id }}">
+          <button type="submit">Disable invite</button>
+        </form>
+      {% endif %}
+    </div>
+  {% empty %}
+    <p class="meta">No invites yet.</p>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h2>Recent users</h2>
+  {% for user in recent_users %}
+    <div class="row">
+      <strong>{{ user.username }}</strong>
+      <div class="meta">{{ user.email }} · joined {{ user.date_joined }}</div>
+    </div>
+  {% empty %}
+    <p class="meta">No users yet.</p>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <h2>Tenants</h2>
+  {% for tenant in tenant_rows %}
+    <div class="row">
+      <strong>{{ tenant.name }}</strong>
+      <div class="meta">slug={{ tenant.slug }} · status={{ tenant.status }} · members={{ tenant.member_count }} · workspaces={{ tenant.workspace_count }} · documents={{ tenant.document_count }}</div>
+    </div>
+  {% empty %}
+    <p class="meta">No tenants yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

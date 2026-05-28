@@ -17,8 +17,14 @@
   <div class="wrap">
     <div class="card">
       <h1>Create account</h1>
+      {% if invite %}
+        <p>You're joining{% if invite.tenant %} <strong>{{ invite.tenant.name }}</strong>{% else %} Docstore{% endif %} with an invite.</p>
+      {% endif %}
       <form method="post">
         {% csrf_token %}
+        {% if invite_token %}
+          <input type="hidden" name="invite" value="{{ invite_token }}">
+        {% endif %}
         {{ form.as_p }}
         <button type="submit">Create account</button>
       </form>

@@ -5,19 +5,24 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.views import LoginView
-from django.shortcuts import redirect, render
+from django.contrib.auth import get_user_model
+from django.db.models import Count
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 from django.utils.text import slugify
 
+from connectors.models import Connector
 from documents.models import Document
 from documents.upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
 from retrieval.service import answer_question
 
 from .forms import SignUpForm
-from .models import APIKey, ExternalAccount, Tenant, TenantMembership, Workspace
+from .models import APIKey, ExternalAccount, InviteToken, Tenant, TenantMembership, Workspace
 from .api_auth import hash_api_key
 from .oauth import exchange_code_for_tokens, fetch_graph_me, microsoft_authorize_url
 
 logger = logging.getLogger(__name__)
+User = get_user_model()
 
 
 class AppLoginView(LoginView):
@@ -49,6 +54,31 @@ def _bootstrap_user_workspace(user, session):
     workspace = tenant.workspaces.order_by('created_at').first()
     if workspace is None:
         workspace = Workspace.objects.create(tenant=tenant, name='Default Workspace', slug='default')
+
+    session['current_tenant_id'] = tenant.id
+    session['current_workspace_id'] = workspace.id
+    return tenant, workspace
+
+
+def _apply_invite_membership(invite, user, session):
+    tenant = invite.tenant
+    if tenant is None:
+        return _bootstrap_user_workspace(user, session)
+
+    workspace = invite.workspace or tenant.workspaces.order_by('created_at').first()
+    if workspace is None:
+        workspace = Workspace.objects.create(tenant=tenant, name='Default Workspace', slug='default')
+
+    TenantMembership.objects.update_or_create(
+        tenant=tenant,
+        user=user,
+        defaults={'role': invite.role or TenantMembership.ROLE_MEMBER},
+    )
+
+    invite.claimed_by = user
+    invite.claimed_at = timezone.now()
+    invite.active = False
+    invite.save(update_fields=['claimed_by', 'claimed_at', 'active', 'updated_at'])
 
     session['current_tenant_id'] = tenant.id
     session['current_workspace_id'] = workspace.id
@@ -222,16 +252,32 @@ def _handle_workspace_actions(request, base):
 def signup(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
-    if not settings.ALLOW_PUBLIC_SIGNUPS:
-        messages.error(request, 'New sign-ups are currently disabled.')
+
+    token_value = (request.GET.get('invite') or request.POST.get('invite') or '').strip()
+    invite = None
+    if token_value:
+        invite = InviteToken.objects.filter(token=token_value, active=True).first()
+        if not invite:
+            messages.error(request, 'Invite link is invalid or already used.')
+            return redirect('login')
+        if invite.expires_at and invite.expires_at <= timezone.now():
+            messages.error(request, 'This invite link has expired.')
+            return redirect('login')
+
+    if not settings.ALLOW_PUBLIC_SIGNUPS and not invite:
+        messages.error(request, 'Docstore is invite only right now.')
         return redirect('login')
+
     form = SignUpForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         user = form.save()
-        _bootstrap_user_workspace(user, request.session)
+        if invite:
+            _apply_invite_membership(invite, user, request.session)
+        else:
+            _bootstrap_user_workspace(user, request.session)
         login(request, user)
         return redirect('dashboard')
-    return render(request, 'auth/signup.html', {'form': form})
+    return render(request, 'auth/signup.html', {'form': form, 'invite_token': token_value, 'invite': invite})
 
 
 def microsoft_connect_start(request):
@@ -530,3 +576,72 @@ def dashboard_api_keys(request):
         return redirect('dashboard_api_keys')
 
     return render(request, 'dashboard/api_keys.html', base)
+
+
+def staff_dashboard(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    if not request.user.is_staff:
+        messages.error(request, 'Staff access required.')
+        return redirect('dashboard')
+
+    if request.method == 'POST' and request.POST.get('action') == 'create_invite':
+        email = (request.POST.get('email') or '').strip()
+        tenant_id = (request.POST.get('tenant_id') or '').strip()
+        workspace_id = (request.POST.get('workspace_id') or '').strip()
+        role = (request.POST.get('role') or TenantMembership.ROLE_MEMBER).strip()
+        note = (request.POST.get('note') or '').strip()
+        tenant = Tenant.objects.filter(id=tenant_id).first() if tenant_id else None
+        workspace = Workspace.objects.filter(id=workspace_id, tenant=tenant).first() if tenant and workspace_id else None
+        invite = InviteToken.objects.create(
+            email=email,
+            token=secrets.token_urlsafe(32),
+            tenant=tenant,
+            workspace=workspace,
+            role=role if role in {TenantMembership.ROLE_OWNER, TenantMembership.ROLE_ADMIN, TenantMembership.ROLE_MEMBER} else TenantMembership.ROLE_MEMBER,
+            note=note,
+            created_by=request.user,
+            active=True,
+        )
+        signup_url = request.build_absolute_uri(f'/signup/?invite={invite.token}')
+        messages.success(request, f'Invite created for {email or "link-only access"}. Share this URL: {signup_url}')
+        return redirect('staff_dashboard')
+
+    if request.method == 'POST' and request.POST.get('action') == 'disable_invite':
+        invite = get_object_or_404(InviteToken, id=request.POST.get('invite_id'))
+        invite.active = False
+        invite.save(update_fields=['active', 'updated_at'])
+        messages.success(request, 'Invite disabled.')
+        return redirect('staff_dashboard')
+
+    stats = {
+        'users_count': User.objects.count(),
+        'tenants_count': Tenant.objects.count(),
+        'workspaces_count': Workspace.objects.count(),
+        'documents_count': Document.objects.count(),
+        'api_keys_count': APIKey.objects.count(),
+        'connectors_count': Connector.objects.count(),
+        'active_invites_count': InviteToken.objects.filter(active=True, claimed_at__isnull=True).count(),
+    }
+
+    recent_users = User.objects.order_by('-date_joined')[:10]
+    recent_invites = InviteToken.objects.select_related('tenant', 'workspace', 'created_by', 'claimed_by').order_by('-created_at')[:20]
+    tenant_rows = Tenant.objects.annotate(
+        member_count=Count('memberships', distinct=True),
+        workspace_count=Count('workspaces', distinct=True),
+        document_count=Count('documents', distinct=True),
+    ).order_by('name')[:25]
+
+    context = {
+        'section': 'staff',
+        'is_staff_user': True,
+        'current_workspace': None,
+        'available_workspaces': Workspace.objects.none(),
+        'staff_stats': stats,
+        'recent_users': recent_users,
+        'recent_invites': recent_invites,
+        'tenant_rows': tenant_rows,
+        'tenants': Tenant.objects.order_by('name'),
+        'role_choices': TenantMembership.ROLE_CHOICES,
+    }
+    return render(request, 'dashboard/staff.html', context)

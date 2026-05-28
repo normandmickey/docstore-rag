@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import APIKey, ExternalAccount, Tenant, TenantMembership, Workspace
+from .models import APIKey, ExternalAccount, InviteToken, Tenant, TenantMembership, Workspace
 
 
 @admin.register(Tenant)
@@ -36,3 +36,10 @@ class ExternalAccountAdmin(admin.ModelAdmin):
     list_display = ('user', 'provider', 'email', 'display_name', 'tenant', 'workspace', 'expires_at')
     search_fields = ('user__username', 'email', 'display_name', 'external_user_id')
     list_filter = ('provider', 'tenant')
+
+
+@admin.register(InviteToken)
+class InviteTokenAdmin(admin.ModelAdmin):
+    list_display = ('email', 'tenant', 'workspace', 'role', 'active', 'created_by', 'claimed_by', 'expires_at', 'created_at')
+    search_fields = ('email', 'token', 'tenant__name', 'workspace__name', 'created_by__username', 'claimed_by__username')
+    list_filter = ('active', 'role', 'tenant')
