@@ -6,6 +6,7 @@
   <p class="meta">Create keys for integrations and scripts. The full raw key is only shown once.</p>
   {% if current_workspace %}
     <p class="meta">Current API target: tenant_id={{ current_workspace.tenant.id }} · workspace_id={{ current_workspace.id }} · {{ current_workspace.tenant.slug }}/{{ current_workspace.slug }}</p>
+    <p class="meta">Workspace-scoped API keys can omit both tenant_id and workspace_id in API requests. Tenant-wide keys can omit tenant_id but still need workspace_id.</p>
   {% endif %}
   <form method="post">
     {% csrf_token %}
@@ -24,6 +25,11 @@
     <pre id="new-api-key">{{ new_api_key }}</pre>
     <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('new-api-key').innerText)">Copy key</button>
   {% endif %}
+  <h3 style="margin-top: 22px;">Example request shape</h3>
+  <pre>{
+  "query": "What does this workspace say about 1095-C?",
+  "top_k": 5
+}</pre>
 </div>
 
 <div class="card">

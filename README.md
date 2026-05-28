@@ -299,8 +299,8 @@ Current behavior:
 Current behavior now:
 - unauthenticated API requests must provide a Bearer API key
 - tenant context is inferred from the API key
-- workspace-scoped keys can use the API without sending `workspace_id`
-- tenant-wide keys still need `workspace_id`
+- workspace-scoped keys can use the API without sending `tenant_id` or `workspace_id`
+- tenant-wide keys can omit `tenant_id` but still need `workspace_id`
 - successful API-key lookups update `last_used_at`
 
 Current limitation:
@@ -415,6 +415,8 @@ resp.raise_for_status()
 print(resp.json())
 ```
 
+For tenant-wide API keys, keep sending `workspace_id` but you can omit `tenant_id`.
+
 ### URL ingest
 
 ```bash
@@ -457,6 +459,8 @@ print(resp.json())
 ```
 
 ### Document delete / restore / purge
+
+For workspace-scoped keys, document lifecycle calls can also omit tenant/workspace IDs.
 
 Soft delete:
 
