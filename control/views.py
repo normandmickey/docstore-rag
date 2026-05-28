@@ -1,3 +1,4 @@
+import hashlib
 import logging
 import secrets
 
@@ -13,7 +14,7 @@ from documents.upload_service import collect_urls_for_ingest, create_or_reuse_do
 from retrieval.service import answer_question
 
 from .forms import SignUpForm
-from .models import ExternalAccount, Tenant, TenantMembership, Workspace
+from .models import APIKey, ExternalAccount, Tenant, TenantMembership, Workspace
 from .oauth import exchange_code_for_tokens, fetch_graph_me, microsoft_authorize_url
 
 logger = logging.getLogger(__name__)
@@ -123,6 +124,7 @@ def _dashboard_base(request):
         'url_document_rows': url_document_rows,
         'deleted_document_rows': deleted_document_rows,
         'external_accounts': ExternalAccount.objects.filter(user=request.user).order_by('-updated_at'),
+        'api_keys': APIKey.objects.filter(tenant_id=current_tenant_id).order_by('-created_at') if current_tenant_id else APIKey.objects.none(),
         'is_staff_user': bool(request.user.is_staff),
     }
 
@@ -464,3 +466,54 @@ def dashboard_connectors(request):
         return handled
     base['section'] = 'connectors'
     return render(request, 'dashboard/connectors.html', base)
+
+
+def dashboard_api_keys(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+
+    current_workspace = base['current_workspace']
+    tenant_id = base['current_tenant_id']
+    base['section'] = 'api_keys'
+    base['new_api_key'] = ''
+
+    if request.method == 'POST' and request.POST.get('action') == 'create_api_key' and tenant_id:
+        label = (request.POST.get('label') or '').strip() or 'API Key'
+        scope = (request.POST.get('scope') or 'workspace').strip()
+        raw_key = f"ds_{secrets.token_urlsafe(32)}"
+        key_prefix = raw_key[:12]
+        key_hash = hashlib.sha256(raw_key.encode('utf-8')).hexdigest()
+        workspace = current_workspace if scope == 'workspace' else None
+        scopes_json = ['workspace'] if workspace else ['tenant']
+        APIKey.objects.create(
+            tenant_id=tenant_id,
+            workspace=workspace,
+            label=label,
+            key_prefix=key_prefix,
+            key_hash=key_hash,
+            scopes_json=scopes_json,
+            active=True,
+        )
+        base['new_api_key'] = raw_key
+        messages.success(request, 'API key created. Copy it now — it will only be shown once.')
+        base = _dashboard_base(request)
+        base['section'] = 'api_keys'
+        base['new_api_key'] = raw_key
+        return render(request, 'dashboard/api_keys.html', base)
+
+    if request.method == 'POST' and request.POST.get('action') == 'revoke_api_key' and tenant_id:
+        key_id = request.POST.get('key_id')
+        key = APIKey.objects.filter(id=key_id, tenant_id=tenant_id).first()
+        if not key:
+            messages.error(request, 'API key not found.')
+            return redirect('dashboard_api_keys')
+        key.active = False
+        key.save(update_fields=['active'])
+        messages.success(request, f'Revoked API key "{key.label}".')
+        return redirect('dashboard_api_keys')
+
+    return render(request, 'dashboard/api_keys.html', base)

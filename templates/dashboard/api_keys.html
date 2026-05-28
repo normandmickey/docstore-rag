@@ -1,0 +1,45 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}API Keys · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Create API key</h2>
+  <p class="meta">Create keys for integrations and scripts. The full raw key is only shown once.</p>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="create_api_key">
+    <label>Label</label>
+    <input type="text" name="label" placeholder="e.g. Zapier, backend sync, local script">
+    <label>Scope</label>
+    <select name="scope">
+      <option value="workspace">Current workspace only</option>
+      <option value="tenant">Entire tenant</option>
+    </select>
+    <button type="submit">Create API key</button>
+  </form>
+  {% if new_api_key %}
+    <h3 style="margin-top: 22px;">Copy this key now</h3>
+    <pre>{{ new_api_key }}</pre>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Existing API keys</h2>
+  {% for key in api_keys %}
+    <div class="row">
+      <strong>{{ key.label }}</strong><br>
+      <span class="meta">Prefix: {{ key.key_prefix }} · Scope: {% if key.workspace %}workspace ({{ key.workspace.name }}){% else %}tenant-wide{% endif %} · Active: {{ key.active|yesno:"yes,no" }}</span><br>
+      <span class="meta">Created: {{ key.created_at }}{% if key.last_used_at %} · Last used: {{ key.last_used_at }}{% endif %}</span>
+      {% if key.active %}
+        <form method="post" style="margin-top: 10px;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="revoke_api_key">
+          <input type="hidden" name="key_id" value="{{ key.id }}">
+          <button type="submit" style="background: #991b1b;">Revoke</button>
+        </form>
+      {% endif %}
+    </div>
+  {% empty %}
+    <p>No API keys yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}
