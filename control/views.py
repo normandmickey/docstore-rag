@@ -165,6 +165,7 @@ def dashboard(request):
     for document in documents:
         latest_job = document.ingestion_jobs.order_by('-created_at').first()
         latest_version = document.versions.order_by('-version_number', '-id').first()
+        version_count = document.versions.count()
         chunk_count = document.chunks.count()
         preview = ''
         if latest_version:
@@ -172,6 +173,8 @@ def dashboard(request):
         document_rows.append({
             'document': document,
             'latest_job': latest_job,
+            'latest_version': latest_version,
+            'version_count': version_count,
             'chunk_count': chunk_count,
             'preview': preview,
         })
