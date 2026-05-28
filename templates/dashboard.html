@@ -6,20 +6,64 @@
   <title>Dashboard · Docstore RAG</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 0; background: #0b1020; color: #eef2ff; }
-    .wrap { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
-    .card { background: #121a33; border: 1px solid #243055; border-radius: 16px; padding: 28px; }
+    .wrap { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
+    .card { background: #121a33; border: 1px solid #243055; border-radius: 16px; padding: 28px; margin-bottom: 24px; }
     a { color: #93c5fd; }
     .row { padding: 14px 0; border-top: 1px solid #243055; }
     .row:first-of-type { border-top: 0; }
+    input[type="text"], input[type="file"] { width: 100%; box-sizing: border-box; padding: 12px; margin: 8px 0 16px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #fff; }
+    button { padding: 12px 16px; border: 0; border-radius: 10px; background: #2563eb; color: white; cursor: pointer; }
+    .msg { background: #123524; border: 1px solid #1f7a4c; color: #d1fae5; padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }
+    .meta { color: #94a3b8; font-size: 0.95rem; }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="card">
       <h1>Dashboard</h1>
-      <p>You are signed in. Your current tenant/workspace IDs are stored in session for early API testing.</p>
+      {% if messages %}
+        {% for message in messages %}
+          <div class="msg">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+      <p>You are signed in.</p>
       <p><strong>Current tenant:</strong> {{ current_tenant_id|default:'not set' }}<br>
       <strong>Current workspace:</strong> {{ current_workspace_id|default:'not set' }}</p>
+      {% if current_workspace %}
+      <p class="meta">Active workspace: {{ current_workspace.name }} ({{ current_workspace.tenant.name }})</p>
+      {% endif %}
+      <p style="margin-top: 24px;"><a href="/admin/">Admin</a> · <a href="/logout/">Log out</a></p>
+    </div>
+
+    <div class="card">
+      <h2>Upload document</h2>
+      {% if current_workspace %}
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <label>Collection (optional)</label>
+        <input type="text" name="collection" placeholder="e.g. support, contracts, policies">
+        <label>File</label>
+        <input type="file" name="file" required>
+        <button type="submit">Upload and ingest</button>
+      </form>
+      {% else %}
+      <p>No active workspace is set for this session yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="card">
+      <h2>Your documents</h2>
+      {% for document in documents %}
+        <div class="row">
+          <strong>{{ document.filename }}</strong><br>
+          <span class="meta">Status: {{ document.status }} · Collection: {{ document.collection|default:'—' }} · Uploaded: {{ document.created_at }}</span>
+        </div>
+      {% empty %}
+        <p>No documents uploaded yet.</p>
+      {% endfor %}
+    </div>
+
+    <div class="card">
       <h2>Your tenant memberships</h2>
       {% for membership in memberships %}
         <div class="row">
@@ -30,7 +74,6 @@
       {% empty %}
         <p>No memberships yet.</p>
       {% endfor %}
-      <p style="margin-top: 24px;"><a href="/admin/">Admin</a> · <a href="/logout/">Log out</a></p>
     </div>
   </div>
 </body>
