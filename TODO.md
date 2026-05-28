@@ -6,15 +6,19 @@
 - [ ] Add deleted timestamp in Trash
 - [ ] Add deleted-by tracking for soft delete actions
 - [ ] Add recent activity cards/feed to Overview
-- [ ] Improve empty states and copy polish across Overview, Documents, URLs, Chat, and Connectors pages
-- [ ] Consider overview quick actions (Upload file, Ingest URLs, Ask question, Connect Microsoft)
-- [ ] Consider document filters by source type, collection, and status
+- [ ] Improve empty states and copy polish across Overview, Documents, URLs, Chat, Connectors, and API Keys pages
+- [ ] Consider overview quick actions (Upload file, Ingest URLs, Ask question, Connect Microsoft, Create API key)
+- [ ] Consider document filters by source type, collection, status, and date
+- [ ] Show recent successful/failed ingestion activity on Overview
+- [ ] Consider a lightweight in-app changelog / “What’s new” section
 
 ## Documents
 - [ ] Add document detail page
 - [ ] Add reingest action for latest document version
 - [ ] Add version history expander / version detail view
 - [ ] Show more explicit ingestion history per document
+- [ ] Add document metadata panel (source type, source URL, file size, mime type, content hash)
+- [ ] Add collection management / collection filters in the Documents page
 - [ ] Consider restore/purge API responses in dashboard without full page reloads
 
 ## URL ingestion
@@ -26,26 +30,47 @@
 - [ ] Consider robots/sitemap-aware crawling rules
 - [ ] Add URL ingestion result details in UI (created/versioned/skipped/failed rows)
 - [ ] Consider per-run URL ingest logs for debugging
+- [ ] Add URL-specific delete/purge affordances from the URLs page
+- [ ] Show URL import timestamps / last fetched timestamps
+- [ ] Consider re-fetch / refresh flow for URL documents
 
 ## Chat / retrieval
-- [ ] Add `/api/v1/chat/` endpoint
 - [ ] Improve answer citations/source formatting in dashboard chat
 - [ ] Improve chunking strategy for long documents
 - [ ] Add better snippet extraction for retrieved chunks
 - [ ] Consider chat history per workspace
 - [ ] Add document-only / collection-only / workspace-wide chat scopes
+- [ ] Add follow-up question UX in the dashboard chat page
+- [ ] Consider streaming responses for long answers
+- [ ] Add clearer “no answer found” / “insufficient context” behavior in API + UI
 
 ## Parsing / ingestion
 - [ ] Add better DOCX handling for headings/tables/lists
 - [ ] Consider OCR support for image-heavy PDFs later if needed
 - [ ] Add richer HTML cleanup / readability extraction
 - [ ] Add support for additional formats only as needed (e.g. CSV, XLSX, PPTX)
+- [ ] Add ingestion metrics/logging for chunk counts, timing, and embedding failures
+- [ ] Add parse failure categorization (network, parser, embeddings, storage)
 
 ## Deletion lifecycle
 - [ ] Add selective purge from Trash UI
 - [ ] Add trash search/filtering
 - [ ] Add restore/purge bulk summary messages with filenames or counts by type
 - [ ] Consider retention policy for soft-deleted docs
+- [ ] Add deleted timestamp and deleted-by persistence in the model layer
+- [ ] Consider delayed purge / scheduled cleanup job
+
+## API keys / API platform
+- [ ] Add example snippets directly on the API Keys page for search/chat/url-ingest/delete flows
+- [ ] Add explicit copy examples for workspace-scoped vs tenant-wide keys
+- [ ] Add API key rename/edit labels flow
+- [ ] Add revoke-all / bulk revoke UX
+- [ ] Add audit trail for API key creation/revoke/use
+- [ ] Add API key rate limiting / abuse controls
+- [ ] Add API auth/authorization hardening review
+- [ ] Add API error response docs and examples
+- [ ] Consider API versioning strategy before the surface area grows further
+- [ ] Add JSON schema or OpenAPI generation for the public API
 
 ## Connectors
 - [ ] Add SharePoint site/drive/folder picker UI
@@ -56,16 +81,29 @@
 - [ ] Add connector sync history page
 - [ ] Add scheduled/incremental SharePoint sync
 - [ ] Add better connector setup docs in-app
+- [ ] Add disconnect / reconnect Microsoft account flows
+- [ ] Add external account health/status indicators (token expired, permissions missing, etc.)
+- [ ] Consider connector support for Google Drive / Dropbox later only if needed
 
-## API / platform
-- [ ] Add API endpoints for connector management once UX is settled
-- [ ] Add API auth/authorization hardening review
+## Security / permissions
+- [ ] Encrypt or otherwise better-protect stored refresh tokens and external account secrets at rest
+- [ ] Review tenant/workspace ownership and permission checks across dashboard actions
+- [ ] Add explicit authorization tests for cross-tenant / cross-workspace access attempts
+- [ ] Consider CSRF / session hardening review for dashboard POST actions
+- [ ] Review exposure of IDs in the UI and keep end-user-facing APIs tenant-opaque where possible
+
+## Testing / reliability
 - [ ] Add server-side tests for upload/version/delete/restore/purge flows
 - [ ] Add tests for URL ingest + duplicate handling
 - [ ] Add tests for chat/retrieval flows
+- [ ] Add tests for API key auth (workspace-scoped, tenant-wide, revoked, bad key)
+- [ ] Add tests for SharePoint OAuth/account connection flow once stabilized
+- [ ] Add smoke-test script for post-deploy verification on VPS
 
-## Config / maintenance
-- [ ] Clean up deprecated django-allauth settings warnings
+## README / docs / maintenance
 - [ ] Document dashboard subpage structure in README
-- [ ] Document delete/restore/purge API endpoints in README
-- [ ] Document URL ingest API endpoint and crawl behavior in README
+- [ ] Document the new API-key inferred tenant/workspace behavior more explicitly in README
+- [ ] Add sample request/response bodies for document upload endpoint in README
+- [ ] Add examples for tenant-wide API keys in README
+- [ ] Clean up deprecated django-allauth settings warnings
+- [ ] Keep TODO.md trimmed as items ship so it stays credible
