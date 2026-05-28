@@ -11,14 +11,15 @@
     <input type="text" name="label" placeholder="e.g. Zapier, backend sync, local script">
     <label>Scope</label>
     <select name="scope">
-      <option value="workspace">Current workspace only</option>
-      <option value="tenant">Entire tenant</option>
+      <option value="workspace">Current workspace only — best for app-specific or KB-specific integrations</option>
+      <option value="tenant">Entire tenant — broader access across workspaces in this tenant</option>
     </select>
     <button type="submit">Create API key</button>
   </form>
   {% if new_api_key %}
     <h3 style="margin-top: 22px;">Copy this key now</h3>
-    <pre>{{ new_api_key }}</pre>
+    <pre id="new-api-key">{{ new_api_key }}</pre>
+    <button type="button" onclick="navigator.clipboard.writeText(document.getElementById('new-api-key').innerText)">Copy key</button>
   {% endif %}
 </div>
 
@@ -27,13 +28,15 @@
   {% for key in api_keys %}
     <div class="row">
       <strong>{{ key.label }}</strong><br>
-      <span class="meta">Prefix: {{ key.key_prefix }} · Scope: {% if key.workspace %}workspace ({{ key.workspace.name }}){% else %}tenant-wide{% endif %} · Active: {{ key.active|yesno:"yes,no" }}</span><br>
-      <span class="meta">Created: {{ key.created_at }}{% if key.last_used_at %} · Last used: {{ key.last_used_at }}{% endif %}</span>
+      <span class="meta">Prefix: {{ key.key_prefix }} · Scope: {% if key.workspace %}workspace-only ({{ key.workspace.name }}){% else %}tenant-wide{% endif %} · Active: {{ key.active|yesno:"yes,no" }}</span><br>
+      <span class="meta">Created: {{ key.created_at }}{% if key.last_used_at %} · Last used: {{ key.last_used_at }}{% else %} · Last used: never{% endif %}</span>
       {% if key.active %}
         <form method="post" style="margin-top: 10px;">
           {% csrf_token %}
           <input type="hidden" name="action" value="revoke_api_key">
           <input type="hidden" name="key_id" value="{{ key.id }}">
+          <label>Type <strong>REVOKE</strong> to disable this key:</label>
+          <input type="text" name="confirm_revoke" placeholder="REVOKE">
           <button type="submit" style="background: #991b1b;">Revoke</button>
         </form>
       {% endif %}

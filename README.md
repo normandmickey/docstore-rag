@@ -27,6 +27,7 @@ Current stack and behavior are now beyond the initial scaffold stage:
 - user signup/login/logout
 - automatic tenant + default workspace bootstrap
 - workspace creation and switching from the dashboard
+- dashboard API key management (create + revoke)
 
 ### Document ingestion
 - dashboard upload flow
@@ -105,6 +106,10 @@ Current stack and behavior are now beyond the initial scaffold stage:
 
 ### API
 - `POST /api/v1/documents/`
+- `POST /api/v1/documents/delete/`
+- `POST /api/v1/documents/restore/`
+- `POST /api/v1/documents/purge/`
+- `POST /api/v1/urls/ingest/`
 - `POST /api/v1/search/`
 
 ## Key Models
@@ -275,6 +280,22 @@ SharePoint support is partially scaffolded, not finished.
 - generated vectors live in Postgres, not SQLite
 - chat quality depends on extraction quality + chunk quality
 - PDF parsing is now real; OCR/layout-heavy docs are still not a focus yet
+
+## API keys
+
+Dashboard users can now create and revoke API keys from:
+
+- `/dashboard/api-keys/`
+
+Current behavior:
+- raw key is shown once at creation time
+- only the prefix + SHA-256 hash are stored
+- keys can be scoped to current workspace or whole tenant
+- revoke disables a key without deleting the DB record
+- helper exists for Bearer-token lookup and `last_used_at` updates (`control/api_auth.py`)
+
+Current limitation:
+- the helper exists, but all API endpoints are not yet fully enforcing API-key auth end-to-end
 
 ## Good Next Steps
 - add document detail + reingest flow

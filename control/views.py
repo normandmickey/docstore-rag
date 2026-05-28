@@ -507,6 +507,10 @@ def dashboard_api_keys(request):
 
     if request.method == 'POST' and request.POST.get('action') == 'revoke_api_key' and tenant_id:
         key_id = request.POST.get('key_id')
+        confirm = (request.POST.get('confirm_revoke') or '').strip().lower()
+        if confirm != 'revoke':
+            messages.error(request, 'Revoke not confirmed. Type REVOKE to disable the key.')
+            return redirect('dashboard_api_keys')
         key = APIKey.objects.filter(id=key_id, tenant_id=tenant_id).first()
         if not key:
             messages.error(request, 'API key not found.')
