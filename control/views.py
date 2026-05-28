@@ -222,6 +222,9 @@ def _handle_workspace_actions(request, base):
 def signup(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
+    if not settings.ALLOW_PUBLIC_SIGNUPS:
+        messages.error(request, 'New sign-ups are currently disabled.')
+        return redirect('login')
     form = SignUpForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         user = form.save()
