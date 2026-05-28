@@ -10,8 +10,8 @@ except Exception:  # pragma: no cover
 
 
 class LocalDocumentStorage(FileSystemStorage):
-    location = settings.MEDIA_ROOT / 'documents'
-    base_url = f"{settings.MEDIA_URL}documents/"
+    location = settings.MEDIA_ROOT
+    base_url = settings.MEDIA_URL
 
 
 if S3Storage and getattr(settings, 'USE_S3_STORAGE', False) and settings.S3_ENDPOINT_URL not in ('', 'http://localhost:9000'):
