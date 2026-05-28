@@ -1,4 +1,3 @@
-import hashlib
 import logging
 import secrets
 
@@ -15,6 +14,7 @@ from retrieval.service import answer_question
 
 from .forms import SignUpForm
 from .models import APIKey, ExternalAccount, Tenant, TenantMembership, Workspace
+from .api_auth import hash_api_key
 from .oauth import exchange_code_for_tokens, fetch_graph_me, microsoft_authorize_url
 
 logger = logging.getLogger(__name__)
@@ -486,10 +486,10 @@ def dashboard_api_keys(request):
         scope = (request.POST.get('scope') or 'workspace').strip()
         raw_key = f"ds_{secrets.token_urlsafe(32)}"
         key_prefix = raw_key[:12]
-        key_hash = hashlib.sha256(raw_key.encode('utf-8')).hexdigest()
+        key_hash = hash_api_key(raw_key)
         workspace = current_workspace if scope == 'workspace' else None
         scopes_json = ['workspace'] if workspace else ['tenant']
-        APIKey.objects.create(
+        api_key = APIKey.objects.create(
             tenant_id=tenant_id,
             workspace=workspace,
             label=label,
@@ -498,6 +498,12 @@ def dashboard_api_keys(request):
             scopes_json=scopes_json,
             active=True,
         )
+        if api_key.key_hash != hash_api_key(raw_key):
+            logger.error('API key integrity check failed immediately after creation for key_id=%s', api_key.id)
+            api_key.active = False
+            api_key.save(update_fields=['active'])
+            messages.error(request, 'API key creation failed integrity verification. Please try again.')
+            return redirect('dashboard_api_keys')
         base['new_api_key'] = raw_key
         messages.success(request, 'API key created. Copy it now — it will only be shown once.')
         base = _dashboard_base(request)
