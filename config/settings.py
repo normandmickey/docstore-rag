@@ -144,3 +144,9 @@ LOGOUT_REDIRECT_URL = '/login/'
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
 ACCOUNT_EMAIL_REQUIRED = True
+
+
+CELERY_TASK_DEFAULT_QUEUE = 'docstore'
+CELERY_TASK_ROUTES = {
+    'ingestion.tasks.ingest_document_task': {'queue': 'docstore'},
+}
