@@ -25,7 +25,7 @@
         <label style="display: flex; gap: 10px; align-items: flex-start;">
           <input type="checkbox" name="document_ids" value="{{ row.document.id }}" style="width: auto; margin-top: 6px;">
           <span style="flex: 1;">
-            <strong>{{ row.document.filename }}</strong><br>
+            <strong>{{ row.document.filename }}</strong>{% if row.document.file %} · <a href="/documents/{{ row.document.id }}/download/" target="_blank" rel="noopener noreferrer">Open</a>{% endif %}<br>
             <span class="meta">Status: {{ row.document.status }} · Collection: {{ row.document.collection|default:'—' }} · Uploaded: {{ row.document.created_at }}</span><br>
             {% if row.source_url %}<span class="meta">Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></span><br>{% endif %}
             <span class="meta">Versions: {{ row.version_count }}{% if row.latest_version %} · Latest v{{ row.latest_version.version_number }}{% endif %}{% if row.chunk_count %} · Chunks: {{ row.chunk_count }}{% endif %}</span><br>
@@ -57,7 +57,7 @@
           <label style="display: flex; gap: 10px; align-items: flex-start;">
             <input type="checkbox" name="document_ids" value="{{ row.document.id }}" style="width: auto; margin-top: 6px;">
             <span style="flex: 1;">
-              <strong>{{ row.document.filename }}</strong><br>
+              <strong>{{ row.document.filename }}</strong>{% if row.document.file %} · <a href="/documents/{{ row.document.id }}/download/" target="_blank" rel="noopener noreferrer">Open</a>{% endif %}<br>
               <span class="meta">Failed · Collection: {{ row.document.collection|default:'—' }} · Uploaded: {{ row.document.created_at }}</span><br>
               {% if row.source_url %}<span class="meta">Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></span><br>{% endif %}
               {% if row.latest_job %}<span class="status status-{{ row.latest_job.status }}">Job {{ row.latest_job.status }}</span> <span class="meta">Stage: {{ row.latest_job.stage }}</span>{% endif %}
@@ -87,7 +87,7 @@
           <label style="display: flex; gap: 10px; align-items: flex-start;">
             <input type="checkbox" name="document_ids" value="{{ row.document.id }}" style="width: auto; margin-top: 6px;">
             <span style="flex: 1;">
-              <strong>{{ row.document.filename }}</strong><br>
+              <strong>{{ row.document.filename }}</strong>{% if row.document.file %} · <a href="/documents/{{ row.document.id }}/download/" target="_blank" rel="noopener noreferrer">Open</a>{% endif %}<br>
               <span class="meta">Deleted · Collection: {{ row.document.collection|default:'—' }}</span><br>
               {% if row.source_url %}<span class="meta">Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></span><br>{% endif %}
             </span>
