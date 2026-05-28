@@ -11,7 +11,7 @@
     a { color: #93c5fd; }
     .row { padding: 14px 0; border-top: 1px solid #243055; }
     .row:first-of-type { border-top: 0; }
-    input[type="text"], input[type="file"] { width: 100%; box-sizing: border-box; padding: 12px; margin: 8px 0 16px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #fff; }
+    input[type="text"], input[type="file"], select { width: 100%; box-sizing: border-box; padding: 12px; margin: 8px 0 16px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #fff; }
     button { padding: 12px 16px; border: 0; border-radius: 10px; background: #2563eb; color: white; cursor: pointer; }
     .msg { background: #123524; border: 1px solid #1f7a4c; color: #d1fae5; padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }
     .meta { color: #94a3b8; font-size: 0.95rem; }
@@ -39,6 +39,28 @@
       <p class="meta">Active workspace: {{ current_workspace.name }} ({{ current_workspace.tenant.name }})</p>
       {% endif %}
       <p style="margin-top: 24px;"><a href="/admin/">Admin</a> · <a href="/logout/">Log out</a></p>
+    </div>
+
+    <div class="card">
+      <h2>Workspace</h2>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="switch_workspace">
+        <label>Select workspace</label>
+        <select name="workspace_id">
+          {% for workspace in available_workspaces %}
+            <option value="{{ workspace.id }}" {% if current_workspace and workspace.id == current_workspace.id %}selected{% endif %}>{{ workspace.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Switch workspace</button>
+      </form>
+      <form method="post" style="margin-top: 18px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_workspace">
+        <label>Create workspace</label>
+        <input type="text" name="workspace_name" placeholder="e.g. Sales Docs">
+        <button type="submit">Create workspace</button>
+      </form>
     </div>
 
     <div class="card">
