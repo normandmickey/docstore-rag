@@ -1,5 +1,6 @@
 from rest_framework import serializers, status
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from control.api_guard import resolve_api_context
@@ -24,6 +25,7 @@ class DocumentCreateSerializer(serializers.Serializer):
 
 
 class DocumentCreateView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = DocumentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -74,6 +76,7 @@ class URLIngestSerializer(serializers.Serializer):
 
 
 class URLIngestView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = URLIngestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -129,6 +132,7 @@ class DocumentDeleteSerializer(serializers.Serializer):
 
 
 class DocumentDeleteView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = DocumentDeleteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -153,6 +157,7 @@ class DocumentDeleteView(APIView):
 
 
 class DocumentRestoreView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = DocumentDeleteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -178,6 +183,7 @@ class DocumentRestoreView(APIView):
 
 
 class DocumentPurgeView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = DocumentDeleteSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

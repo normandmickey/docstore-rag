@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from rest_framework.response import Response
+from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from control.api_guard import resolve_api_context
@@ -23,6 +24,7 @@ class ChatSerializer(serializers.Serializer):
 
 
 class SearchView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = SearchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -57,6 +59,7 @@ class SearchView(APIView):
 
 
 class ChatView(APIView):
+    permission_classes = [AllowAny]
     def post(self, request):
         serializer = ChatSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
