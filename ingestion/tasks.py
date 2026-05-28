@@ -50,6 +50,9 @@ def normalize_extracted_text(text):
     return normalized.strip()
 
 
+EMBEDDING_MAX_INPUT_CHARS = 2000
+
+
 def build_chunks(text, chunk_size=400, overlap=None):
     text = normalize_extracted_text(text)
     if not text:
@@ -110,6 +113,32 @@ def build_chunks(text, chunk_size=400, overlap=None):
             deduped.append(chunk)
             last = chunk
     return deduped
+
+
+def enforce_embedding_limit(chunks, max_chars=EMBEDDING_MAX_INPUT_CHARS):
+    safe_chunks = []
+    for chunk in chunks:
+        chunk = (chunk or '').strip()
+        if not chunk:
+            continue
+        if len(chunk) <= max_chars:
+            safe_chunks.append(chunk)
+            continue
+
+        start = 0
+        while start < len(chunk):
+            end = min(start + max_chars, len(chunk))
+            if end < len(chunk):
+                split_at = chunk.rfind(' ', start, end)
+                if split_at > start + 100:
+                    end = split_at
+            piece = chunk[start:end].strip()
+            if piece:
+                safe_chunks.append(piece)
+            if end >= len(chunk):
+                break
+            start = end
+    return safe_chunks
 
 
 def extract_pdf_text(raw):
@@ -197,6 +226,7 @@ def ingest_document_task(self, ingestion_job_id):
 
         chunk_size = job.workspace.default_chunk_size or 400
         chunks = build_chunks(cleaned_text, chunk_size=chunk_size, overlap=max(40, int(chunk_size * 0.2)))
+        chunks = enforce_embedding_limit(chunks)
         vectors = embed_texts(chunks) if chunks else []
         Chunk.objects.filter(document_version=version).delete()
         for idx, chunk_text in enumerate(chunks):
