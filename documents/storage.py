@@ -14,7 +14,7 @@ class LocalDocumentStorage(FileSystemStorage):
     base_url = f"{settings.MEDIA_URL}documents/"
 
 
-if S3Storage and getattr(settings, 'USE_S3_STORAGE', False):
+if S3Storage and getattr(settings, 'USE_S3_STORAGE', False) and settings.S3_ENDPOINT_URL not in ('', 'http://localhost:9000'):
     class DocumentStorage(S3Storage):
         bucket_name = settings.S3_BUCKET
         default_acl = None

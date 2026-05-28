@@ -211,3 +211,6 @@ Returns:
 4. Add upload + ingestion job flow
 5. Add chunk + embedding pipeline
 6. Add search endpoint
+
+
+- Local/dev default uses filesystem storage unless a real S3/MinIO endpoint is configured.
