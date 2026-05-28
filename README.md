@@ -1,216 +1,198 @@
 # Docstore RAG
 
-A multi-tenant document storage and embedding service for RAG, built with Django for admin visibility and operational control.
+A multi-tenant document storage, retrieval, and chat service for RAG workflows, built with Django for admin visibility and operational control.
 
-## Goals
+## Current Status
 
-- Multi-tenant document storage
-- Workspace/collection isolation
-- Async ingestion pipeline
-- Chunking + embeddings
-- Postgres + PGVector retrieval
-- S3/MinIO-compatible blob storage
-- Django admin for documents, jobs, tenants, and failures
-- API-first design for app integrations
+Docstore is live at:
 
-## Planned Stack
+- `https://docstore.oddsmith.net`
 
-- Django
-- Django REST Framework
-- Postgres
-- PGVector
-- Celery + Redis
-- MinIO/S3-compatible object storage
-- OpenAI embeddings by default
-- Local OpenAI-compatible LLM optional for answer generation
+Current stack and behavior are now beyond the initial scaffold stage:
 
-## Core Concepts
+- Django app with signup/login/logout
+- tenant + workspace onboarding
+- dashboard-based file uploads
+- async ingestion with Celery + Redis
+- Postgres + pgvector chunk storage
+- OpenAI embeddings
+- workspace search
+- basic dashboard chat with documents
+- duplicate detection + versioning
+- SharePoint connector foundation scaffolded
 
+## What Works Now
+
+### Authentication and onboarding
+- user signup/login/logout
+- automatic tenant + default workspace bootstrap
+- workspace creation and switching from the dashboard
+
+### Document ingestion
+- dashboard upload flow
+- local filesystem storage fallback in production when S3/MinIO is not configured
+- per-document ingestion jobs via Celery
+- document status tracking in the dashboard
+- failed documents hidden from the main dashboard list
+
+### Supported file types
+- PDF via `PyMuPDF`
+- DOCX via `python-docx`
+- Markdown (`.md`)
+- plain text (`.txt`)
+- basic HTML ingestion
+
+### Retrieval and chat
+- embeddings stored in Postgres via pgvector
+- `/api/v1/search/` uses vector similarity search
+- dashboard “chat with documents” UI retrieves chunks and generates an answer with source context
+
+### Duplicate/version handling
+- exact duplicate uploads in the same workspace are skipped using content hash comparison
+- same filename + changed content becomes a new `DocumentVersion`
+- dashboard shows version count and latest version number
+
+### Connector groundwork
+- `connectors` app exists
+- SharePoint connector models/admin/migration exist
+- Microsoft Graph helper exists
+- manual SharePoint sync command scaffold exists
+- per-user Microsoft OAuth account connection scaffold exists
+
+## Architecture
+
+## Core concepts
 - **Tenant**: top-level account/org boundary
 - **Workspace**: logical knowledge base inside a tenant
 - **Collection**: optional namespace/tag within a workspace
-- **Document**: uploaded source file and metadata
+- **Document**: stored source file and document-level metadata
+- **DocumentVersion**: version history for a logical document
 - **Chunk**: retrievable text unit with embedding
-- **Ingestion Job**: async parsing/chunking/embedding job
+- **IngestionJob**: async parse/chunk/embed job
+- **ExternalAccount**: user-owned OAuth-linked external provider account (currently Microsoft scaffold)
+- **Connector**: sync configuration for external systems like SharePoint
 
-## Proposed App Layout
+## App layout
+- `control` — auth flow, tenants, workspaces, API keys, external accounts
+- `documents` — document records, versions, upload handling, duplicate/version logic
+- `ingestion` — parsing, chunking, embeddings, Celery jobs
+- `retrieval` — vector search, answer assembly, dashboard chat
+- `audit` — retrieval logging
+- `connectors` — SharePoint connector models, Graph helper, sync runs, bindings
 
-- `control` — tenants, workspaces, API keys, admin controls
-- `documents` — document records, versions, source metadata, storage references
-- `ingestion` — pipelines, parsers, chunking, jobs, worker tasks
-- `retrieval` — vector search, filters, citations, answer assembly
-- `providers` — embedding/generation/storage adapters
-- `audit` — query logs, retrieval logs, usage events
+## Key implementation decisions
+- use Postgres + pgvector as the primary retrieval store
+- use OpenAI embeddings (`text-embedding-3-large` by default)
+- keep original files out of Postgres
+- prefer local filesystem storage until a real S3/MinIO endpoint exists
+- queue ingestion one document/job at a time through Celery
+- isolate docstore Celery onto its own queue (`docstore`)
+- enqueue ingestion only after DB transaction commit
+- use content-hash-aware duplicate detection instead of filename-only logic
 
-## V1 Priorities
+## Important Routes
 
-1. Tenant/workspace isolation
-2. Upload file -> queue ingestion -> parse -> chunk -> embed -> searchable
-3. Search endpoint with citations
-4. Admin visibility into failures and document/job state
-5. Delete/reindex flows
+### Web
+- `/`
+- `/signup/`
+- `/login/`
+- `/logout/`
+- `/dashboard/`
+- `/admin/`
+- `/healthz/`
+- `/connect/microsoft/`
+- `/connect/microsoft/callback/`
 
-## Deliberate Non-Goals for V1
+### API
+- `POST /api/v1/documents/`
+- `POST /api/v1/search/`
 
-- Full multimodal document understanding
-- Advanced OCR/layout grounding by default
-- Huge connector marketplace
-- Fancy end-user frontend
-- Agent workflows beyond basic query/search APIs
+## Key Models
 
-## Why Django
+### control
+- `Tenant`
+- `Workspace`
+- `TenantMembership`
+- `APIKey`
+- `ExternalAccount`
 
-Django gives us:
-- mature admin for tenant/document/job operations
-- fast model iteration
-- strong ORM fit for Postgres-heavy systems
-- good internal tooling without building a separate ops panel first
+### documents
+- `Document`
+- `DocumentVersion`
+- `Chunk`
 
-## Suggested Data Model
+### ingestion
+- `IngestionJob`
 
-### control_tenant
-- id
-- name
-- slug
-- status
-- metadata_json
-- created_at
-- updated_at
+### connectors
+- `Connector`
+- `ConnectorSyncRun`
+- `ExternalDocumentBinding`
 
-### control_workspace
-- id
-- tenant_id
-- name
-- slug
-- default_embedding_model
-- default_chunk_size
-- metadata_json
-- created_at
-- updated_at
+## Environment Notes
 
-### documents_document
-- id
-- tenant_id
-- workspace_id
-- collection
-- status
-- filename
-- mime_type
-- size_bytes
-- object_key
-- content_hash
-- source_type
-- source_url
-- uploaded_by
-- created_at
-- updated_at
+### OpenAI
+Required for embeddings and current answer generation:
 
-### documents_documentversion
-- id
-- document_id
-- version_number
-- object_key
-- content_hash
-- parse_status
-- extraction_metadata_json
-- created_at
+```env
+OPENAI_API_KEY=...
+OPENAI_BASE_URL=https://api.openai.com/v1
+DEFAULT_EMBEDDING_MODEL=text-embedding-3-large
+DEFAULT_CHAT_MODEL=gpt-4.1-mini
+```
 
-### documents_chunk
-- id
-- tenant_id
-- workspace_id
-- document_id
-- document_version_id
-- chunk_index
-- text
-- token_count
-- metadata_json
-- embedding vector
-- created_at
+### Storage
+If no real S3/MinIO endpoint is configured, the app falls back to local filesystem storage.
 
-### ingestion_ingestionjob
-- id
-- tenant_id
-- workspace_id
-- document_id
-- document_version_id
-- status
-- stage
-- error_text
-- started_at
-- finished_at
-- created_at
+### Celery
+Docstore uses its own queue:
 
-### control_apikey
-- id
-- tenant_id
-- workspace_id nullable
-- label
-- key_prefix
-- key_hash
-- scopes_json
-- last_used_at
-- active
-- created_at
+```env
+CELERY_BROKER_URL=redis://localhost:6379/0
+CELERY_RESULT_BACKEND=redis://localhost:6379/1
+```
 
-## Retrieval API V1
+Worker should consume the `docstore` queue.
 
-### POST `/api/v1/documents/`
-Create document + upload metadata, then queue ingestion.
+### Microsoft / SharePoint OAuth scaffold
+Not fully configured yet in production. When resumed, these env vars are expected:
 
-### POST `/api/v1/documents/{id}/ingest/`
-Force ingestion or reingestion.
+```env
+MS_GRAPH_CLIENT_ID=...
+MS_GRAPH_CLIENT_SECRET=...
+MS_GRAPH_REDIRECT_URI=https://docstore.oddsmith.net/connect/microsoft/callback/
+MS_GRAPH_TENANT_ID=common
+MS_GRAPH_SCOPES=openid profile email offline_access Files.Read Sites.Read.All User.Read
+```
 
-### POST `/api/v1/search/`
-Inputs:
-- query
-- workspace
-- collection optional
-- top_k
-- metadata filters
+## SharePoint Status
 
-Returns:
-- chunk matches
-- scores
-- document metadata
-- citations
+SharePoint support is partially scaffolded, not finished.
 
-### POST `/api/v1/query/`
-Inputs:
-- query
-- workspace
-- retrieval settings
-- generation toggle/model
+### Already built
+- connector models and admin
+- Graph helper
+- manual sync command scaffold
+- per-user Microsoft account connection scaffold
 
-Returns:
-- answer
-- citations
-- supporting chunks
+### Still needed
+- real Azure app registration/config in production
+- user-facing site/drive/folder picker
+- token refresh handling
+- user-token-based SharePoint browsing/sync
+- scheduled/incremental sync
+- cleaner connector UX in dashboard
 
 ## Operational Notes
+- production deploy path uses Pi -> VPS rsync
+- `.env` is intentionally excluded from deploy sync
+- generated vectors live in Postgres, not SQLite
+- chat quality depends on extraction quality + chunk quality
+- PDF parsing is now real; OCR/layout-heavy docs are still not a focus yet
 
-- Use shared tables with explicit `tenant_id` + `workspace_id` in V1.
-- Consider Postgres RLS later if needed.
-- Keep embeddings provider-abstracted.
-- Keep original files out of Postgres; use object storage.
-- Keep answer generation separate from retrieval internals so retrieval can be debugged directly.
-
-## Recommended V1 Defaults
-
-- Postgres + PGVector only
-- OpenAI embeddings first
-- local OpenAI-compatible generation optional
-- MinIO in local/dev, S3/R2 in production
-- Celery workers for parsing/embedding jobs
-
-## Next Steps
-
-1. Scaffold Django project + apps
-2. Add docker-compose for Postgres/Redis/MinIO
-3. Implement initial models + admin
-4. Add upload + ingestion job flow
-5. Add chunk + embedding pipeline
-6. Add search endpoint
-
-
-- Local/dev default uses filesystem storage unless a real S3/MinIO endpoint is configured.
+## Good Next Steps
+- add document detail + reingest flow
+- add `/api/v1/chat/` endpoint
+- add SharePoint site/drive/folder picker using connected Microsoft accounts
+- improve token handling and connector UX
+- extend parser coverage further only as needed
