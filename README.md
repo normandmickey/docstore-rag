@@ -305,9 +305,119 @@ Current behavior now:
 Current limitation:
 - not every future endpoint is wired yet; new endpoints should use the same guard pattern in `control/api_guard.py`
 
+## API examples
+
+All unauthenticated API requests should include a Bearer API key:
+
+```http
+Authorization: Bearer ds_...
+```
+
+### Search
+
+```bash
+curl -X POST https://docstore.oddsmith.net/api/v1/search/ \
+  -H "Authorization: Bearer ds_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": 1,
+    "workspace_id": 1,
+    "query": "What does this workspace say about authentication?",
+    "top_k": 5
+  }'
+```
+
+### Chat
+
+```bash
+curl -X POST https://docstore.oddsmith.net/api/v1/chat/ \
+  -H "Authorization: Bearer ds_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": 1,
+    "workspace_id": 1,
+    "question": "Summarize the policy described in these docs.",
+    "top_k": 5
+  }'
+```
+
+Optional document-scoped chat:
+
+```bash
+curl -X POST https://docstore.oddsmith.net/api/v1/chat/ \
+  -H "Authorization: Bearer ds_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": 1,
+    "workspace_id": 1,
+    "question": "What does this specific document say about onboarding?",
+    "document_id": 42,
+    "top_k": 5
+  }'
+```
+
+### URL ingest
+
+```bash
+curl -X POST https://docstore.oddsmith.net/api/v1/urls/ingest/ \
+  -H "Authorization: Bearer ds_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": 1,
+    "workspace_id": 1,
+    "urls": [
+      "https://example.com/docs/start",
+      "https://example.com/help/article"
+    ],
+    "collection": "docs",
+    "crawl_mode": "single",
+    "max_pages": 10
+  }'
+```
+
+### Document delete / restore / purge
+
+Soft delete:
+
+```bash
+curl -X POST https://docstore.oddsmith.net/api/v1/documents/delete/ \
+  -H "Authorization: Bearer ds_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": 1,
+    "workspace_id": 1,
+    "document_ids": [12, 13]
+  }'
+```
+
+Restore:
+
+```bash
+curl -X POST https://docstore.oddsmith.net/api/v1/documents/restore/ \
+  -H "Authorization: Bearer ds_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": 1,
+    "workspace_id": 1,
+    "document_ids": [12, 13]
+  }'
+```
+
+Purge:
+
+```bash
+curl -X POST https://docstore.oddsmith.net/api/v1/documents/purge/ \
+  -H "Authorization: Bearer ds_YOUR_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "tenant_id": 1,
+    "workspace_id": 1,
+    "document_ids": [12, 13]
+  }'
+```
+
 ## Good Next Steps
 - add document detail + reingest flow
-- add `/api/v1/chat/` endpoint
 - add SharePoint site/drive/folder picker using connected Microsoft accounts
 - improve token handling and connector UX
 - extend parser coverage further only as needed
