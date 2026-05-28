@@ -139,7 +139,14 @@ def _dashboard_base(request):
         return rows
 
     all_document_rows = build_document_rows(documents)
+    failed_documents = Document.objects.filter(
+        tenant_id=current_tenant_id,
+        workspace_id=current_workspace_id,
+        status=Document.STATUS_FAILED,
+    ).prefetch_related('ingestion_jobs', 'chunks', 'versions').order_by('-updated_at')[:25] if current_workspace else Document.objects.none()
+
     deleted_document_rows = build_document_rows(deleted_documents)
+    failed_document_rows = build_document_rows(failed_documents)
     url_document_rows = [row for row in all_document_rows if row['document'].source_type == Document.SOURCE_URL]
     file_document_rows = [row for row in all_document_rows if row['document'].source_type != Document.SOURCE_URL]
 
@@ -153,6 +160,7 @@ def _dashboard_base(request):
         'file_document_rows': file_document_rows,
         'url_document_rows': url_document_rows,
         'deleted_document_rows': deleted_document_rows,
+        'failed_document_rows': failed_document_rows,
         'external_accounts': ExternalAccount.objects.filter(user=request.user).order_by('-updated_at'),
         'api_keys': APIKey.objects.filter(tenant_id=current_tenant_id).order_by('-created_at') if current_tenant_id else APIKey.objects.none(),
         'is_staff_user': bool(request.user.is_staff),

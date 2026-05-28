@@ -47,6 +47,36 @@
   </form>
 </div>
 <div class="card">
+  <h2>Failed documents</h2>
+  {% if failed_document_rows %}
+    <form method="post" style="margin-bottom: 18px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="delete_document">
+      {% for row in failed_document_rows %}
+        <div class="row">
+          <label style="display: flex; gap: 10px; align-items: flex-start;">
+            <input type="checkbox" name="document_ids" value="{{ row.document.id }}" style="width: auto; margin-top: 6px;">
+            <span style="flex: 1;">
+              <strong>{{ row.document.filename }}</strong><br>
+              <span class="meta">Failed · Collection: {{ row.document.collection|default:'—' }} · Uploaded: {{ row.document.created_at }}</span><br>
+              {% if row.source_url %}<span class="meta">Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></span><br>{% endif %}
+              {% if row.latest_job %}<span class="status status-{{ row.latest_job.status }}">Job {{ row.latest_job.status }}</span> <span class="meta">Stage: {{ row.latest_job.stage }}</span>{% endif %}
+              {% if row.latest_job and row.latest_job.error_text %}<pre>{{ row.latest_job.error_text }}</pre>{% endif %}
+            </span>
+          </label>
+        </div>
+      {% endfor %}
+      <label style="display: flex; gap: 10px; align-items: center; margin-top: 14px;">
+        <input type="checkbox" name="confirm_delete" value="yes" style="width: auto;">
+        <span>I understand these failed documents will be moved to trash.</span>
+      </label>
+      <button type="submit" style="background: #991b1b; margin-top: 12px;">Delete selected failed docs</button>
+    </form>
+  {% else %}
+    <p>No failed documents right now.</p>
+  {% endif %}
+</div>
+<div class="card">
   <h2>Trash</h2>
   {% if deleted_document_rows %}
     <form method="post" style="margin-bottom: 18px;">
