@@ -142,7 +142,7 @@ def dashboard(request):
                     status=IngestionJob.STATUS_QUEUED,
                     stage='queued',
                 )
-            ingest_document_task.delay(job.id)
+            transaction.on_commit(lambda: ingest_document_task.delay(job.id))
             messages.success(request, f'Uploaded {document.filename}. Ingestion job #{job.id} queued.')
         except Exception as exc:
             logger.exception('Dashboard upload failed for user=%s workspace=%s filename=%s', request.user.id, current_workspace.id, getattr(upload, 'name', ''))
