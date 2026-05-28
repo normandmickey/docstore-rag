@@ -1,3 +1,4 @@
+import re
 from io import BytesIO
 
 import fitz
@@ -11,11 +12,101 @@ from providers import embed_texts
 from .models import IngestionJob
 
 
-def naive_chunks(text, chunk_size=800):
-    text = (text or '').strip()
+def normalize_extracted_text(text):
+    text = (text or '').replace('\x00', ' ')
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
+    text = re.sub(r'[ \t]+', ' ', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)
+
+    cleaned_lines = []
+    for raw_line in text.split('\n'):
+        line = raw_line.strip()
+        if not line:
+            cleaned_lines.append('')
+            continue
+        if len(line) <= 3 and any(ch.isdigit() for ch in line):
+            continue
+        if re.fullmatch(r'[\d\s\|.,:%$\-()]+', line) and sum(ch.isdigit() for ch in line) >= max(4, len(line) // 2):
+            continue
+        cleaned_lines.append(line)
+
+    paragraphs = []
+    current = []
+    for line in cleaned_lines:
+        if not line:
+            if current:
+                paragraphs.append(' '.join(current).strip())
+                current = []
+            continue
+        if current and not re.search(r'[.!?:]$|:$', current[-1]) and line[:1].islower():
+            current.append(line)
+        else:
+            current.append(line)
+    if current:
+        paragraphs.append(' '.join(current).strip())
+
+    normalized = '\n\n'.join(p for p in paragraphs if p)
+    normalized = re.sub(r'\n{3,}', '\n\n', normalized)
+    return normalized.strip()
+
+
+def chunk_text(text, chunk_size=800, overlap=120):
+    text = normalize_extracted_text(text)
     if not text:
         return []
-    return [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+
+    paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
+    chunks = []
+    current = ''
+
+    def tail_overlap(value):
+        if overlap <= 0 or len(value) <= overlap:
+            return value
+        cut = value[-overlap:]
+        space = cut.find(' ')
+        return cut[space + 1:] if space != -1 and space < len(cut) - 1 else cut
+
+    for paragraph in paragraphs:
+        if len(paragraph) > chunk_size:
+            if current:
+                chunks.append(current.strip())
+                current = ''
+            start = 0
+            while start < len(paragraph):
+                end = min(start + chunk_size, len(paragraph))
+                if end < len(paragraph):
+                    split_at = paragraph.rfind(' ', start, end)
+                    if split_at > start + max(80, overlap // 2):
+                        end = split_at
+                piece = paragraph[start:end].strip()
+                if piece:
+                    chunks.append(piece)
+                if end >= len(paragraph):
+                    break
+                start = end - overlap if overlap > 0 else end
+            continue
+
+        candidate = f"{current}\n\n{paragraph}".strip() if current else paragraph
+        if len(candidate) <= chunk_size:
+            current = candidate
+        else:
+            if current:
+                chunks.append(current.strip())
+                current = f"{tail_overlap(current)}\n\n{paragraph}".strip()
+            else:
+                chunks.append(paragraph)
+                current = ''
+
+    if current:
+        chunks.append(current.strip())
+
+    deduped = []
+    last = None
+    for chunk in chunks:
+        if chunk and chunk != last:
+            deduped.append(chunk)
+            last = chunk
+    return deduped
 
 
 def extract_pdf_text(raw):
@@ -96,12 +187,12 @@ def ingest_document_task(self, ingestion_job_id):
 
     try:
         extracted_text = extract_document_text(document, version)
-        extracted_text = (extracted_text or '').replace('\x00', ' ')
+        cleaned_text = normalize_extracted_text(extracted_text)
 
         job.stage = 'embedding'
         job.save(update_fields=['stage'])
 
-        chunks = naive_chunks(extracted_text, chunk_size=job.workspace.default_chunk_size or 800)
+        chunks = chunk_text(cleaned_text, chunk_size=job.workspace.default_chunk_size or 800, overlap=120)
         vectors = embed_texts(chunks) if chunks else []
         Chunk.objects.filter(document_version=version).delete()
         for idx, chunk_text in enumerate(chunks):
@@ -120,7 +211,7 @@ def ingest_document_task(self, ingestion_job_id):
         version.parse_status = 'ready'
         version.extraction_metadata_json = {
             **(version.extraction_metadata_json or {}),
-            'raw_text_preview': extracted_text[:500],
+            'raw_text_preview': cleaned_text[:500],
             'chunk_count': len(chunks),
         }
         version.save(update_fields=['parse_status', 'extraction_metadata_json'])
