@@ -19,6 +19,9 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',
     'storages',
+    'django.contrib.sites',
+    'allauth',
+    'allauth.account',
     'pgvector.django',
     'control',
     'documents',
@@ -33,6 +36,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -133,3 +137,10 @@ if USE_S3_STORAGE:
     AWS_S3_USE_SSL = S3_USE_SSL
     AWS_DEFAULT_ACL = None
     AWS_QUERYSTRING_AUTH = True
+
+SITE_ID = 1
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/login/'
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_AUTHENTICATION_METHOD = 'username_email'
+ACCOUNT_EMAIL_REQUIRED = True

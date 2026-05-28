@@ -7,3 +7,4 @@ pgvector==0.4.2
 python-dotenv==1.2.2
 django-storages==1.14.6
 boto3==1.43.16
+django-allauth==65.13.0
