@@ -2,6 +2,7 @@ from celery import shared_task
 from django.utils import timezone
 
 from documents.models import Chunk, Document
+from providers import embed_texts
 from .models import IngestionJob
 
 
@@ -38,6 +39,7 @@ def ingest_document_task(self, ingestion_job_id):
 
         extracted_text = (extracted_text or '').replace('\x00', ' ')
         chunks = naive_chunks(extracted_text, chunk_size=job.workspace.default_chunk_size or 800)
+        vectors = embed_texts(chunks) if chunks else []
         Chunk.objects.filter(document_version=version).delete()
         for idx, chunk_text in enumerate(chunks):
             Chunk.objects.create(
@@ -48,8 +50,8 @@ def ingest_document_task(self, ingestion_job_id):
                 chunk_index=idx,
                 text=chunk_text,
                 token_count=max(1, len(chunk_text) // 4),
-                metadata_json={'stub': True},
-                embedding=None,
+                metadata_json={'stub': False},
+                embedding=vectors[idx] if idx < len(vectors) else None,
             )
 
         version.parse_status = 'ready'

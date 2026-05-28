@@ -1,9 +1,10 @@
-from django.db.models import Q
+from pgvector.django import CosineDistance
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from documents.models import Chunk
+from providers import embed_texts
 from audit.models import RetrievalLog
 from control.models import Tenant, Workspace
 
@@ -26,11 +27,13 @@ class SearchView(APIView):
         query = data['query'].strip()
         top_k = data['top_k']
 
-        qs = Chunk.objects.filter(tenant=tenant, workspace=workspace)
-        if query:
-            for token in [part.strip() for part in query.split() if part.strip()][:5]:
-                qs = qs.filter(Q(text__icontains=token))
-        results = list(qs.select_related('document')[:top_k])
+        query_vector = embed_texts([query])[0]
+        results = list(
+            Chunk.objects.filter(tenant=tenant, workspace=workspace, embedding__isnull=False)
+            .select_related('document')
+            .annotate(distance=CosineDistance('embedding', query_vector))
+            .order_by('distance')[:top_k]
+        )
 
         RetrievalLog.objects.create(
             tenant=tenant,
@@ -50,6 +53,7 @@ class SearchView(APIView):
                     'document': row.document.filename,
                     'chunk_index': row.chunk_index,
                     'text': row.text,
+                    'distance': float(getattr(row, 'distance', 0.0)),
                 }
                 for row in results
             ]
