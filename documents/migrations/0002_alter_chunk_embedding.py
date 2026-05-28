@@ -11,7 +11,11 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
+        migrations.RemoveField(
+            model_name='chunk',
+            name='embedding',
+        ),
+        migrations.AddField(
             model_name='chunk',
             name='embedding',
             field=pgvector.django.vector.VectorField(blank=True, dimensions=3072, null=True),
