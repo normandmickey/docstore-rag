@@ -106,4 +106,11 @@
 - [ ] Add sample request/response bodies for document upload endpoint in README
 - [ ] Add examples for tenant-wide API keys in README
 - [ ] Clean up deprecated django-allauth settings warnings
+- [ ] Add future MinIO/S3 migration checklist:
+  - [ ] audit code for filesystem-only assumptions (`.path`, direct `open()`, raw absolute paths)
+  - [ ] keep storage backend fully env-switchable
+  - [ ] stand up MinIO bucket with stable object key layout matching current `Document.file` names
+  - [ ] sync existing local media files into object storage without changing DB file keys
+  - [ ] verify upload/read/ingest/delete/restore/purge flows against object storage
+  - [ ] document rollback path back to local filesystem storage
 - [ ] Keep TODO.md trimmed as items ship so it stays credible
