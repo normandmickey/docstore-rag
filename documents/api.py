@@ -3,9 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from control.models import Tenant, Workspace
-from ingestion.models import IngestionJob
-from ingestion.tasks import ingest_document_task
-from .models import Document, DocumentVersion
+from .upload_service import create_or_reuse_document
 
 
 class DocumentCreateSerializer(serializers.Serializer):
@@ -33,45 +31,29 @@ class DocumentCreateView(APIView):
         workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
         uploaded_file = data.get('file')
         filename = data.get('filename') or (uploaded_file.name if uploaded_file else 'untitled.txt')
-        object_key = data.get('object_key') or f'{tenant.slug}/{workspace.slug}/{filename}'
         size_bytes = data.get('size_bytes') or (uploaded_file.size if uploaded_file else 0)
 
-        document = Document.objects.create(
+        result = create_or_reuse_document(
             tenant=tenant,
             workspace=workspace,
-            collection=data.get('collection', ''),
+            uploaded_file=uploaded_file,
             filename=filename,
             mime_type=data.get('mime_type') or getattr(uploaded_file, 'content_type', '') or '',
             size_bytes=size_bytes,
-            object_key=object_key,
-            content_hash=data.get('content_hash', ''),
-            source_type=data.get('source_type', Document.SOURCE_UPLOAD),
-            source_url=data.get('source_url', ''),
+            collection=data.get('collection', ''),
             uploaded_by=request.user if request.user.is_authenticated else None,
-            file=uploaded_file,
+            raw_text=data.get('raw_text', ''),
         )
-        version = DocumentVersion.objects.create(
-            document=document,
-            version_number=1,
-            object_key=document.object_key,
-            content_hash=document.content_hash,
-            extraction_metadata_json={'raw_text': data.get('raw_text', '')},
-        )
-        job = IngestionJob.objects.create(
-            tenant=tenant,
-            workspace=workspace,
-            document=document,
-            document_version=version,
-            status=IngestionJob.STATUS_QUEUED,
-            stage='queued',
-        )
-        ingest_document_task.delay(job.id)
+        document = result['document']
+        version = result['version']
+        job = result['job']
         return Response(
             {
                 'document_id': document.id,
-                'document_version_id': version.id,
-                'ingestion_job_id': job.id,
+                'document_version_id': version.id if version else None,
+                'ingestion_job_id': job.id if job else None,
                 'status': document.status,
+                'mode': result['mode'],
             },
-            status=status.HTTP_201_CREATED,
+            status=status.HTTP_201_CREATED if result['mode'] != 'duplicate' else status.HTTP_200_OK,
         )
