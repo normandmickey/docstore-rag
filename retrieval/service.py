@@ -1,7 +1,7 @@
 from pgvector.django import CosineDistance
 
 from audit.models import RetrievalLog
-from documents.models import Chunk
+from documents.models import Chunk, Document
 from providers import answer_with_context, embed_texts
 
 
@@ -11,6 +11,7 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
         tenant=tenant,
         workspace=workspace,
         embedding__isnull=False,
+        document__status=Document.STATUS_READY,
     ).select_related('document')
     if document_id:
         qs = qs.filter(document_id=document_id)
