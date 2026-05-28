@@ -90,6 +90,8 @@ def dashboard(request):
             documents = Document.objects.filter(
                 tenant_id=current_tenant_id,
                 workspace_id=current_workspace_id,
+            ).exclude(
+                status=Document.STATUS_FAILED,
             ).prefetch_related('ingestion_jobs', 'chunks', 'versions').order_by('-created_at')[:25]
 
     if request.method == 'POST' and request.POST.get('action') == 'create_workspace':
