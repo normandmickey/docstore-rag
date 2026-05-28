@@ -7,7 +7,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.views import LoginView
 from django.contrib.auth import get_user_model
 from django.db.models import Count
-from django.http import Http404, HttpResponseRedirect
+from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.text import slugify
@@ -371,7 +371,15 @@ def document_download(request, document_id):
     if not document.file:
         raise Http404('Document file not found.')
 
-    return HttpResponseRedirect(document.file.url)
+    try:
+        fh = document.file.open('rb')
+    except Exception as exc:
+        raise Http404(f'Document file could not be opened: {exc}')
+
+    response = FileResponse(fh, as_attachment=False, filename=document.filename)
+    if document.mime_type:
+        response['Content-Type'] = document.mime_type
+    return response
 
 
 def dashboard_documents(request):
