@@ -55,9 +55,11 @@ def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime
             document.mime_type = mime_type or document.mime_type
             document.size_bytes = size_bytes or document.size_bytes
             document.content_hash = content_hash
-            document.file = uploaded_file
             document.status = Document.STATUS_PENDING
-            document.save(update_fields=['collection', 'mime_type', 'size_bytes', 'content_hash', 'file', 'status', 'updated_at'])
+            if uploaded_file:
+                document.file.save(filename, uploaded_file, save=False)
+                document.object_key = document.file.name
+            document.save(update_fields=['collection', 'mime_type', 'size_bytes', 'content_hash', 'file', 'object_key', 'status', 'updated_at'])
             version = DocumentVersion.objects.create(
                 document=document,
                 version_number=next_version,
@@ -67,7 +69,7 @@ def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime
             )
             mode = 'versioned'
         else:
-            document = Document.objects.create(
+            document = Document(
                 tenant=tenant,
                 workspace=workspace,
                 collection=collection,
@@ -79,8 +81,11 @@ def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime
                 source_type=source_type,
                 source_url=source_url,
                 uploaded_by=uploaded_by,
-                file=uploaded_file,
             )
+            if uploaded_file:
+                document.file.save(filename, uploaded_file, save=False)
+                document.object_key = document.file.name
+            document.save()
             version = DocumentVersion.objects.create(
                 document=document,
                 version_number=1,
