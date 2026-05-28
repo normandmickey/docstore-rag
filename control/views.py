@@ -107,14 +107,21 @@ def _dashboard_base(request):
             })
         return rows
 
+    all_document_rows = build_document_rows(documents)
+    deleted_document_rows = build_document_rows(deleted_documents)
+    url_document_rows = [row for row in all_document_rows if row['document'].source_type == Document.SOURCE_URL]
+    file_document_rows = [row for row in all_document_rows if row['document'].source_type != Document.SOURCE_URL]
+
     return {
         'memberships': memberships,
         'current_tenant_id': current_tenant_id,
         'current_workspace_id': current_workspace_id,
         'current_workspace': current_workspace,
         'available_workspaces': Workspace.objects.filter(tenant_id=current_tenant_id).order_by('name') if current_tenant_id else Workspace.objects.none(),
-        'document_rows': build_document_rows(documents),
-        'deleted_document_rows': build_document_rows(deleted_documents),
+        'document_rows': all_document_rows,
+        'file_document_rows': file_document_rows,
+        'url_document_rows': url_document_rows,
+        'deleted_document_rows': deleted_document_rows,
         'external_accounts': ExternalAccount.objects.filter(user=request.user).order_by('-updated_at'),
         'is_staff_user': bool(request.user.is_staff),
     }
@@ -285,7 +292,10 @@ def dashboard(request):
     handled = _handle_workspace_actions(request, base)
     if handled:
         return handled
+    base['section'] = 'overview'
     base['recent_count'] = len(base['document_rows'])
+    base['file_count'] = len(base['file_document_rows'])
+    base['url_count'] = len(base['url_document_rows'])
     base['trash_count'] = len(base['deleted_document_rows'])
     return render(request, 'dashboard/index.html', base)
 
@@ -326,6 +336,7 @@ def dashboard_documents(request):
             messages.error(request, f'Upload failed: {exc}')
         return redirect('dashboard_documents')
 
+    base['section'] = 'documents'
     return render(request, 'dashboard/documents.html', base)
 
 
@@ -403,6 +414,7 @@ def dashboard_urls(request):
             messages.success(request, summary + '.')
         return redirect('dashboard_urls')
 
+    base['section'] = 'urls'
     return render(request, 'dashboard/urls.html', base)
 
 
@@ -439,6 +451,7 @@ def dashboard_chat(request):
                 messages.error(request, f'Chat failed: {exc}')
         else:
             messages.error(request, 'Ask a question first.')
+    base['section'] = 'chat'
     return render(request, 'dashboard/chat.html', base)
 
 
@@ -449,4 +462,5 @@ def dashboard_connectors(request):
     handled = _handle_workspace_actions(request, base)
     if handled:
         return handled
+    base['section'] = 'connectors'
     return render(request, 'dashboard/connectors.html', base)

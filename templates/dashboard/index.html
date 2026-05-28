@@ -4,8 +4,12 @@
 <div class="card">
   <h2>Overview</h2>
   <p class="meta">Use the sections above to manage documents, import URLs, chat with your workspace, and connect external systems.</p>
-  <div class="row"><strong>Active documents:</strong> {{ recent_count }}</div>
-  <div class="row"><strong>Trash:</strong> {{ trash_count }}</div>
-  <div class="row"><strong>Connected Microsoft accounts:</strong> {{ external_accounts|length }}</div>
+  <div class="grid">
+    <div class="stat"><strong>Active documents</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ recent_count }}</div></div>
+    <div class="stat"><strong>Uploaded/file docs</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ file_count }}</div></div>
+    <div class="stat"><strong>URL docs</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ url_count }}</div></div>
+    <div class="stat"><strong>Trash</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ trash_count }}</div></div>
+    <div class="stat"><strong>Connected Microsoft accounts</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ external_accounts|length }}</div></div>
+  </div>
 </div>
 {% endblock %}

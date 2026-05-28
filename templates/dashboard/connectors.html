@@ -2,6 +2,10 @@
 {% block title %}Connectors · Docstore{% endblock %}
 {% block content %}
 <div class="card">
+  <h2>Connectors</h2>
+  <p class="meta">This page is for external knowledge sources. Microsoft / SharePoint is scaffolded first and will be the main connector flow here.</p>
+</div>
+<div class="card">
   <h2>Microsoft / SharePoint connections</h2>
   <p class="meta">Connect your own Microsoft account so this workspace can later sync SharePoint content.</p>
   <p><a href="/connect/microsoft/">Connect Microsoft account</a></p>
@@ -10,5 +14,10 @@
   {% empty %}
     <p>No external Microsoft accounts connected yet.</p>
   {% endfor %}
+</div>
+<div class="card">
+  <h2>Planned connector types</h2>
+  <div class="row"><strong>SharePoint</strong><br><span class="meta">OAuth scaffold exists; picker and sync UI still to come.</span></div>
+  <div class="row"><strong>Web / URLs</strong><br><span class="meta">Already handled on the URLs page as direct imports.</span></div>
 </div>
 {% endblock %}
