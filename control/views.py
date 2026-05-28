@@ -7,6 +7,7 @@ from django.contrib.auth import login, logout
 from django.contrib.auth.views import LoginView
 from django.contrib.auth import get_user_model
 from django.db.models import Count
+from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.text import slugify
@@ -357,6 +358,20 @@ def dashboard(request):
     base['url_count'] = len(base['url_document_rows'])
     base['trash_count'] = len(base['deleted_document_rows'])
     return render(request, 'dashboard/index.html', base)
+
+
+def document_download(request, document_id):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    document = get_object_or_404(Document, id=document_id)
+    membership = TenantMembership.objects.filter(user=request.user, tenant=document.tenant).exists()
+    if not membership and not request.user.is_staff:
+        raise Http404('Document not found.')
+    if not document.file:
+        raise Http404('Document file not found.')
+
+    return HttpResponseRedirect(document.file.url)
 
 
 def dashboard_documents(request):
