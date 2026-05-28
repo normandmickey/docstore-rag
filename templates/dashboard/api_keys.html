@@ -4,6 +4,9 @@
 <div class="card">
   <h2>Create API key</h2>
   <p class="meta">Create keys for integrations and scripts. The full raw key is only shown once.</p>
+  {% if current_workspace %}
+    <p class="meta">Current API target: tenant_id={{ current_workspace.tenant.id }} · workspace_id={{ current_workspace.id }} · {{ current_workspace.tenant.slug }}/{{ current_workspace.slug }}</p>
+  {% endif %}
   <form method="post">
     {% csrf_token %}
     <input type="hidden" name="action" value="create_api_key">
@@ -29,6 +32,7 @@
     <div class="row">
       <strong>{{ key.label }}</strong><br>
       <span class="meta">Prefix: {{ key.key_prefix }} · Scope: {% if key.workspace %}workspace-only ({{ key.workspace.name }}){% else %}tenant-wide{% endif %} · Active: {{ key.active|yesno:"yes,no" }}</span><br>
+      <span class="meta">tenant_id={{ key.tenant_id }}{% if key.workspace_id %} · workspace_id={{ key.workspace_id }}{% endif %}</span><br>
       <span class="meta">Created: {{ key.created_at }}{% if key.last_used_at %} · Last used: {{ key.last_used_at }}{% else %} · Last used: never{% endif %}</span>
       {% if key.active %}
         <form method="post" style="margin-top: 10px;">
