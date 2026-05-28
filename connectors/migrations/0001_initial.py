@@ -6,8 +6,8 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('control', '0003_apikey'),
-        ('documents', '0002_alter_chunk_embedding'),
+        ('control', '0002_tenantmembership'),
+        ('documents', '0003_document_file'),
     ]
 
     operations = [
