@@ -3,15 +3,14 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
-from control.api_guard import resolve_api_context
-from control.models import Tenant, Workspace
+from control.api_guard import resolve_request_context
 from .models import Document
 from .upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
 
 
 class DocumentCreateSerializer(serializers.Serializer):
-    tenant_id = serializers.IntegerField()
-    workspace_id = serializers.IntegerField()
+    tenant_id = serializers.IntegerField(required=False)
+    workspace_id = serializers.IntegerField(required=False)
     filename = serializers.CharField(max_length=255, required=False)
     mime_type = serializers.CharField(max_length=120, required=False, allow_blank=True)
     size_bytes = serializers.IntegerField(required=False, default=0)
@@ -31,9 +30,11 @@ class DocumentCreateView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        tenant = Tenant.objects.get(id=data['tenant_id'])
-        workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
-        resolve_api_context(request, tenant=tenant, workspace=workspace)
+        tenant, workspace, _api_key = resolve_request_context(
+            request,
+            tenant_id=data.get('tenant_id'),
+            workspace_id=data.get('workspace_id'),
+        )
         uploaded_file = data.get('file')
         filename = data.get('filename') or (uploaded_file.name if uploaded_file else 'untitled.txt')
         size_bytes = data.get('size_bytes') or (uploaded_file.size if uploaded_file else 0)
@@ -67,8 +68,8 @@ class DocumentCreateView(APIView):
 
 
 class URLIngestSerializer(serializers.Serializer):
-    tenant_id = serializers.IntegerField()
-    workspace_id = serializers.IntegerField()
+    tenant_id = serializers.IntegerField(required=False)
+    workspace_id = serializers.IntegerField(required=False)
     urls = serializers.ListField(child=serializers.URLField(), allow_empty=False)
     collection = serializers.CharField(max_length=120, required=False, allow_blank=True)
     crawl_mode = serializers.ChoiceField(choices=['single', 'same_domain'], required=False, default='single')
@@ -82,9 +83,11 @@ class URLIngestView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        tenant = Tenant.objects.get(id=data['tenant_id'])
-        workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
-        resolve_api_context(request, tenant=tenant, workspace=workspace)
+        tenant, workspace, _api_key = resolve_request_context(
+            request,
+            tenant_id=data.get('tenant_id'),
+            workspace_id=data.get('workspace_id'),
+        )
         urls = collect_urls_for_ingest(data['urls'], crawl_mode=data['crawl_mode'], max_pages=data['max_pages'])
 
         created = 0
@@ -126,8 +129,8 @@ class URLIngestView(APIView):
 
 
 class DocumentDeleteSerializer(serializers.Serializer):
-    tenant_id = serializers.IntegerField()
-    workspace_id = serializers.IntegerField()
+    tenant_id = serializers.IntegerField(required=False)
+    workspace_id = serializers.IntegerField(required=False)
     document_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
 
 
@@ -138,9 +141,11 @@ class DocumentDeleteView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        tenant = Tenant.objects.get(id=data['tenant_id'])
-        workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
-        resolve_api_context(request, tenant=tenant, workspace=workspace)
+        tenant, workspace, _api_key = resolve_request_context(
+            request,
+            tenant_id=data.get('tenant_id'),
+            workspace_id=data.get('workspace_id'),
+        )
         documents = list(Document.objects.filter(
             id__in=data['document_ids'],
             tenant=tenant,
@@ -163,9 +168,11 @@ class DocumentRestoreView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        tenant = Tenant.objects.get(id=data['tenant_id'])
-        workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
-        resolve_api_context(request, tenant=tenant, workspace=workspace)
+        tenant, workspace, _api_key = resolve_request_context(
+            request,
+            tenant_id=data.get('tenant_id'),
+            workspace_id=data.get('workspace_id'),
+        )
         documents = list(Document.objects.filter(
             id__in=data['document_ids'],
             tenant=tenant,
@@ -189,9 +196,11 @@ class DocumentPurgeView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        tenant = Tenant.objects.get(id=data['tenant_id'])
-        workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
-        resolve_api_context(request, tenant=tenant, workspace=workspace)
+        tenant, workspace, _api_key = resolve_request_context(
+            request,
+            tenant_id=data.get('tenant_id'),
+            workspace_id=data.get('workspace_id'),
+        )
         documents = list(Document.objects.filter(
             id__in=data['document_ids'],
             tenant=tenant,

@@ -3,21 +3,20 @@ from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
-from control.api_guard import resolve_api_context
-from control.models import Tenant, Workspace
+from control.api_guard import resolve_request_context
 from .service import answer_question, retrieve_chunks
 
 
 class SearchSerializer(serializers.Serializer):
-    tenant_id = serializers.IntegerField()
-    workspace_id = serializers.IntegerField()
+    tenant_id = serializers.IntegerField(required=False)
+    workspace_id = serializers.IntegerField(required=False)
     query = serializers.CharField()
     top_k = serializers.IntegerField(required=False, default=5, min_value=1, max_value=50)
 
 
 class ChatSerializer(serializers.Serializer):
-    tenant_id = serializers.IntegerField()
-    workspace_id = serializers.IntegerField()
+    tenant_id = serializers.IntegerField(required=False)
+    workspace_id = serializers.IntegerField(required=False)
     question = serializers.CharField()
     top_k = serializers.IntegerField(required=False, default=5, min_value=1, max_value=20)
     document_id = serializers.IntegerField(required=False)
@@ -30,9 +29,11 @@ class SearchView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        tenant = Tenant.objects.get(id=data['tenant_id'])
-        workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
-        resolve_api_context(request, tenant=tenant, workspace=workspace)
+        tenant, workspace, _api_key = resolve_request_context(
+            request,
+            tenant_id=data.get('tenant_id'),
+            workspace_id=data.get('workspace_id'),
+        )
         query = data['query'].strip()
         top_k = data['top_k']
 
@@ -65,9 +66,11 @@ class ChatView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        tenant = Tenant.objects.get(id=data['tenant_id'])
-        workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
-        resolve_api_context(request, tenant=tenant, workspace=workspace)
+        tenant, workspace, _api_key = resolve_request_context(
+            request,
+            tenant_id=data.get('tenant_id'),
+            workspace_id=data.get('workspace_id'),
+        )
 
         answer, results = answer_question(
             tenant=tenant,

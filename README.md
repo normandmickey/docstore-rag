@@ -298,11 +298,13 @@ Current behavior:
 
 Current behavior now:
 - unauthenticated API requests must provide a Bearer API key
-- tenant mismatch is rejected
-- workspace-scoped keys can only access their workspace
+- tenant context is inferred from the API key
+- workspace-scoped keys can use the API without sending `workspace_id`
+- tenant-wide keys still need `workspace_id`
 - successful API-key lookups update `last_used_at`
 
 Current limitation:
+- signed-in session requests still use explicit `tenant_id` + `workspace_id`
 - not every future endpoint is wired yet; new endpoints should use the same guard pattern in `control/api_guard.py`
 
 ## API examples
@@ -315,13 +317,13 @@ Authorization: Bearer ds_...
 
 ### Search
 
+For workspace-scoped API keys, you can omit tenant/workspace IDs entirely:
+
 ```bash
 curl -X POST https://docstore.oddsmith.net/api/v1/search/ \
   -H "Authorization: Bearer ds_YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "tenant_id": 1,
-    "workspace_id": 1,
     "query": "What does this workspace say about authentication?",
     "top_k": 5
   }'
@@ -337,8 +339,6 @@ resp = requests.post(
         "Content-Type": "application/json",
     },
     json={
-        "tenant_id": 1,
-        "workspace_id": 1,
         "query": "What does this workspace say about authentication?",
         "top_k": 5,
     },
@@ -355,8 +355,6 @@ curl -X POST https://docstore.oddsmith.net/api/v1/chat/ \
   -H "Authorization: Bearer ds_YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "tenant_id": 1,
-    "workspace_id": 1,
     "question": "Summarize the policy described in these docs.",
     "top_k": 5
   }'
@@ -372,8 +370,6 @@ resp = requests.post(
         "Content-Type": "application/json",
     },
     json={
-        "tenant_id": 1,
-        "workspace_id": 1,
         "question": "Summarize the policy described in these docs.",
         "top_k": 5,
     },
@@ -393,8 +389,6 @@ curl -X POST https://docstore.oddsmith.net/api/v1/chat/ \
   -H "Authorization: Bearer ds_YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "tenant_id": 1,
-    "workspace_id": 1,
     "question": "What does this specific document say about onboarding?",
     "document_id": 42,
     "top_k": 5
@@ -411,8 +405,6 @@ resp = requests.post(
         "Content-Type": "application/json",
     },
     json={
-        "tenant_id": 1,
-        "workspace_id": 1,
         "question": "What does this specific document say about onboarding?",
         "document_id": 42,
         "top_k": 5,
@@ -430,8 +422,6 @@ curl -X POST https://docstore.oddsmith.net/api/v1/urls/ingest/ \
   -H "Authorization: Bearer ds_YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "tenant_id": 1,
-    "workspace_id": 1,
     "urls": [
       "https://example.com/docs/start",
       "https://example.com/help/article"
@@ -452,8 +442,6 @@ resp = requests.post(
         "Content-Type": "application/json",
     },
     json={
-        "tenant_id": 1,
-        "workspace_id": 1,
         "urls": [
             "https://example.com/docs/start",
             "https://example.com/help/article",
@@ -477,8 +465,6 @@ curl -X POST https://docstore.oddsmith.net/api/v1/documents/delete/ \
   -H "Authorization: Bearer ds_YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "tenant_id": 1,
-    "workspace_id": 1,
     "document_ids": [12, 13]
   }'
 ```
@@ -493,8 +479,6 @@ resp = requests.post(
         "Content-Type": "application/json",
     },
     json={
-        "tenant_id": 1,
-        "workspace_id": 1,
         "document_ids": [12, 13],
     },
     timeout=60,
@@ -510,8 +494,6 @@ curl -X POST https://docstore.oddsmith.net/api/v1/documents/restore/ \
   -H "Authorization: Bearer ds_YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "tenant_id": 1,
-    "workspace_id": 1,
     "document_ids": [12, 13]
   }'
 ```
@@ -526,8 +508,6 @@ resp = requests.post(
         "Content-Type": "application/json",
     },
     json={
-        "tenant_id": 1,
-        "workspace_id": 1,
         "document_ids": [12, 13],
     },
     timeout=60,
@@ -543,8 +523,6 @@ curl -X POST https://docstore.oddsmith.net/api/v1/documents/purge/ \
   -H "Authorization: Bearer ds_YOUR_KEY" \
   -H "Content-Type: application/json" \
   -d '{
-    "tenant_id": 1,
-    "workspace_id": 1,
     "document_ids": [12, 13]
   }'
 ```
@@ -559,8 +537,6 @@ resp = requests.post(
         "Content-Type": "application/json",
     },
     json={
-        "tenant_id": 1,
-        "workspace_id": 1,
         "document_ids": [12, 13],
     },
     timeout=60,
