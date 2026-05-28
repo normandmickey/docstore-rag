@@ -1,5 +1,5 @@
 from django.contrib.auth import login
-from django.contrib.auth.views import LoginView, LogoutView
+from django.contrib.auth.views import LoginView
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.utils.text import slugify
@@ -13,8 +13,10 @@ class AppLoginView(LoginView):
     redirect_authenticated_user = True
 
 
-class AppLogoutView(LogoutView):
-    next_page = reverse_lazy('login')
+def logout_view(request):
+    from django.contrib.auth import logout
+    logout(request)
+    return redirect('login')
 
 
 def signup(request):

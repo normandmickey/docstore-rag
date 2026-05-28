@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import path
 from documents.api import DocumentCreateView
-from control.views import AppLoginView, AppLogoutView, dashboard, signup
+from control.views import AppLoginView, dashboard, logout_view, signup
 from retrieval.api import SearchView
 
 
@@ -18,7 +18,7 @@ def health(_request):
 urlpatterns = [
     path('', home),
     path('login/', AppLoginView.as_view(), name='login'),
-    path('logout/', AppLogoutView.as_view(), name='logout'),
+    path('logout/', logout_view, name='logout'),
     path('signup/', signup, name='signup'),
     path('dashboard/', dashboard, name='dashboard'),
     path('api/v1/documents/', DocumentCreateView.as_view()),
