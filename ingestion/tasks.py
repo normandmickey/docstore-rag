@@ -60,7 +60,7 @@ def build_chunks(text, chunk_size=1000, overlap=None):
         return []
 
     if overlap is None:
-        overlap = max(80, int(chunk_size * 0.3))
+        overlap = max(80, int(chunk_size * 0.2))
 
     splitter = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
@@ -190,7 +190,7 @@ def ingest_document_task(self, ingestion_job_id):
         job.save(update_fields=['stage'])
 
         chunk_size = job.workspace.default_chunk_size or 1000
-        chunks = build_chunks(cleaned_text, chunk_size=chunk_size, overlap=max(80, int(chunk_size * 0.3)))
+        chunks = build_chunks(cleaned_text, chunk_size=chunk_size, overlap=max(80, int(chunk_size * 0.2)))
         chunks = enforce_embedding_limit(chunks)
         vectors = embed_texts(chunks) if chunks else []
         Chunk.objects.filter(document_version=version).delete()
