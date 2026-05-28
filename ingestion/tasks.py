@@ -50,7 +50,7 @@ def normalize_extracted_text(text):
     return normalized.strip()
 
 
-def chunk_text(text, chunk_size=800, overlap=120):
+def build_chunks(text, chunk_size=800, overlap=120):
     text = normalize_extracted_text(text)
     if not text:
         return []
@@ -192,7 +192,7 @@ def ingest_document_task(self, ingestion_job_id):
         job.stage = 'embedding'
         job.save(update_fields=['stage'])
 
-        chunks = chunk_text(cleaned_text, chunk_size=job.workspace.default_chunk_size or 800, overlap=120)
+        chunks = build_chunks(cleaned_text, chunk_size=job.workspace.default_chunk_size or 800, overlap=120)
         vectors = embed_texts(chunks) if chunks else []
         Chunk.objects.filter(document_version=version).delete()
         for idx, chunk_text in enumerate(chunks):
