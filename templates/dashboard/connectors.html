@@ -1,0 +1,14 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Connectors · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Microsoft / SharePoint connections</h2>
+  <p class="meta">Connect your own Microsoft account so this workspace can later sync SharePoint content.</p>
+  <p><a href="/connect/microsoft/">Connect Microsoft account</a></p>
+  {% for account in external_accounts %}
+    <div class="row"><strong>{{ account.display_name|default:account.email|default:'Microsoft account' }}</strong><br><span class="meta">{{ account.provider }} · {{ account.email }}{% if account.workspace %} · Workspace: {{ account.workspace.name }}{% endif %}</span></div>
+  {% empty %}
+    <p>No external Microsoft accounts connected yet.</p>
+  {% endfor %}
+</div>
+{% endblock %}

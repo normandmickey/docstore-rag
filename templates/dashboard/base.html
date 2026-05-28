@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Dashboard · Docstore RAG{% endblock %}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #0b1020; color: #eef2ff; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 48px; }
+    .topbar, .card { background: #121a33; border: 1px solid #243055; border-radius: 16px; padding: 24px; margin-bottom: 24px; }
+    .nav { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+    .nav a { color: #cfe3ff; text-decoration: none; padding: 10px 14px; border-radius: 10px; background: #1a2446; }
+    .nav a.active { background: #2563eb; color: white; }
+    a { color: #93c5fd; }
+    .row { padding: 14px 0; border-top: 1px solid #243055; }
+    .row:first-of-type { border-top: 0; }
+    input[type="text"], input[type="file"], select, textarea { width: 100%; box-sizing: border-box; padding: 12px; margin: 8px 0 16px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #fff; }
+    button { padding: 12px 16px; border: 0; border-radius: 10px; background: #2563eb; color: white; cursor: pointer; }
+    .msg { background: #123524; border: 1px solid #1f7a4c; color: #d1fae5; padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }
+    .meta { color: #94a3b8; font-size: 0.95rem; }
+    .status { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+    .status-queued { background: #3f3f46; color: #f4f4f5; }
+    .status-running { background: #1d4ed8; color: #dbeafe; }
+    .status-succeeded { background: #166534; color: #dcfce7; }
+    .status-failed { background: #991b1b; color: #fee2e2; }
+    pre { white-space: pre-wrap; background: #0f172a; padding: 12px; border-radius: 10px; color: #cbd5e1; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <h1 style="margin: 0;">Docstore</h1>
+      {% if messages %}
+        <div style="margin-top: 16px;">
+          {% for message in messages %}
+            <div class="msg">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+      <p><strong>Current workspace:</strong> {% if current_workspace %}{{ current_workspace.name }} ({{ current_workspace.tenant.name }}){% else %}not set{% endif %}</p>
+      <div class="nav">
+        <a href="/dashboard/" class="{% if section == 'overview' %}active{% endif %}">Overview</a>
+        <a href="/dashboard/documents/" class="{% if section == 'documents' %}active{% endif %}">Documents</a>
+        <a href="/dashboard/urls/" class="{% if section == 'urls' %}active{% endif %}">URLs</a>
+        <a href="/dashboard/chat/" class="{% if section == 'chat' %}active{% endif %}">Chat</a>
+        <a href="/dashboard/connectors/" class="{% if section == 'connectors' %}active{% endif %}">Connectors</a>
+        {% if is_staff_user %}
+          <a href="/admin/">Admin</a>
+        {% endif %}
+        <a href="/logout/">Log out</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Workspace</h2>
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="switch_workspace">
+        <label>Select workspace</label>
+        <select name="workspace_id">
+          {% for workspace in available_workspaces %}
+            <option value="{{ workspace.id }}" {% if current_workspace and workspace.id == current_workspace.id %}selected{% endif %}>{{ workspace.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Switch workspace</button>
+      </form>
+      <form method="post" style="margin-top: 18px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="create_workspace">
+        <label>Create workspace</label>
+        <input type="text" name="workspace_name" placeholder="e.g. Sales Docs">
+        <button type="submit">Create workspace</button>
+      </form>
+    </div>
+
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

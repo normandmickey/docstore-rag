@@ -54,6 +54,162 @@ def _bootstrap_user_workspace(user, session):
     return tenant, workspace
 
 
+def _dashboard_base(request):
+    if not request.user.is_authenticated:
+        return None
+
+    if not request.session.get('current_tenant_id') or not request.session.get('current_workspace_id'):
+        _bootstrap_user_workspace(request.user, request.session)
+
+    memberships = TenantMembership.objects.select_related('tenant').filter(user=request.user)
+    current_tenant_id = request.session.get('current_tenant_id')
+    current_workspace_id = request.session.get('current_workspace_id')
+    current_workspace = None
+    documents = Document.objects.none()
+    deleted_documents = Document.objects.none()
+
+    if current_tenant_id and current_workspace_id:
+        current_workspace = Workspace.objects.select_related('tenant').filter(
+            id=current_workspace_id,
+            tenant_id=current_tenant_id,
+        ).first()
+        if current_workspace:
+            documents = Document.objects.filter(
+                tenant_id=current_tenant_id,
+                workspace_id=current_workspace_id,
+            ).exclude(
+                status__in=[Document.STATUS_FAILED, Document.STATUS_DELETED],
+            ).prefetch_related('ingestion_jobs', 'chunks', 'versions').order_by('-created_at')[:25]
+            deleted_documents = Document.objects.filter(
+                tenant_id=current_tenant_id,
+                workspace_id=current_workspace_id,
+                status=Document.STATUS_DELETED,
+            ).prefetch_related('ingestion_jobs', 'chunks', 'versions').order_by('-updated_at')[:25]
+
+    def build_document_rows(items):
+        rows = []
+        for document in items:
+            latest_job = document.ingestion_jobs.order_by('-created_at').first()
+            latest_version = document.versions.order_by('-version_number', '-id').first()
+            version_count = document.versions.count()
+            chunk_count = document.chunks.count()
+            preview = ''
+            if latest_version:
+                preview = (latest_version.extraction_metadata_json or {}).get('raw_text_preview', '')
+            rows.append({
+                'document': document,
+                'latest_job': latest_job,
+                'latest_version': latest_version,
+                'version_count': version_count,
+                'chunk_count': chunk_count,
+                'preview': preview,
+                'source_url': document.source_url,
+            })
+        return rows
+
+    return {
+        'memberships': memberships,
+        'current_tenant_id': current_tenant_id,
+        'current_workspace_id': current_workspace_id,
+        'current_workspace': current_workspace,
+        'available_workspaces': Workspace.objects.filter(tenant_id=current_tenant_id).order_by('name') if current_tenant_id else Workspace.objects.none(),
+        'document_rows': build_document_rows(documents),
+        'deleted_document_rows': build_document_rows(deleted_documents),
+        'external_accounts': ExternalAccount.objects.filter(user=request.user).order_by('-updated_at'),
+        'is_staff_user': bool(request.user.is_staff),
+    }
+
+
+def _handle_workspace_actions(request, base):
+    current_tenant_id = base['current_tenant_id']
+    current_workspace = base['current_workspace']
+
+    if request.method == 'POST' and request.POST.get('action') == 'create_workspace':
+        name = (request.POST.get('workspace_name') or '').strip() or 'New Workspace'
+        if current_tenant_id:
+            tenant = Tenant.objects.get(id=current_tenant_id)
+            base_slug = slugify(name) or 'workspace'
+            slug = base_slug
+            i = 2
+            while Workspace.objects.filter(tenant=tenant, slug=slug).exists():
+                slug = f'{base_slug}-{i}'
+                i += 1
+            workspace = Workspace.objects.create(tenant=tenant, name=name, slug=slug)
+            request.session['current_workspace_id'] = workspace.id
+            messages.success(request, f'Workspace "{workspace.name}" created and selected.')
+        return redirect(request.path)
+
+    if request.method == 'POST' and request.POST.get('action') == 'switch_workspace':
+        workspace_id = request.POST.get('workspace_id')
+        workspace = Workspace.objects.filter(id=workspace_id, tenant_id=current_tenant_id).first()
+        if workspace:
+            request.session['current_workspace_id'] = workspace.id
+            messages.success(request, f'Switched to workspace "{workspace.name}".')
+        return redirect(request.path)
+
+    if request.method == 'POST' and request.POST.get('action') == 'delete_document' and current_workspace:
+        document_ids = request.POST.getlist('document_ids') or [request.POST.get('document_id')]
+        confirm = (request.POST.get('confirm_delete') or '').strip().lower()
+        document_ids = [doc_id for doc_id in document_ids if doc_id]
+        if confirm != 'yes':
+            messages.error(request, 'Delete not confirmed. Check the confirmation box to soft-delete documents.')
+            return redirect(request.path)
+        documents_to_delete = list(Document.objects.filter(
+            id__in=document_ids,
+            tenant=current_workspace.tenant,
+            workspace=current_workspace,
+        ).exclude(status=Document.STATUS_DELETED))
+        if not documents_to_delete:
+            messages.error(request, 'No matching documents found.')
+            return redirect(request.path)
+        for document in documents_to_delete:
+            document.soft_delete()
+        messages.success(request, f'Soft-deleted {len(documents_to_delete)} document(s).')
+        return redirect(request.path)
+
+    if request.method == 'POST' and request.POST.get('action') == 'restore_document' and current_workspace:
+        document_ids = [doc_id for doc_id in request.POST.getlist('document_ids') if doc_id]
+        documents_to_restore = list(Document.objects.filter(
+            id__in=document_ids,
+            tenant=current_workspace.tenant,
+            workspace=current_workspace,
+            status=Document.STATUS_DELETED,
+        ))
+        if not documents_to_restore:
+            messages.error(request, 'No deleted documents selected for restore.')
+            return redirect(request.path)
+        for document in documents_to_restore:
+            document.restore()
+        messages.success(request, f'Restored {len(documents_to_restore)} document(s).')
+        return redirect(request.path)
+
+    if request.method == 'POST' and request.POST.get('action') == 'purge_document' and current_workspace:
+        document_ids = [doc_id for doc_id in request.POST.getlist('document_ids') if doc_id]
+        confirm = (request.POST.get('confirm_purge') or '').strip().lower()
+        if confirm != 'purge':
+            messages.error(request, 'Purge not confirmed. Type PURGE in the confirmation box.')
+            return redirect(request.path)
+        documents_to_purge = list(Document.objects.filter(
+            id__in=document_ids,
+            tenant=current_workspace.tenant,
+            workspace=current_workspace,
+            status=Document.STATUS_DELETED,
+        ))
+        if not documents_to_purge:
+            messages.error(request, 'No deleted documents selected for purge.')
+            return redirect(request.path)
+        purged = 0
+        for document in documents_to_purge:
+            if document.file:
+                document.file.delete(save=False)
+            document.delete()
+            purged += 1
+        messages.success(request, f'Permanently purged {purged} document(s).')
+        return redirect(request.path)
+
+    return None
+
+
 def signup(request):
     if request.user.is_authenticated:
         return redirect('dashboard')
@@ -85,10 +241,10 @@ def microsoft_connect_callback(request):
 
     if error:
         messages.error(request, f'Microsoft connection failed: {error}')
-        return redirect('dashboard')
+        return redirect('dashboard_connectors')
     if not code or not expected_state or expected_state != returned_state:
         messages.error(request, 'Microsoft connection failed: invalid OAuth state or missing code.')
-        return redirect('dashboard')
+        return redirect('dashboard_connectors')
 
     try:
         tokens = exchange_code_for_tokens(code)
@@ -119,152 +275,70 @@ def microsoft_connect_callback(request):
     except Exception as exc:
         logger.exception('Microsoft OAuth callback failed for user=%s', request.user.id)
         messages.error(request, f'Microsoft connection failed: {exc}')
-    return redirect('dashboard')
+    return redirect('dashboard_connectors')
 
 
 def dashboard(request):
     if not request.user.is_authenticated:
         return redirect('login')
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+    base['recent_count'] = len(base['document_rows'])
+    base['trash_count'] = len(base['deleted_document_rows'])
+    return render(request, 'dashboard/index.html', base)
 
-    if not request.session.get('current_tenant_id') or not request.session.get('current_workspace_id'):
-        _bootstrap_user_workspace(request.user, request.session)
 
-    memberships = TenantMembership.objects.select_related('tenant').filter(user=request.user)
-    current_tenant_id = request.session.get('current_tenant_id')
-    current_workspace_id = request.session.get('current_workspace_id')
-    current_workspace = None
-    documents = Document.objects.none()
-    deleted_documents = Document.objects.none()
-    external_accounts = ExternalAccount.objects.filter(user=request.user).order_by('-updated_at')
-    url_ingest_summary = ''
-    chat_answer = ''
-    chat_question = ''
-    chat_results = []
+def dashboard_documents(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
 
-    if current_tenant_id and current_workspace_id:
-        current_workspace = Workspace.objects.select_related('tenant').filter(
-            id=current_workspace_id,
-            tenant_id=current_tenant_id,
-        ).first()
-        if current_workspace:
-            documents = Document.objects.filter(
-                tenant_id=current_tenant_id,
-                workspace_id=current_workspace_id,
-            ).exclude(
-                status__in=[Document.STATUS_FAILED, Document.STATUS_DELETED],
-            ).prefetch_related('ingestion_jobs', 'chunks', 'versions').order_by('-created_at')[:25]
-            deleted_documents = Document.objects.filter(
-                tenant_id=current_tenant_id,
-                workspace_id=current_workspace_id,
-                status=Document.STATUS_DELETED,
-            ).prefetch_related('ingestion_jobs', 'chunks', 'versions').order_by('-updated_at')[:25]
-
-    if request.method == 'POST' and request.POST.get('action') == 'create_workspace':
-        name = (request.POST.get('workspace_name') or '').strip() or 'New Workspace'
-        if current_tenant_id:
-            tenant = Tenant.objects.get(id=current_tenant_id)
-            base = slugify(name) or 'workspace'
-            slug = base
-            i = 2
-            while Workspace.objects.filter(tenant=tenant, slug=slug).exists():
-                slug = f'{base}-{i}'
-                i += 1
-            workspace = Workspace.objects.create(tenant=tenant, name=name, slug=slug)
-            request.session['current_workspace_id'] = workspace.id
-            messages.success(request, f'Workspace "{workspace.name}" created and selected.')
-        return redirect('dashboard')
-
-    if request.method == 'POST' and request.POST.get('action') == 'switch_workspace':
-        workspace_id = request.POST.get('workspace_id')
-        workspace = Workspace.objects.filter(id=workspace_id, tenant_id=current_tenant_id).first()
-        if workspace:
-            request.session['current_workspace_id'] = workspace.id
-            messages.success(request, f'Switched to workspace "{workspace.name}".')
-        return redirect('dashboard')
-
-    if request.method == 'POST' and request.POST.get('action') == 'delete_document' and current_workspace:
-        document_ids = request.POST.getlist('document_ids') or [request.POST.get('document_id')]
-        confirm = (request.POST.get('confirm_delete') or '').strip().lower()
-        document_ids = [doc_id for doc_id in document_ids if doc_id]
-        if confirm != 'yes':
-            messages.error(request, 'Delete not confirmed. Check the confirmation box to soft-delete documents.')
-            return redirect('dashboard')
-        documents_to_delete = list(Document.objects.filter(
-            id__in=document_ids,
-            tenant=current_workspace.tenant,
-            workspace=current_workspace,
-        ).exclude(status=Document.STATUS_DELETED))
-        if not documents_to_delete:
-            messages.error(request, 'No matching documents found.')
-            return redirect('dashboard')
+    current_workspace = base['current_workspace']
+    if request.method == 'POST' and request.FILES.get('file') and current_workspace:
+        upload = request.FILES['file']
+        collection = (request.POST.get('collection') or '').strip()
         try:
-            for document in documents_to_delete:
-                document.soft_delete()
-            messages.success(request, f'Soft-deleted {len(documents_to_delete)} document(s).')
+            result = create_or_reuse_document(
+                tenant=current_workspace.tenant,
+                workspace=current_workspace,
+                uploaded_file=upload,
+                filename=upload.name,
+                mime_type=getattr(upload, 'content_type', '') or '',
+                size_bytes=getattr(upload, 'size', 0) or 0,
+                collection=collection,
+                uploaded_by=request.user,
+            )
+            document = result['document']
+            job = result['job']
+            if result['mode'] == 'duplicate':
+                messages.info(request, f'{document.filename} is already in this workspace. Skipped duplicate upload.')
+            elif result['mode'] == 'versioned':
+                messages.success(request, f'Uploaded new version of {document.filename}. Ingestion job #{job.id} queued.')
+            else:
+                messages.success(request, f'Uploaded {document.filename}. Ingestion job #{job.id} queued.')
         except Exception as exc:
-            logger.exception('Dashboard delete failed for user=%s workspace=%s documents=%s', request.user.id, current_workspace.id, document_ids)
-            messages.error(request, f'Delete failed: {exc}')
-        return redirect('dashboard')
+            logger.exception('Dashboard upload failed for user=%s workspace=%s filename=%s', request.user.id, current_workspace.id, getattr(upload, 'name', ''))
+            messages.error(request, f'Upload failed: {exc}')
+        return redirect('dashboard_documents')
 
-    if request.method == 'POST' and request.POST.get('action') == 'restore_document' and current_workspace:
-        document_ids = [doc_id for doc_id in request.POST.getlist('document_ids') if doc_id]
-        documents_to_restore = list(Document.objects.filter(
-            id__in=document_ids,
-            tenant=current_workspace.tenant,
-            workspace=current_workspace,
-            status=Document.STATUS_DELETED,
-        ))
-        if not documents_to_restore:
-            messages.error(request, 'No deleted documents selected for restore.')
-            return redirect('dashboard')
-        for document in documents_to_restore:
-            document.restore()
-        messages.success(request, f'Restored {len(documents_to_restore)} document(s).')
-        return redirect('dashboard')
+    return render(request, 'dashboard/documents.html', base)
 
-    if request.method == 'POST' and request.POST.get('action') == 'purge_document' and current_workspace:
-        document_ids = [doc_id for doc_id in request.POST.getlist('document_ids') if doc_id]
-        confirm = (request.POST.get('confirm_purge') or '').strip().lower()
-        if confirm != 'purge':
-            messages.error(request, 'Purge not confirmed. Type PURGE in the confirmation box.')
-            return redirect('dashboard')
-        documents_to_purge = list(Document.objects.filter(
-            id__in=document_ids,
-            tenant=current_workspace.tenant,
-            workspace=current_workspace,
-            status=Document.STATUS_DELETED,
-        ))
-        if not documents_to_purge:
-            messages.error(request, 'No deleted documents selected for purge.')
-            return redirect('dashboard')
-        purged = 0
-        for document in documents_to_purge:
-            if document.file:
-                document.file.delete(save=False)
-            document.delete()
-            purged += 1
-        messages.success(request, f'Permanently purged {purged} document(s).')
-        return redirect('dashboard')
 
-    if request.method == 'POST' and request.POST.get('action') == 'ask_question' and current_workspace:
-        chat_question = (request.POST.get('question') or '').strip()
-        selected_document_id = (request.POST.get('document_id') or '').strip()
-        document_scope = int(selected_document_id) if selected_document_id.isdigit() else None
-        if chat_question:
-            try:
-                chat_answer, chat_results = answer_question(
-                    tenant=current_workspace.tenant,
-                    workspace=current_workspace,
-                    query=chat_question,
-                    top_k=5,
-                    document_id=document_scope,
-                )
-            except Exception as exc:
-                logger.exception('Dashboard chat failed for user=%s workspace=%s', request.user.id, current_workspace.id)
-                messages.error(request, f'Chat failed: {exc}')
-        else:
-            messages.error(request, 'Ask a question first.')
+def dashboard_urls(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
 
+    current_workspace = base['current_workspace']
+    base['url_ingest_summary'] = ''
     if request.method == 'POST' and request.POST.get('action') == 'ingest_urls' and current_workspace:
         raw_urls = request.POST.get('urls') or ''
         collection = (request.POST.get('collection') or '').strip()
@@ -281,7 +355,7 @@ def dashboard(request):
         failed = []
         if not seed_urls:
             messages.error(request, 'Add at least one URL.')
-            return redirect('dashboard')
+            return redirect('dashboard_urls')
         valid_seeds = []
         for url in seed_urls:
             if not (url.startswith('http://') or url.startswith('https://')):
@@ -321,82 +395,58 @@ def dashboard(request):
         summary = f'URL ingest: scanned {len(urls)} URLs, created {created}, versioned {versioned}, skipped {skipped}'
         if known_skips:
             summary += f' ({known_skips} already known source URLs)'
-        url_ingest_summary = summary
+        base['url_ingest_summary'] = summary
         if failed:
             summary += f', failed {len(failed)}.'
             messages.error(request, summary + ' Failed URLs: ' + '; '.join(failed[:5]))
         else:
             messages.success(request, summary + '.')
-        return redirect('dashboard')
+        return redirect('dashboard_urls')
 
-    if request.method == 'POST' and request.FILES.get('file') and current_workspace:
-        upload = request.FILES['file']
-        collection = (request.POST.get('collection') or '').strip()
-        try:
-            result = create_or_reuse_document(
-                tenant=current_workspace.tenant,
-                workspace=current_workspace,
-                uploaded_file=upload,
-                filename=upload.name,
-                mime_type=getattr(upload, 'content_type', '') or '',
-                size_bytes=getattr(upload, 'size', 0) or 0,
-                collection=collection,
-                uploaded_by=request.user,
-            )
-            document = result['document']
-            job = result['job']
-            if result['mode'] == 'duplicate':
-                messages.info(request, f'{document.filename} is already in this workspace. Skipped duplicate upload.')
-            elif result['mode'] == 'versioned':
-                messages.success(request, f'Uploaded new version of {document.filename}. Ingestion job #{job.id} queued.')
-            else:
-                messages.success(request, f'Uploaded {document.filename}. Ingestion job #{job.id} queued.')
-        except Exception as exc:
-            logger.exception('Dashboard upload failed for user=%s workspace=%s filename=%s', request.user.id, current_workspace.id, getattr(upload, 'name', ''))
-            messages.error(request, f'Upload failed: {exc}')
-        return redirect('dashboard')
+    return render(request, 'dashboard/urls.html', base)
 
-    def build_document_rows(items):
-        rows = []
-        for document in items:
-            latest_job = document.ingestion_jobs.order_by('-created_at').first()
-            latest_version = document.versions.order_by('-version_number', '-id').first()
-            version_count = document.versions.count()
-            chunk_count = document.chunks.count()
-            preview = ''
-            if latest_version:
-                preview = (latest_version.extraction_metadata_json or {}).get('raw_text_preview', '')
-            rows.append({
-                'document': document,
-                'latest_job': latest_job,
-                'latest_version': latest_version,
-                'version_count': version_count,
-                'chunk_count': chunk_count,
-                'preview': preview,
-                'source_url': document.source_url,
-            })
-        return rows
 
-    document_rows = build_document_rows(documents)
-    deleted_document_rows = build_document_rows(deleted_documents)
+def dashboard_chat(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
 
-    available_workspaces = Workspace.objects.filter(tenant_id=current_tenant_id).order_by('name') if current_tenant_id else Workspace.objects.none()
+    current_workspace = base['current_workspace']
+    base['chat_answer'] = ''
+    base['chat_question'] = ''
+    base['chat_results'] = []
+    if request.method == 'POST' and request.POST.get('action') == 'ask_question' and current_workspace:
+        chat_question = (request.POST.get('question') or '').strip()
+        selected_document_id = (request.POST.get('document_id') or '').strip()
+        document_scope = int(selected_document_id) if selected_document_id.isdigit() else None
+        base['chat_question'] = chat_question
+        if chat_question:
+            try:
+                chat_answer, chat_results = answer_question(
+                    tenant=current_workspace.tenant,
+                    workspace=current_workspace,
+                    query=chat_question,
+                    top_k=5,
+                    document_id=document_scope,
+                )
+                base['chat_answer'] = chat_answer
+                base['chat_results'] = chat_results
+            except Exception as exc:
+                logger.exception('Dashboard chat failed for user=%s workspace=%s', request.user.id, current_workspace.id)
+                messages.error(request, f'Chat failed: {exc}')
+        else:
+            messages.error(request, 'Ask a question first.')
+    return render(request, 'dashboard/chat.html', base)
 
-    return render(
-        request,
-        'dashboard.html',
-        {
-            'memberships': memberships,
-            'current_tenant_id': current_tenant_id,
-            'current_workspace_id': current_workspace_id,
-            'current_workspace': current_workspace,
-            'available_workspaces': available_workspaces,
-            'document_rows': document_rows,
-            'deleted_document_rows': deleted_document_rows,
-            'external_accounts': external_accounts,
-            'url_ingest_summary': url_ingest_summary,
-            'chat_question': chat_question,
-            'chat_answer': chat_answer,
-            'chat_results': chat_results,
-        },
-    )
+
+def dashboard_connectors(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+    return render(request, 'dashboard/connectors.html', base)

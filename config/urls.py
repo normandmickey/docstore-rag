@@ -3,7 +3,7 @@ from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import path
 from documents.api import DocumentCreateView, DocumentDeleteView, DocumentPurgeView, DocumentRestoreView, URLIngestView
-from control.views import AppLoginView, dashboard, logout_view, microsoft_connect_callback, microsoft_connect_start, signup
+from control.views import AppLoginView, dashboard, dashboard_chat, dashboard_connectors, dashboard_documents, dashboard_urls, logout_view, microsoft_connect_callback, microsoft_connect_start, signup
 from retrieval.api import SearchView
 
 
@@ -21,6 +21,10 @@ urlpatterns = [
     path('logout/', logout_view, name='logout'),
     path('signup/', signup, name='signup'),
     path('dashboard/', dashboard, name='dashboard'),
+    path('dashboard/documents/', dashboard_documents, name='dashboard_documents'),
+    path('dashboard/urls/', dashboard_urls, name='dashboard_urls'),
+    path('dashboard/chat/', dashboard_chat, name='dashboard_chat'),
+    path('dashboard/connectors/', dashboard_connectors, name='dashboard_connectors'),
     path('connect/microsoft/', microsoft_connect_start, name='microsoft_connect_start'),
     path('connect/microsoft/callback/', microsoft_connect_callback, name='microsoft_connect_callback'),
     path('api/v1/documents/', DocumentCreateView.as_view()),

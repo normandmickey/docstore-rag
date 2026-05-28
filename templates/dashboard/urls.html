@@ -1,0 +1,26 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}URLs · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Ingest URLs</h2>
+  {% if current_workspace %}
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="ingest_urls">
+    <label>Collection (optional)</label>
+    <input type="text" name="collection" placeholder="e.g. docs, help-center, policies">
+    <label>URLs (one per line)</label>
+    <textarea name="urls" rows="8">{{ request.POST.urls }}</textarea>
+    <label>Crawl mode</label>
+    <select name="crawl_mode">
+      <option value="single">Just these URLs</option>
+      <option value="same_domain">Also crawl linked pages on the same domain</option>
+    </select>
+    <label>Max pages</label>
+    <input type="text" name="max_pages" value="10">
+    {% if url_ingest_summary %}<p class="meta">Last summary: {{ url_ingest_summary }}</p>{% endif %}
+    <button type="submit">Ingest URLs</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
