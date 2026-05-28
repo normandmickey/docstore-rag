@@ -9,7 +9,7 @@ from django.shortcuts import redirect, render
 from django.utils.text import slugify
 
 from documents.models import Document
-from documents.upload_service import create_or_reuse_document
+from documents.upload_service import create_or_reuse_document, create_or_reuse_url_document
 from retrieval.service import answer_question
 
 from .forms import SignUpForm
@@ -193,6 +193,46 @@ def dashboard(request):
                 messages.error(request, f'Chat failed: {exc}')
         else:
             messages.error(request, 'Ask a question first.')
+
+    if request.method == 'POST' and request.POST.get('action') == 'ingest_urls' and current_workspace:
+        raw_urls = request.POST.get('urls') or ''
+        collection = (request.POST.get('collection') or '').strip()
+        urls = [line.strip() for line in raw_urls.splitlines() if line.strip()]
+        created = 0
+        versioned = 0
+        skipped = 0
+        failed = []
+        if not urls:
+            messages.error(request, 'Add at least one URL.')
+            return redirect('dashboard')
+        for url in urls:
+            if not (url.startswith('http://') or url.startswith('https://')):
+                failed.append(f'{url} (invalid URL)')
+                continue
+            try:
+                result = create_or_reuse_url_document(
+                    tenant=current_workspace.tenant,
+                    workspace=current_workspace,
+                    url=url,
+                    collection=collection,
+                    uploaded_by=request.user,
+                )
+                if result['mode'] == 'duplicate':
+                    skipped += 1
+                elif result['mode'] == 'versioned':
+                    versioned += 1
+                else:
+                    created += 1
+            except Exception as exc:
+                logger.exception('Dashboard URL ingest failed for user=%s workspace=%s url=%s', request.user.id, current_workspace.id, url)
+                failed.append(f'{url} ({exc})')
+        summary = f'URL ingest: created {created}, versioned {versioned}, skipped {skipped}'
+        if failed:
+            summary += f', failed {len(failed)}.'
+            messages.error(request, summary + ' Failed URLs: ' + '; '.join(failed[:5]))
+        else:
+            messages.success(request, summary + '.')
+        return redirect('dashboard')
 
     if request.method == 'POST' and request.FILES.get('file') and current_workspace:
         upload = request.FILES['file']
