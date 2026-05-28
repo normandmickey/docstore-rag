@@ -1,7 +1,10 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.views import LoginView
-from django.shortcuts import get_object_or_404, redirect, render
+from django.db import transaction
+from django.shortcuts import redirect, render
 from django.utils.text import slugify
 
 from documents.models import Document
@@ -10,6 +13,8 @@ from ingestion.tasks import ingest_document_task
 
 from .forms import SignUpForm
 from .models import Tenant, TenantMembership, Workspace
+
+logger = logging.getLogger(__name__)
 
 
 class AppLoginView(LoginView):
@@ -62,39 +67,44 @@ def dashboard(request):
             documents = Document.objects.filter(
                 tenant_id=current_tenant_id,
                 workspace_id=current_workspace_id,
-            ).prefetch_related('ingestion_jobs', 'chunks').order_by('-created_at')[:25]
+            ).prefetch_related('ingestion_jobs', 'chunks', 'versions').order_by('-created_at')[:25]
 
     if request.method == 'POST' and request.FILES.get('file') and current_workspace:
         upload = request.FILES['file']
         collection = (request.POST.get('collection') or '').strip()
-        document = Document.objects.create(
-            tenant=current_workspace.tenant,
-            workspace=current_workspace,
-            collection=collection,
-            filename=upload.name,
-            mime_type=getattr(upload, 'content_type', '') or '',
-            size_bytes=getattr(upload, 'size', 0) or 0,
-            object_key=f'{current_workspace.tenant.slug}/{current_workspace.slug}/{upload.name}',
-            source_type=Document.SOURCE_UPLOAD,
-            uploaded_by=request.user,
-            file=upload,
-        )
-        version = document.versions.create(
-            version_number=1,
-            object_key=document.object_key,
-            content_hash='',
-            extraction_metadata_json={},
-        )
-        job = IngestionJob.objects.create(
-            tenant=current_workspace.tenant,
-            workspace=current_workspace,
-            document=document,
-            document_version=version,
-            status=IngestionJob.STATUS_QUEUED,
-            stage='queued',
-        )
-        ingest_document_task.delay(job.id)
-        messages.success(request, f'Uploaded {document.filename}. Ingestion job #{job.id} queued.')
+        try:
+            with transaction.atomic():
+                document = Document.objects.create(
+                    tenant=current_workspace.tenant,
+                    workspace=current_workspace,
+                    collection=collection,
+                    filename=upload.name,
+                    mime_type=getattr(upload, 'content_type', '') or '',
+                    size_bytes=getattr(upload, 'size', 0) or 0,
+                    object_key=f'{current_workspace.tenant.slug}/{current_workspace.slug}/{upload.name}',
+                    source_type=Document.SOURCE_UPLOAD,
+                    uploaded_by=request.user,
+                    file=upload,
+                )
+                version = document.versions.create(
+                    version_number=1,
+                    object_key=document.object_key,
+                    content_hash='',
+                    extraction_metadata_json={},
+                )
+                job = IngestionJob.objects.create(
+                    tenant=current_workspace.tenant,
+                    workspace=current_workspace,
+                    document=document,
+                    document_version=version,
+                    status=IngestionJob.STATUS_QUEUED,
+                    stage='queued',
+                )
+            ingest_document_task.delay(job.id)
+            messages.success(request, f'Uploaded {document.filename}. Ingestion job #{job.id} queued.')
+        except Exception as exc:
+            logger.exception('Dashboard upload failed for user=%s workspace=%s filename=%s', request.user.id, current_workspace.id, getattr(upload, 'name', ''))
+            messages.error(request, f'Upload failed: {exc}')
         return redirect('dashboard')
 
     document_rows = []
