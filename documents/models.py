@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from pgvector.django import VectorField
 
 from control.models import Tenant, Workspace
 
@@ -77,7 +78,7 @@ class Chunk(models.Model):
     text = models.TextField()
     token_count = models.PositiveIntegerField(default=0)
     metadata_json = models.JSONField(default=dict, blank=True)
-    embedding = models.JSONField(default=list, blank=True)
+    embedding = VectorField(dimensions=3072, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
