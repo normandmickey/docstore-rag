@@ -2,6 +2,7 @@ from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from control.api_guard import resolve_api_context
 from control.models import Tenant, Workspace
 from .service import retrieve_chunks
 
@@ -21,6 +22,7 @@ class SearchView(APIView):
 
         tenant = Tenant.objects.get(id=data['tenant_id'])
         workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
+        resolve_api_context(request, tenant=tenant, workspace=workspace)
         query = data['query'].strip()
         top_k = data['top_k']
 

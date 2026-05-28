@@ -294,8 +294,14 @@ Current behavior:
 - revoke disables a key without deleting the DB record
 - helper exists for Bearer-token lookup and `last_used_at` updates (`control/api_auth.py`)
 
+Current behavior now:
+- unauthenticated API requests must provide a Bearer API key
+- tenant mismatch is rejected
+- workspace-scoped keys can only access their workspace
+- successful API-key lookups update `last_used_at`
+
 Current limitation:
-- the helper exists, but all API endpoints are not yet fully enforcing API-key auth end-to-end
+- not every future endpoint is wired yet; new endpoints should use the same guard pattern in `control/api_guard.py`
 
 ## Good Next Steps
 - add document detail + reingest flow

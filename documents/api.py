@@ -2,6 +2,7 @@ from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from control.api_guard import resolve_api_context
 from control.models import Tenant, Workspace
 from .models import Document
 from .upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
@@ -30,6 +31,7 @@ class DocumentCreateView(APIView):
 
         tenant = Tenant.objects.get(id=data['tenant_id'])
         workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
+        resolve_api_context(request, tenant=tenant, workspace=workspace)
         uploaded_file = data.get('file')
         filename = data.get('filename') or (uploaded_file.name if uploaded_file else 'untitled.txt')
         size_bytes = data.get('size_bytes') or (uploaded_file.size if uploaded_file else 0)
@@ -79,6 +81,7 @@ class URLIngestView(APIView):
 
         tenant = Tenant.objects.get(id=data['tenant_id'])
         workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
+        resolve_api_context(request, tenant=tenant, workspace=workspace)
         urls = collect_urls_for_ingest(data['urls'], crawl_mode=data['crawl_mode'], max_pages=data['max_pages'])
 
         created = 0
@@ -133,6 +136,7 @@ class DocumentDeleteView(APIView):
 
         tenant = Tenant.objects.get(id=data['tenant_id'])
         workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
+        resolve_api_context(request, tenant=tenant, workspace=workspace)
         documents = list(Document.objects.filter(
             id__in=data['document_ids'],
             tenant=tenant,
@@ -156,6 +160,7 @@ class DocumentRestoreView(APIView):
 
         tenant = Tenant.objects.get(id=data['tenant_id'])
         workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
+        resolve_api_context(request, tenant=tenant, workspace=workspace)
         documents = list(Document.objects.filter(
             id__in=data['document_ids'],
             tenant=tenant,
@@ -180,6 +185,7 @@ class DocumentPurgeView(APIView):
 
         tenant = Tenant.objects.get(id=data['tenant_id'])
         workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
+        resolve_api_context(request, tenant=tenant, workspace=workspace)
         documents = list(Document.objects.filter(
             id__in=data['document_ids'],
             tenant=tenant,
