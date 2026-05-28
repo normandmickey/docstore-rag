@@ -8,9 +8,9 @@
     {% csrf_token %}
     <label>Collection (optional)</label>
     <input type="text" name="collection" placeholder="e.g. support, contracts, policies">
-    <label>File</label>
-    <input type="file" name="file" required>
-    <p class="meta">Supported now: PDF, DOCX, Markdown, TXT, and HTML.</p>
+    <label>Files</label>
+    <input type="file" name="file" multiple required>
+    <p class="meta">Supported now: PDF, DOCX, Markdown, TXT, and HTML. You can select multiple files at once.</p>
     <button type="submit">Upload and ingest</button>
   </form>
   {% endif %}

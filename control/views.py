@@ -368,31 +368,40 @@ def dashboard_documents(request):
         return handled
 
     current_workspace = base['current_workspace']
-    if request.method == 'POST' and request.FILES.get('file') and current_workspace:
-        upload = request.FILES['file']
+    uploads = request.FILES.getlist('file') if request.method == 'POST' else []
+    if request.method == 'POST' and uploads and current_workspace:
         collection = (request.POST.get('collection') or '').strip()
-        try:
-            result = create_or_reuse_document(
-                tenant=current_workspace.tenant,
-                workspace=current_workspace,
-                uploaded_file=upload,
-                filename=upload.name,
-                mime_type=getattr(upload, 'content_type', '') or '',
-                size_bytes=getattr(upload, 'size', 0) or 0,
-                collection=collection,
-                uploaded_by=request.user,
-            )
-            document = result['document']
-            job = result['job']
-            if result['mode'] == 'duplicate':
-                messages.info(request, f'{document.filename} is already in this workspace. Skipped duplicate upload.')
-            elif result['mode'] == 'versioned':
-                messages.success(request, f'Uploaded new version of {document.filename}. Ingestion job #{job.id} queued.')
-            else:
-                messages.success(request, f'Uploaded {document.filename}. Ingestion job #{job.id} queued.')
-        except Exception as exc:
-            logger.exception('Dashboard upload failed for user=%s workspace=%s filename=%s', request.user.id, current_workspace.id, getattr(upload, 'name', ''))
-            messages.error(request, f'Upload failed: {exc}')
+        created = 0
+        versioned = 0
+        duplicates = 0
+        failed = []
+        for upload in uploads:
+            try:
+                result = create_or_reuse_document(
+                    tenant=current_workspace.tenant,
+                    workspace=current_workspace,
+                    uploaded_file=upload,
+                    filename=upload.name,
+                    mime_type=getattr(upload, 'content_type', '') or '',
+                    size_bytes=getattr(upload, 'size', 0) or 0,
+                    collection=collection,
+                    uploaded_by=request.user,
+                )
+                if result['mode'] == 'duplicate':
+                    duplicates += 1
+                elif result['mode'] == 'versioned':
+                    versioned += 1
+                else:
+                    created += 1
+            except Exception as exc:
+                logger.exception('Dashboard upload failed for user=%s workspace=%s filename=%s', request.user.id, current_workspace.id, getattr(upload, 'name', ''))
+                failed.append(f"{getattr(upload, 'name', 'file')} ({exc})")
+
+        summary = f'Upload summary: created {created}, versioned {versioned}, skipped duplicates {duplicates}'
+        if failed:
+            messages.error(request, summary + f", failed {len(failed)}. Failed files: " + '; '.join(failed[:5]))
+        else:
+            messages.success(request, summary + '.')
         return redirect('dashboard_documents')
 
     base['section'] = 'documents'
