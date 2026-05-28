@@ -29,7 +29,7 @@ def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime
         tenant=tenant,
         workspace=workspace,
         content_hash=content_hash,
-    ).first() if content_hash else None
+    ).exclude(status=Document.STATUS_DELETED).order_by('-created_at').first() if content_hash else None
     if exact_duplicate:
         latest_version = exact_duplicate.versions.order_by('-version_number', '-id').first()
         latest_job = exact_duplicate.ingestion_jobs.order_by('-created_at').first()
@@ -45,7 +45,7 @@ def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime
         tenant=tenant,
         workspace=workspace,
         filename=filename,
-    ).order_by('-created_at').first()
+    ).exclude(status=Document.STATUS_DELETED).order_by('-created_at').first()
 
     with transaction.atomic():
         if existing_same_name:
