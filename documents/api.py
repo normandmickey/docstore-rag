@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 
 from control.models import Tenant, Workspace
 from .models import Document
-from .upload_service import create_or_reuse_document
+from .upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
 
 
 class DocumentCreateSerializer(serializers.Serializer):
@@ -44,6 +44,8 @@ class DocumentCreateView(APIView):
             collection=data.get('collection', ''),
             uploaded_by=request.user if request.user.is_authenticated else None,
             raw_text=data.get('raw_text', ''),
+            source_type=data.get('source_type', Document.SOURCE_UPLOAD),
+            source_url=data.get('source_url', ''),
         )
         document = result['document']
         version = result['version']
@@ -58,3 +60,60 @@ class DocumentCreateView(APIView):
             },
             status=status.HTTP_201_CREATED if result['mode'] != 'duplicate' else status.HTTP_200_OK,
         )
+
+
+class URLIngestSerializer(serializers.Serializer):
+    tenant_id = serializers.IntegerField()
+    workspace_id = serializers.IntegerField()
+    urls = serializers.ListField(child=serializers.URLField(), allow_empty=False)
+    collection = serializers.CharField(max_length=120, required=False, allow_blank=True)
+    crawl_mode = serializers.ChoiceField(choices=['single', 'same_domain'], required=False, default='single')
+    max_pages = serializers.IntegerField(required=False, default=10, min_value=1, max_value=50)
+
+
+class URLIngestView(APIView):
+    def post(self, request):
+        serializer = URLIngestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        tenant = Tenant.objects.get(id=data['tenant_id'])
+        workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
+        urls = collect_urls_for_ingest(data['urls'], crawl_mode=data['crawl_mode'], max_pages=data['max_pages'])
+
+        created = 0
+        versioned = 0
+        skipped = 0
+        failed = []
+        ingested = []
+
+        for url in urls:
+            try:
+                result = create_or_reuse_url_document(
+                    tenant=tenant,
+                    workspace=workspace,
+                    url=url,
+                    collection=data.get('collection', ''),
+                    uploaded_by=request.user if request.user.is_authenticated else None,
+                )
+                ingested.append({
+                    'url': result.get('normalized_url', url),
+                    'document_id': result['document'].id,
+                    'mode': result['mode'],
+                })
+                if result['mode'] == 'duplicate':
+                    skipped += 1
+                elif result['mode'] == 'versioned':
+                    versioned += 1
+                else:
+                    created += 1
+            except Exception as exc:
+                failed.append({'url': url, 'error': str(exc)})
+
+        return Response({
+            'created': created,
+            'versioned': versioned,
+            'skipped': skipped,
+            'failed': failed,
+            'ingested': ingested,
+        })

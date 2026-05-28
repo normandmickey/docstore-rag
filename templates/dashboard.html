@@ -87,7 +87,14 @@
         <input type="text" name="collection" placeholder="e.g. docs, help-center, policies">
         <label>URLs (one per line)</label>
         <textarea name="urls" rows="6" style="width: 100%; box-sizing: border-box; padding: 12px; margin: 8px 0 16px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #fff;">{{ request.POST.urls }}</textarea>
-        <p class="meta">Public pages only for now. Each URL is fetched and ingested as its own document.</p>
+        <label>Crawl mode</label>
+        <select name="crawl_mode">
+          <option value="single">Just these URLs</option>
+          <option value="same_domain">Also crawl linked pages on the same domain</option>
+        </select>
+        <label>Max pages</label>
+        <input type="text" name="max_pages" value="10">
+        <p class="meta">Public pages only for now. Same-domain crawl is intentionally basic and capped.</p>
         <button type="submit">Ingest URLs</button>
       </form>
       {% else %}

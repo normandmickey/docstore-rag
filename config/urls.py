@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import path
-from documents.api import DocumentCreateView
+from documents.api import DocumentCreateView, URLIngestView
 from control.views import AppLoginView, dashboard, logout_view, microsoft_connect_callback, microsoft_connect_start, signup
 from retrieval.api import SearchView
 
@@ -24,6 +24,7 @@ urlpatterns = [
     path('connect/microsoft/', microsoft_connect_start, name='microsoft_connect_start'),
     path('connect/microsoft/callback/', microsoft_connect_callback, name='microsoft_connect_callback'),
     path('api/v1/documents/', DocumentCreateView.as_view()),
+    path('api/v1/urls/ingest/', URLIngestView.as_view()),
     path('api/v1/search/', SearchView.as_view()),
     path('admin/', admin.site.urls),
     path('healthz/', health),

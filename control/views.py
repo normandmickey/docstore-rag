@@ -9,7 +9,7 @@ from django.shortcuts import redirect, render
 from django.utils.text import slugify
 
 from documents.models import Document
-from documents.upload_service import create_or_reuse_document, create_or_reuse_url_document
+from documents.upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
 from retrieval.service import answer_question
 
 from .forms import SignUpForm
@@ -197,18 +197,28 @@ def dashboard(request):
     if request.method == 'POST' and request.POST.get('action') == 'ingest_urls' and current_workspace:
         raw_urls = request.POST.get('urls') or ''
         collection = (request.POST.get('collection') or '').strip()
-        urls = [line.strip() for line in raw_urls.splitlines() if line.strip()]
+        crawl_mode = (request.POST.get('crawl_mode') or 'single').strip()
+        max_pages_raw = (request.POST.get('max_pages') or '10').strip()
+        try:
+            max_pages = max(1, min(int(max_pages_raw or '10'), 50))
+        except ValueError:
+            max_pages = 10
+        seed_urls = [line.strip() for line in raw_urls.splitlines() if line.strip()]
         created = 0
         versioned = 0
         skipped = 0
         failed = []
-        if not urls:
+        if not seed_urls:
             messages.error(request, 'Add at least one URL.')
             return redirect('dashboard')
-        for url in urls:
+        valid_seeds = []
+        for url in seed_urls:
             if not (url.startswith('http://') or url.startswith('https://')):
                 failed.append(f'{url} (invalid URL)')
-                continue
+            else:
+                valid_seeds.append(url)
+        urls = collect_urls_for_ingest(valid_seeds, crawl_mode=crawl_mode, max_pages=max_pages)
+        for url in urls:
             try:
                 result = create_or_reuse_url_document(
                     tenant=current_workspace.tenant,

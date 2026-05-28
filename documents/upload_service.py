@@ -1,7 +1,9 @@
 import hashlib
-from urllib.parse import urlparse
+from collections import deque
+from urllib.parse import urljoin, urlparse, urlunparse
 
 import requests
+from bs4 import BeautifulSoup
 from django.core.files.base import ContentFile
 from django.db import transaction
 from markdownify import markdownify as html_to_markdown
@@ -107,6 +109,16 @@ def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime
     }
 
 
+def normalize_url(url):
+    parsed = urlparse((url or '').strip())
+    scheme = (parsed.scheme or 'https').lower()
+    netloc = parsed.netloc.lower()
+    path = parsed.path or '/'
+    if path != '/' and path.endswith('/'):
+        path = path.rstrip('/')
+    return urlunparse((scheme, netloc, path, '', parsed.query, ''))
+
+
 def _filename_from_url(url, content_type='text/html'):
     parsed = urlparse(url)
     tail = (parsed.path or '').rstrip('/').split('/')[-1]
@@ -117,32 +129,95 @@ def _filename_from_url(url, content_type='text/html'):
     return f'{parsed.netloc or "page"}.txt'
 
 
+def _extract_links_from_html(html, base_url):
+    soup = BeautifulSoup(html, 'html.parser')
+    links = []
+    for tag in soup.find_all('a', href=True):
+        href = (tag.get('href') or '').strip()
+        if not href or href.startswith('#') or href.startswith('mailto:') or href.startswith('javascript:'):
+            continue
+        absolute = normalize_url(urljoin(base_url, href))
+        if absolute.startswith('http://') or absolute.startswith('https://'):
+            links.append(absolute)
+    return links
+
+
+def _html_to_text(html):
+    soup = BeautifulSoup(html, 'html.parser')
+    for tag in soup(['script', 'style', 'noscript']):
+        tag.decompose()
+    main = soup.find('main') or soup.find('article') or soup.body or soup
+    return html_to_markdown(str(main))
+
+
 def create_or_reuse_url_document(*, tenant, workspace, url, collection='', uploaded_by=None):
-    response = requests.get(url, timeout=45, headers={'User-Agent': 'docstore-rag/1.0'})
+    normalized_url = normalize_url(url)
+
+    existing_by_url = Document.objects.filter(
+        tenant=tenant,
+        workspace=workspace,
+        source_type=Document.SOURCE_URL,
+        source_url=normalized_url,
+    ).order_by('-created_at').first()
+
+    response = requests.get(normalized_url, timeout=45, headers={'User-Agent': 'docstore-rag/1.0'})
     response.raise_for_status()
 
     content_type = response.headers.get('Content-Type', '').split(';')[0].strip().lower()
-    raw = response.content
-    if content_type == 'text/html' or url.lower().endswith(('.html', '.htm')):
-        raw_text = html_to_markdown(response.text)
+    if content_type == 'text/html' or normalized_url.lower().endswith(('.html', '.htm', '/')):
+        raw_text = _html_to_text(response.text)
         mime_type = 'text/html'
-        filename = _filename_from_url(url, content_type='text/html')
+        filename = _filename_from_url(normalized_url, content_type='text/html')
     else:
         raw_text = response.text
         mime_type = content_type or 'text/plain'
-        filename = _filename_from_url(url, content_type=mime_type)
+        filename = _filename_from_url(normalized_url, content_type=mime_type)
 
     uploaded_file = ContentFile(raw_text.encode('utf-8'), name=filename)
-    return create_or_reuse_document(
+    result = create_or_reuse_document(
         tenant=tenant,
         workspace=workspace,
         uploaded_file=uploaded_file,
-        filename=filename,
+        filename=(existing_by_url.filename if existing_by_url else filename),
         mime_type=mime_type,
         size_bytes=len(raw_text.encode('utf-8')),
         collection=collection,
         uploaded_by=uploaded_by,
         raw_text=raw_text,
         source_type=Document.SOURCE_URL,
-        source_url=url,
+        source_url=normalized_url,
     )
+    result['normalized_url'] = normalized_url
+    result['discovered_links'] = _extract_links_from_html(response.text, normalized_url) if mime_type == 'text/html' else []
+    return result
+
+
+def collect_urls_for_ingest(seed_urls, crawl_mode='single', max_pages=10):
+    normalized = [normalize_url(url) for url in seed_urls if url]
+    if crawl_mode != 'same_domain':
+        return normalized
+
+    seen = set()
+    queue = deque(normalized)
+    results = []
+    root_domains = {urlparse(url).netloc for url in normalized}
+
+    while queue and len(results) < max_pages:
+        current = queue.popleft()
+        if current in seen:
+            continue
+        seen.add(current)
+        results.append(current)
+        try:
+            response = requests.get(current, timeout=30, headers={'User-Agent': 'docstore-rag/1.0'})
+            response.raise_for_status()
+            content_type = response.headers.get('Content-Type', '').split(';')[0].strip().lower()
+            if content_type != 'text/html':
+                continue
+            for link in _extract_links_from_html(response.text, current):
+                if urlparse(link).netloc in root_domains and link not in seen and link not in queue and len(results) + len(queue) < max_pages:
+                    queue.append(link)
+        except Exception:
+            continue
+
+    return results
