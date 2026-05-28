@@ -134,6 +134,7 @@ def dashboard(request):
     current_workspace_id = request.session.get('current_workspace_id')
     current_workspace = None
     documents = Document.objects.none()
+    deleted_documents = Document.objects.none()
     external_accounts = ExternalAccount.objects.filter(user=request.user).order_by('-updated_at')
     url_ingest_summary = ''
     chat_answer = ''
@@ -152,6 +153,11 @@ def dashboard(request):
             ).exclude(
                 status__in=[Document.STATUS_FAILED, Document.STATUS_DELETED],
             ).prefetch_related('ingestion_jobs', 'chunks', 'versions').order_by('-created_at')[:25]
+            deleted_documents = Document.objects.filter(
+                tenant_id=current_tenant_id,
+                workspace_id=current_workspace_id,
+                status=Document.STATUS_DELETED,
+            ).prefetch_related('ingestion_jobs', 'chunks', 'versions').order_by('-updated_at')[:25]
 
     if request.method == 'POST' and request.POST.get('action') == 'create_workspace':
         name = (request.POST.get('workspace_name') or '').strip() or 'New Workspace'
@@ -198,6 +204,46 @@ def dashboard(request):
         except Exception as exc:
             logger.exception('Dashboard delete failed for user=%s workspace=%s documents=%s', request.user.id, current_workspace.id, document_ids)
             messages.error(request, f'Delete failed: {exc}')
+        return redirect('dashboard')
+
+    if request.method == 'POST' and request.POST.get('action') == 'restore_document' and current_workspace:
+        document_ids = [doc_id for doc_id in request.POST.getlist('document_ids') if doc_id]
+        documents_to_restore = list(Document.objects.filter(
+            id__in=document_ids,
+            tenant=current_workspace.tenant,
+            workspace=current_workspace,
+            status=Document.STATUS_DELETED,
+        ))
+        if not documents_to_restore:
+            messages.error(request, 'No deleted documents selected for restore.')
+            return redirect('dashboard')
+        for document in documents_to_restore:
+            document.restore()
+        messages.success(request, f'Restored {len(documents_to_restore)} document(s).')
+        return redirect('dashboard')
+
+    if request.method == 'POST' and request.POST.get('action') == 'purge_document' and current_workspace:
+        document_ids = [doc_id for doc_id in request.POST.getlist('document_ids') if doc_id]
+        confirm = (request.POST.get('confirm_purge') or '').strip().lower()
+        if confirm != 'purge':
+            messages.error(request, 'Purge not confirmed. Type PURGE in the confirmation box.')
+            return redirect('dashboard')
+        documents_to_purge = list(Document.objects.filter(
+            id__in=document_ids,
+            tenant=current_workspace.tenant,
+            workspace=current_workspace,
+            status=Document.STATUS_DELETED,
+        ))
+        if not documents_to_purge:
+            messages.error(request, 'No deleted documents selected for purge.')
+            return redirect('dashboard')
+        purged = 0
+        for document in documents_to_purge:
+            if document.file:
+                document.file.delete(save=False)
+            document.delete()
+            purged += 1
+        messages.success(request, f'Permanently purged {purged} document(s).')
         return redirect('dashboard')
 
     if request.method == 'POST' and request.POST.get('action') == 'ask_question' and current_workspace:
@@ -310,24 +356,29 @@ def dashboard(request):
             messages.error(request, f'Upload failed: {exc}')
         return redirect('dashboard')
 
-    document_rows = []
-    for document in documents:
-        latest_job = document.ingestion_jobs.order_by('-created_at').first()
-        latest_version = document.versions.order_by('-version_number', '-id').first()
-        version_count = document.versions.count()
-        chunk_count = document.chunks.count()
-        preview = ''
-        if latest_version:
-            preview = (latest_version.extraction_metadata_json or {}).get('raw_text_preview', '')
-        document_rows.append({
-            'document': document,
-            'latest_job': latest_job,
-            'latest_version': latest_version,
-            'version_count': version_count,
-            'chunk_count': chunk_count,
-            'preview': preview,
-            'source_url': document.source_url,
-        })
+    def build_document_rows(items):
+        rows = []
+        for document in items:
+            latest_job = document.ingestion_jobs.order_by('-created_at').first()
+            latest_version = document.versions.order_by('-version_number', '-id').first()
+            version_count = document.versions.count()
+            chunk_count = document.chunks.count()
+            preview = ''
+            if latest_version:
+                preview = (latest_version.extraction_metadata_json or {}).get('raw_text_preview', '')
+            rows.append({
+                'document': document,
+                'latest_job': latest_job,
+                'latest_version': latest_version,
+                'version_count': version_count,
+                'chunk_count': chunk_count,
+                'preview': preview,
+                'source_url': document.source_url,
+            })
+        return rows
+
+    document_rows = build_document_rows(documents)
+    deleted_document_rows = build_document_rows(deleted_documents)
 
     available_workspaces = Workspace.objects.filter(tenant_id=current_tenant_id).order_by('name') if current_tenant_id else Workspace.objects.none()
 
@@ -341,6 +392,7 @@ def dashboard(request):
             'current_workspace': current_workspace,
             'available_workspaces': available_workspaces,
             'document_rows': document_rows,
+            'deleted_document_rows': deleted_document_rows,
             'external_accounts': external_accounts,
             'url_ingest_summary': url_ingest_summary,
             'chat_question': chat_question,

@@ -146,3 +146,55 @@ class DocumentDeleteView(APIView):
             'soft_deleted': len(documents),
             'document_ids': [doc.id for doc in documents],
         })
+
+
+class DocumentRestoreView(APIView):
+    def post(self, request):
+        serializer = DocumentDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        tenant = Tenant.objects.get(id=data['tenant_id'])
+        workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
+        documents = list(Document.objects.filter(
+            id__in=data['document_ids'],
+            tenant=tenant,
+            workspace=workspace,
+            status=Document.STATUS_DELETED,
+        ))
+
+        for document in documents:
+            document.restore()
+
+        return Response({
+            'restored': len(documents),
+            'document_ids': [doc.id for doc in documents],
+        })
+
+
+class DocumentPurgeView(APIView):
+    def post(self, request):
+        serializer = DocumentDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        tenant = Tenant.objects.get(id=data['tenant_id'])
+        workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
+        documents = list(Document.objects.filter(
+            id__in=data['document_ids'],
+            tenant=tenant,
+            workspace=workspace,
+            status=Document.STATUS_DELETED,
+        ))
+
+        purged_ids = []
+        for document in documents:
+            if document.file:
+                document.file.delete(save=False)
+            purged_ids.append(document.id)
+            document.delete()
+
+        return Response({
+            'purged': len(purged_ids),
+            'document_ids': purged_ids,
+        })

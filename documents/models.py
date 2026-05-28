@@ -59,6 +59,10 @@ class Document(models.Model):
         self.status = self.STATUS_DELETED
         self.save(update_fields=['status', 'updated_at'])
 
+    def restore(self):
+        self.status = self.STATUS_READY if self.versions.exists() else self.STATUS_PENDING
+        self.save(update_fields=['status', 'updated_at'])
+
     def __str__(self):
         return f'{self.filename} [{self.workspace}]'
 

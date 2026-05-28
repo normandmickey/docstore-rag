@@ -11,7 +11,7 @@
     a { color: #93c5fd; }
     .row { padding: 14px 0; border-top: 1px solid #243055; }
     .row:first-of-type { border-top: 0; }
-    input[type="text"], input[type="file"], select { width: 100%; box-sizing: border-box; padding: 12px; margin: 8px 0 16px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #fff; }
+    input[type="text"], input[type="file"], select, textarea { width: 100%; box-sizing: border-box; padding: 12px; margin: 8px 0 16px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #fff; }
     button { padding: 12px 16px; border: 0; border-radius: 10px; background: #2563eb; color: white; cursor: pointer; }
     .msg { background: #123524; border: 1px solid #1f7a4c; color: #d1fae5; padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }
     .meta { color: #94a3b8; font-size: 0.95rem; }
@@ -86,7 +86,7 @@
         <label>Collection (optional)</label>
         <input type="text" name="collection" placeholder="e.g. docs, help-center, policies">
         <label>URLs (one per line)</label>
-        <textarea name="urls" rows="6" style="width: 100%; box-sizing: border-box; padding: 12px; margin: 8px 0 16px; border-radius: 10px; border: 1px solid #334155; background: #0f172a; color: #fff;">{{ request.POST.urls }}</textarea>
+        <textarea name="urls" rows="6">{{ request.POST.urls }}</textarea>
         <label>Crawl mode</label>
         <select name="crawl_mode">
           <option value="single">Just these URLs</option>
@@ -195,6 +195,45 @@
           <button type="submit" style="background: #991b1b; margin-top: 12px;">Delete selected</button>
         {% endif %}
       </form>
+    </div>
+
+    <div class="card">
+      <h2>Trash</h2>
+      {% if deleted_document_rows %}
+        <form method="post" style="margin-bottom: 18px;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="restore_document">
+          {% for row in deleted_document_rows %}
+            <div class="row">
+              <label style="display: flex; gap: 10px; align-items: flex-start;">
+                <input type="checkbox" name="document_ids" value="{{ row.document.id }}" style="width: auto; margin-top: 6px;">
+                <span style="flex: 1;">
+                  <strong>{{ row.document.filename }}</strong><br>
+                  <span class="meta">Deleted · Collection: {{ row.document.collection|default:'—' }}</span><br>
+                  {% if row.source_url %}
+                    <span class="meta">Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></span><br>
+                  {% endif %}
+                  <span class="meta">Versions: {{ row.version_count }}{% if row.latest_version %} · Latest v{{ row.latest_version.version_number }}{% endif %}{% if row.chunk_count %} · Chunks: {{ row.chunk_count }}{% endif %}</span>
+                </span>
+              </label>
+            </div>
+          {% endfor %}
+          <button type="submit" style="background: #166534; margin-top: 12px;">Restore selected</button>
+        </form>
+
+        <form method="post">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="purge_document">
+          {% for row in deleted_document_rows %}
+            <input type="hidden" name="document_ids" value="{{ row.document.id }}">
+          {% endfor %}
+          <label>Type <strong>PURGE</strong> to permanently delete all items currently shown in trash:</label>
+          <input type="text" name="confirm_purge" placeholder="PURGE">
+          <button type="submit" style="background: #7f1d1d; margin-top: 12px;">Purge all shown</button>
+        </form>
+      {% else %}
+        <p>No deleted documents in trash.</p>
+      {% endif %}
     </div>
 
     <div class="card">
