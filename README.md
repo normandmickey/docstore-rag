@@ -46,6 +46,7 @@ Current stack and behavior are now beyond the initial scaffold stage:
 ### Retrieval and chat
 - embeddings stored in Postgres via pgvector
 - `/api/v1/search/` uses vector similarity search
+- `/api/v1/chat/` returns answer + cited source chunks
 - dashboard “chat with documents” UI retrieves chunks and generates an answer with source context
 
 ### Duplicate/version handling
@@ -111,6 +112,7 @@ Current stack and behavior are now beyond the initial scaffold stage:
 - `POST /api/v1/documents/purge/`
 - `POST /api/v1/urls/ingest/`
 - `POST /api/v1/search/`
+- `POST /api/v1/chat/`
 
 ## Key Models
 

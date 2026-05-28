@@ -4,7 +4,7 @@ from rest_framework.views import APIView
 
 from control.api_guard import resolve_api_context
 from control.models import Tenant, Workspace
-from .service import retrieve_chunks
+from .service import answer_question, retrieve_chunks
 
 
 class SearchSerializer(serializers.Serializer):
@@ -12,6 +12,14 @@ class SearchSerializer(serializers.Serializer):
     workspace_id = serializers.IntegerField()
     query = serializers.CharField()
     top_k = serializers.IntegerField(required=False, default=5, min_value=1, max_value=50)
+
+
+class ChatSerializer(serializers.Serializer):
+    tenant_id = serializers.IntegerField()
+    workspace_id = serializers.IntegerField()
+    question = serializers.CharField()
+    top_k = serializers.IntegerField(required=False, default=5, min_value=1, max_value=20)
+    document_id = serializers.IntegerField(required=False)
 
 
 class SearchView(APIView):
@@ -35,6 +43,40 @@ class SearchView(APIView):
 
         return Response({
             'results': [
+                {
+                    'chunk_id': row.id,
+                    'document_id': row.document_id,
+                    'document': row.document.filename,
+                    'chunk_index': row.chunk_index,
+                    'text': row.text,
+                    'distance': float(getattr(row, 'distance', 0.0)),
+                }
+                for row in results
+            ]
+        })
+
+
+class ChatView(APIView):
+    def post(self, request):
+        serializer = ChatSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        tenant = Tenant.objects.get(id=data['tenant_id'])
+        workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
+        resolve_api_context(request, tenant=tenant, workspace=workspace)
+
+        answer, results = answer_question(
+            tenant=tenant,
+            workspace=workspace,
+            query=data['question'].strip(),
+            top_k=data['top_k'],
+            document_id=data.get('document_id'),
+        )
+
+        return Response({
+            'answer': answer,
+            'sources': [
                 {
                     'chunk_id': row.id,
                     'document_id': row.document_id,

@@ -4,7 +4,7 @@ from django.shortcuts import render
 from django.urls import path
 from documents.api import DocumentCreateView, DocumentDeleteView, DocumentPurgeView, DocumentRestoreView, URLIngestView
 from control.views import AppLoginView, dashboard, dashboard_api_keys, dashboard_chat, dashboard_connectors, dashboard_documents, dashboard_urls, logout_view, microsoft_connect_callback, microsoft_connect_start, signup
-from retrieval.api import SearchView
+from retrieval.api import ChatView, SearchView
 
 
 def home(request):
@@ -34,6 +34,7 @@ urlpatterns = [
     path('api/v1/documents/purge/', DocumentPurgeView.as_view()),
     path('api/v1/urls/ingest/', URLIngestView.as_view()),
     path('api/v1/search/', SearchView.as_view()),
+    path('api/v1/chat/', ChatView.as_view()),
     path('admin/', admin.site.urls),
     path('healthz/', health),
 ]
