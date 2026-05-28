@@ -144,9 +144,9 @@ def _extract_links_from_html(html, base_url):
 
 def _html_to_text(html):
     soup = BeautifulSoup(html, 'html.parser')
-    for tag in soup(['script', 'style', 'noscript']):
+    for tag in soup(['script', 'style', 'noscript', 'header', 'footer', 'nav', 'aside', 'form']):
         tag.decompose()
-    main = soup.find('main') or soup.find('article') or soup.body or soup
+    main = soup.find('main') or soup.find('article') or soup.find(attrs={'role': 'main'}) or soup.body or soup
     return html_to_markdown(str(main))
 
 
@@ -193,7 +193,16 @@ def create_or_reuse_url_document(*, tenant, workspace, url, collection='', uploa
 
 
 def collect_urls_for_ingest(seed_urls, crawl_mode='single', max_pages=10):
-    normalized = [normalize_url(url) for url in seed_urls if url]
+    normalized = []
+    seen_seed = set()
+    for url in seed_urls:
+        if not url:
+            continue
+        candidate = normalize_url(url)
+        if candidate in seen_seed:
+            continue
+        seen_seed.add(candidate)
+        normalized.append(candidate)
     if crawl_mode != 'same_domain':
         return normalized
 

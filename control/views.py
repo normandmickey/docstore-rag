@@ -135,6 +135,7 @@ def dashboard(request):
     current_workspace = None
     documents = Document.objects.none()
     external_accounts = ExternalAccount.objects.filter(user=request.user).order_by('-updated_at')
+    url_ingest_summary = ''
     chat_answer = ''
     chat_question = ''
     chat_results = []
@@ -218,7 +219,18 @@ def dashboard(request):
             else:
                 valid_seeds.append(url)
         urls = collect_urls_for_ingest(valid_seeds, crawl_mode=crawl_mode, max_pages=max_pages)
+        existing_url_set = set(Document.objects.filter(
+            tenant=current_workspace.tenant,
+            workspace=current_workspace,
+            source_type=Document.SOURCE_URL,
+            source_url__in=urls,
+        ).values_list('source_url', flat=True))
+        known_skips = 0
         for url in urls:
+            if url in existing_url_set:
+                skipped += 1
+                known_skips += 1
+                continue
             try:
                 result = create_or_reuse_url_document(
                     tenant=current_workspace.tenant,
@@ -236,7 +248,10 @@ def dashboard(request):
             except Exception as exc:
                 logger.exception('Dashboard URL ingest failed for user=%s workspace=%s url=%s', request.user.id, current_workspace.id, url)
                 failed.append(f'{url} ({exc})')
-        summary = f'URL ingest: created {created}, versioned {versioned}, skipped {skipped}'
+        summary = f'URL ingest: scanned {len(urls)} URLs, created {created}, versioned {versioned}, skipped {skipped}'
+        if known_skips:
+            summary += f' ({known_skips} already known source URLs)'
+        url_ingest_summary = summary
         if failed:
             summary += f', failed {len(failed)}.'
             messages.error(request, summary + ' Failed URLs: ' + '; '.join(failed[:5]))
@@ -287,6 +302,7 @@ def dashboard(request):
             'version_count': version_count,
             'chunk_count': chunk_count,
             'preview': preview,
+            'source_url': document.source_url,
         })
 
     available_workspaces = Workspace.objects.filter(tenant_id=current_tenant_id).order_by('name') if current_tenant_id else Workspace.objects.none()
@@ -302,6 +318,7 @@ def dashboard(request):
             'available_workspaces': available_workspaces,
             'document_rows': document_rows,
             'external_accounts': external_accounts,
+            'url_ingest_summary': url_ingest_summary,
             'chat_question': chat_question,
             'chat_answer': chat_answer,
             'chat_results': chat_results,
