@@ -18,6 +18,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'storages',
     'pgvector.django',
     'control',
     'documents',
@@ -120,3 +121,15 @@ S3_SECRET_KEY = os.getenv('S3_SECRET_KEY', '')
 S3_BUCKET = os.getenv('S3_BUCKET', '')
 S3_REGION = os.getenv('S3_REGION', 'us-east-1')
 S3_USE_SSL = os.getenv('S3_USE_SSL', '0') == '1'
+
+
+USE_S3_STORAGE = bool(S3_ENDPOINT_URL and S3_BUCKET)
+if USE_S3_STORAGE:
+    AWS_ACCESS_KEY_ID = S3_ACCESS_KEY
+    AWS_SECRET_ACCESS_KEY = S3_SECRET_KEY
+    AWS_STORAGE_BUCKET_NAME = S3_BUCKET
+    AWS_S3_ENDPOINT_URL = S3_ENDPOINT_URL
+    AWS_S3_REGION_NAME = S3_REGION
+    AWS_S3_USE_SSL = S3_USE_SSL
+    AWS_DEFAULT_ACL = None
+    AWS_QUERYSTRING_AUTH = True

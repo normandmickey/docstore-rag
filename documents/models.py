@@ -3,6 +3,10 @@ from django.db import models
 from pgvector.django import VectorField
 
 from control.models import Tenant, Workspace
+from .storage import DocumentStorage
+
+
+document_storage = DocumentStorage()
 
 
 class Document(models.Model):
@@ -37,6 +41,7 @@ class Document(models.Model):
     content_hash = models.CharField(max_length=128, blank=True, default='')
     source_type = models.CharField(max_length=20, choices=SOURCE_CHOICES, default=SOURCE_UPLOAD)
     source_url = models.URLField(blank=True, default='')
+    file = models.FileField(upload_to='documents/%Y/%m/%d/', storage=document_storage, blank=True, null=True)
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
