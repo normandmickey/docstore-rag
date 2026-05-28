@@ -9,13 +9,24 @@ def get_openai_client():
     return OpenAI(**kwargs)
 
 
+EMBED_BATCH_SIZE = 128
+
+
 def embed_texts(texts, model=None):
+    texts = [text for text in (texts or []) if text]
+    if not texts:
+        return []
+
     client = get_openai_client()
-    response = client.embeddings.create(
-        model=model or settings.DEFAULT_EMBEDDING_MODEL,
-        input=texts,
-    )
-    return [item.embedding for item in response.data]
+    vectors = []
+    for start in range(0, len(texts), EMBED_BATCH_SIZE):
+        batch = texts[start:start + EMBED_BATCH_SIZE]
+        response = client.embeddings.create(
+            model=model or settings.DEFAULT_EMBEDDING_MODEL,
+            input=batch,
+        )
+        vectors.extend(item.embedding for item in response.data)
+    return vectors
 
 
 def answer_with_context(question, context_blocks, model=None):
