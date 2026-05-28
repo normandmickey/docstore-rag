@@ -165,6 +165,92 @@ MS_GRAPH_TENANT_ID=common
 MS_GRAPH_SCOPES=openid profile email offline_access Files.Read Sites.Read.All User.Read
 ```
 
+### Microsoft app registration setup
+Use this when resuming user-owned SharePoint connections.
+
+#### 1. Create the app registration
+In Azure / Microsoft Entra:
+
+- go to `Microsoft Entra ID`
+- go to `App registrations`
+- click `New registration`
+
+Recommended values:
+
+- **Name:** `docstore-rag`
+- **Supported account types:**
+  - use **Accounts in any organizational directory and personal Microsoft accounts** if you want broad compatibility
+  - use an org-only option if this should only work for one Microsoft 365 tenant
+- **Redirect URI:**
+  - Platform: `Web`
+  - URI: `https://docstore.oddsmith.net/connect/microsoft/callback/`
+
+After creation, copy:
+
+- **Application (client) ID** → `MS_GRAPH_CLIENT_ID`
+- **Directory (tenant) ID** → use as `MS_GRAPH_TENANT_ID` if you want tenant-specific auth
+  - otherwise set `MS_GRAPH_TENANT_ID=common` for multi-tenant behavior
+
+#### 2. Create the client secret
+In the app registration:
+
+- go to `Certificates & secrets`
+- click `New client secret`
+- create one and copy the **Value** immediately
+
+Use that value as:
+
+- `MS_GRAPH_CLIENT_SECRET`
+
+Important: use the **secret value**, not the secret ID.
+
+#### 3. Configure authentication
+In the app registration:
+
+- go to `Authentication`
+- confirm the redirect URI exists exactly as:
+  - `https://docstore.oddsmith.net/connect/microsoft/callback/`
+
+No SPA/mobile setup is needed for the current server-side auth-code flow.
+
+#### 4. Add Microsoft Graph API permissions
+In the app registration:
+
+- go to `API permissions`
+- click `Add a permission`
+- choose `Microsoft Graph`
+- choose `Delegated permissions`
+
+Add:
+
+- `openid`
+- `profile`
+- `email`
+- `offline_access`
+- `User.Read`
+- `Files.Read`
+- `Sites.Read.All`
+
+If needed for your tenant, grant admin consent after adding permissions.
+
+#### 5. Set the production env vars
+Add these to the VPS `.env` for docstore:
+
+```env
+MS_GRAPH_CLIENT_ID=YOUR_CLIENT_ID
+MS_GRAPH_CLIENT_SECRET=YOUR_SECRET_VALUE
+MS_GRAPH_REDIRECT_URI=https://docstore.oddsmith.net/connect/microsoft/callback/
+MS_GRAPH_TENANT_ID=common
+MS_GRAPH_SCOPES=openid profile email offline_access Files.Read Sites.Read.All User.Read
+```
+
+#### 6. Restart the app after updating env
+After editing `/home/norm/sites/docstore_rag/.env` on the VPS, restart:
+
+```bash
+sudo systemctl restart docstore-rag.service docstore-rag-celery.service
+```
+
 ## SharePoint Status
 
 SharePoint support is partially scaffolded, not finished.
