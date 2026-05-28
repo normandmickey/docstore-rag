@@ -4,7 +4,7 @@ from pgvector.django import CosineDistance
 
 from audit.models import RetrievalLog
 from documents.models import Chunk, Document
-from providers import answer_with_context, embed_texts
+from providers import answer_with_context, embed_texts, rewrite_question
 
 
 def tokenize_query(text):
@@ -27,7 +27,8 @@ def keyword_score(query, text):
 
 
 def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
-    query_vector = embed_texts([query])[0]
+    standalone_query = rewrite_question(query)
+    query_vector = embed_texts([standalone_query])[0]
     qs = Chunk.objects.filter(
         tenant=tenant,
         workspace=workspace,
@@ -42,7 +43,7 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
     scored = []
     for candidate in candidates:
         relevance = 1.0 - float(getattr(candidate, 'distance', 1.0) or 1.0)
-        lexical = keyword_score(query, getattr(candidate, 'text', ''))
+        lexical = keyword_score(standalone_query, getattr(candidate, 'text', ''))
         blended_score = (0.8 * relevance) + (0.2 * lexical)
         scored.append((blended_score, candidate))
     scored.sort(key=lambda item: item[0], reverse=True)
@@ -59,6 +60,7 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
             'mode': 'vector_search_keyword_boost',
             'document_id': document_id,
             'candidate_count': candidate_count,
+            'standalone_query': standalone_query,
         },
     )
     return results
