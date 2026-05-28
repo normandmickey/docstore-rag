@@ -1,0 +1,24 @@
+from django.contrib import admin
+
+from .models import APIKey, Tenant, Workspace
+
+
+@admin.register(Tenant)
+class TenantAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'status', 'created_at')
+    search_fields = ('name', 'slug')
+    list_filter = ('status',)
+
+
+@admin.register(Workspace)
+class WorkspaceAdmin(admin.ModelAdmin):
+    list_display = ('name', 'tenant', 'slug', 'default_embedding_model', 'default_chunk_size')
+    search_fields = ('name', 'slug', 'tenant__name')
+    list_filter = ('tenant',)
+
+
+@admin.register(APIKey)
+class APIKeyAdmin(admin.ModelAdmin):
+    list_display = ('label', 'tenant', 'workspace', 'key_prefix', 'active', 'last_used_at')
+    search_fields = ('label', 'key_prefix', 'tenant__name', 'workspace__name')
+    list_filter = ('tenant', 'active')
