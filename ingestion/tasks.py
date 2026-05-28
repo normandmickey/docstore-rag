@@ -1,6 +1,10 @@
+from io import BytesIO
+
 import fitz
 from celery import shared_task
 from django.utils import timezone
+from docx import Document as DocxDocument
+from markdownify import markdownify as html_to_markdown
 
 from documents.models import Chunk, Document
 from providers import embed_texts
@@ -14,6 +18,40 @@ def naive_chunks(text, chunk_size=800):
     return [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
 
 
+def extract_pdf_text(raw):
+    pdf = fitz.open(stream=raw, filetype='pdf')
+    try:
+        pages = [page.get_text('text') for page in pdf]
+    finally:
+        pdf.close()
+    return '\n\n'.join(page.strip() for page in pages if page and page.strip())
+
+
+def extract_docx_text(raw):
+    doc = DocxDocument(BytesIO(raw))
+    parts = []
+    for paragraph in doc.paragraphs:
+        text = (paragraph.text or '').strip()
+        if text:
+            parts.append(text)
+    for table in doc.tables:
+        for row in table.rows:
+            values = [(cell.text or '').strip() for cell in row.cells]
+            values = [value for value in values if value]
+            if values:
+                parts.append(' | '.join(values))
+    return '\n\n'.join(parts)
+
+
+def extract_text_document(raw):
+    return raw.decode('utf-8', errors='ignore')
+
+
+def extract_html_text(raw):
+    html = raw.decode('utf-8', errors='ignore')
+    return html_to_markdown(html)
+
+
 def extract_document_text(document, version):
     if not document.file:
         return (version.extraction_metadata_json or {}).get('raw_text', '')
@@ -25,14 +63,20 @@ def extract_document_text(document, version):
     mime_type = (document.mime_type or '').lower()
 
     if filename.endswith('.pdf') or mime_type == 'application/pdf':
-        pdf = fitz.open(stream=raw, filetype='pdf')
-        try:
-            pages = [page.get_text('text') for page in pdf]
-        finally:
-            pdf.close()
-        return '\n\n'.join(page.strip() for page in pages if page and page.strip())
+        return extract_pdf_text(raw)
+    if filename.endswith('.docx') or mime_type in {
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/msword',
+    }:
+        return extract_docx_text(raw)
+    if filename.endswith('.md') or mime_type in {'text/markdown', 'text/x-markdown'}:
+        return extract_text_document(raw)
+    if filename.endswith('.txt') or mime_type.startswith('text/plain'):
+        return extract_text_document(raw)
+    if filename.endswith('.html') or filename.endswith('.htm') or mime_type == 'text/html':
+        return extract_html_text(raw)
 
-    return raw.decode('utf-8', errors='ignore')
+    return extract_text_document(raw)
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 1})
