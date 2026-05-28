@@ -14,3 +14,4 @@ python-docx==1.2.0
 markdownify==1.2.0
 requests==2.32.5
 beautifulsoup4==4.14.3
+langchain-text-splitters==0.3.11

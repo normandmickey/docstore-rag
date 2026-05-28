@@ -5,6 +5,7 @@ import fitz
 from celery import shared_task
 from django.utils import timezone
 from docx import Document as DocxDocument
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from markdownify import markdownify as html_to_markdown
 
 from documents.models import Chunk, Document
@@ -61,55 +62,19 @@ def build_chunks(text, chunk_size=400, overlap=None):
     if overlap is None:
         overlap = max(40, int(chunk_size * 0.2))
 
-    paragraphs = [p.strip() for p in text.split('\n\n') if p.strip()]
-    chunks = []
-    current = ''
-
-    def tail_overlap(value):
-        if overlap <= 0 or len(value) <= overlap:
-            return value
-        cut = value[-overlap:]
-        space = cut.find(' ')
-        return cut[space + 1:] if space != -1 and space < len(cut) - 1 else cut
-
-    for paragraph in paragraphs:
-        if len(paragraph) > chunk_size:
-            if current:
-                chunks.append(current.strip())
-                current = ''
-            start = 0
-            while start < len(paragraph):
-                end = min(start + chunk_size, len(paragraph))
-                if end < len(paragraph):
-                    split_at = paragraph.rfind(' ', start, end)
-                    if split_at > start + max(80, overlap // 2):
-                        end = split_at
-                piece = paragraph[start:end].strip()
-                if piece:
-                    chunks.append(piece)
-                if end >= len(paragraph):
-                    break
-                start = end - overlap if overlap > 0 else end
-            continue
-
-        candidate = f"{current}\n\n{paragraph}".strip() if current else paragraph
-        if len(candidate) <= chunk_size:
-            current = candidate
-        else:
-            if current:
-                chunks.append(current.strip())
-                current = f"{tail_overlap(current)}\n\n{paragraph}".strip()
-            else:
-                chunks.append(paragraph)
-                current = ''
-
-    if current:
-        chunks.append(current.strip())
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=overlap,
+        separators=['\n\n', '\n', ' ', ''],
+        length_function=len,
+        is_separator_regex=False,
+    )
+    chunks = [chunk.strip() for chunk in splitter.split_text(text) if chunk and chunk.strip()]
 
     deduped = []
     last = None
     for chunk in chunks:
-        if chunk and chunk != last:
+        if chunk != last:
             deduped.append(chunk)
             last = chunk
     return deduped
