@@ -1,6 +1,7 @@
 from django.contrib import admin
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
+from django.template.loader import render_to_string
 from django.urls import path
 from documents.api import DocumentCreateView, DocumentDeleteView, DocumentPurgeView, DocumentRestoreView, URLIngestView
 from control.views import AppLoginView, dashboard, dashboard_api_keys, dashboard_chat, dashboard_connectors, dashboard_documents, dashboard_urls, document_download, logout_view, microsoft_connect_callback, microsoft_connect_start, signup, staff_dashboard
@@ -15,8 +16,23 @@ def health(_request):
     return JsonResponse({'ok': True, 'service': 'docstore-rag'})
 
 
+def offline(request):
+    return render(request, 'offline.html')
+
+
+def service_worker(_request):
+    return HttpResponse(render_to_string('sw.js'), content_type='application/javascript')
+
+
+def manifest(_request):
+    return HttpResponse(render_to_string('manifest.webmanifest'), content_type='application/manifest+json')
+
+
 urlpatterns = [
     path('', home),
+    path('offline/', offline, name='offline'),
+    path('sw.js', service_worker, name='service_worker'),
+    path('manifest.webmanifest', manifest, name='manifest'),
     path('login/', AppLoginView.as_view(), name='login'),
     path('logout/', logout_view, name='logout'),
     path('signup/', signup, name='signup'),

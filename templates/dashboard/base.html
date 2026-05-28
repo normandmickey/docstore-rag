@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1020">
+  <link rel="manifest" href="/manifest.webmanifest">
   <title>{% block title %}Dashboard · Docstore RAG{% endblock %}</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 0; background: #0b1020; color: #eef2ff; }
@@ -81,5 +83,14 @@
 
     {% block content %}{% endblock %}
   </div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('/sw.js').catch(function (err) {
+          console.warn('Service worker registration failed', err);
+        });
+      });
+    }
+  </script>
 </body>
 </html>
