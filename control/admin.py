@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import APIKey, Tenant, Workspace
+from .models import APIKey, Tenant, TenantMembership, Workspace
 
 
 @admin.register(Tenant)
@@ -15,6 +15,13 @@ class WorkspaceAdmin(admin.ModelAdmin):
     list_display = ('name', 'tenant', 'slug', 'default_embedding_model', 'default_chunk_size')
     search_fields = ('name', 'slug', 'tenant__name')
     list_filter = ('tenant',)
+
+
+@admin.register(TenantMembership)
+class TenantMembershipAdmin(admin.ModelAdmin):
+    list_display = ('tenant', 'user', 'role', 'created_at')
+    search_fields = ('tenant__name', 'user__username', 'user__email')
+    list_filter = ('role', 'tenant')
 
 
 @admin.register(APIKey)

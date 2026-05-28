@@ -1,4 +1,7 @@
+from django.contrib.auth import get_user_model
 from django.db import models
+
+User = get_user_model()
 
 
 class Tenant(models.Model):
@@ -39,6 +42,29 @@ class Workspace(models.Model):
 
     def __str__(self):
         return f'{self.tenant.slug}/{self.slug}'
+
+
+class TenantMembership(models.Model):
+    ROLE_OWNER = 'owner'
+    ROLE_ADMIN = 'admin'
+    ROLE_MEMBER = 'member'
+    ROLE_CHOICES = [
+        (ROLE_OWNER, 'Owner'),
+        (ROLE_ADMIN, 'Admin'),
+        (ROLE_MEMBER, 'Member'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='memberships')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='tenant_memberships')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default=ROLE_MEMBER)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = [('tenant', 'user')]
+        ordering = ['tenant__name', 'user__username']
+
+    def __str__(self):
+        return f'{self.user} @ {self.tenant} ({self.role})'
 
 
 class APIKey(models.Model):

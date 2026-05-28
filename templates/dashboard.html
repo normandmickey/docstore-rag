@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard · Docstore RAG</title>
+  <style>
+    body { font-family: system-ui, sans-serif; margin: 0; background: #0b1020; color: #eef2ff; }
+    .wrap { max-width: 900px; margin: 0 auto; padding: 48px 24px; }
+    .card { background: #121a33; border: 1px solid #243055; border-radius: 16px; padding: 28px; }
+    a { color: #93c5fd; }
+    .row { padding: 14px 0; border-top: 1px solid #243055; }
+    .row:first-of-type { border-top: 0; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <h1>Dashboard</h1>
+      <p>You are signed in. Your current tenant/workspace IDs are stored in session for early API testing.</p>
+      <p><strong>Current tenant:</strong> {{ current_tenant_id|default:'not set' }}<br>
+      <strong>Current workspace:</strong> {{ current_workspace_id|default:'not set' }}</p>
+      <h2>Your tenant memberships</h2>
+      {% for membership in memberships %}
+        <div class="row">
+          <strong>{{ membership.tenant.name }}</strong><br>
+          Slug: {{ membership.tenant.slug }}<br>
+          Role: {{ membership.role }}
+        </div>
+      {% empty %}
+        <p>No memberships yet.</p>
+      {% endfor %}
+      <p style="margin-top: 24px;"><a href="/admin/">Admin</a> · <a href="/logout/">Log out</a></p>
+    </div>
+  </div>
+</body>
+</html>
