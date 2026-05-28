@@ -1,5 +1,7 @@
 import logging
+import secrets
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.views import LoginView
@@ -11,7 +13,8 @@ from documents.upload_service import create_or_reuse_document
 from retrieval.service import answer_question
 
 from .forms import SignUpForm
-from .models import Tenant, TenantMembership, Workspace
+from .models import ExternalAccount, Tenant, TenantMembership, Workspace
+from .oauth import exchange_code_for_tokens, fetch_graph_me, microsoft_authorize_url
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +66,62 @@ def signup(request):
     return render(request, 'auth/signup.html', {'form': form})
 
 
+def microsoft_connect_start(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    state = secrets.token_urlsafe(24)
+    request.session['ms_oauth_state'] = state
+    return redirect(microsoft_authorize_url(state))
+
+
+def microsoft_connect_callback(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    expected_state = request.session.get('ms_oauth_state')
+    returned_state = request.GET.get('state')
+    code = request.GET.get('code')
+    error = request.GET.get('error')
+
+    if error:
+        messages.error(request, f'Microsoft connection failed: {error}')
+        return redirect('dashboard')
+    if not code or not expected_state or expected_state != returned_state:
+        messages.error(request, 'Microsoft connection failed: invalid OAuth state or missing code.')
+        return redirect('dashboard')
+
+    try:
+        tokens = exchange_code_for_tokens(code)
+        profile = fetch_graph_me(tokens['access_token'])
+        if not request.session.get('current_tenant_id') or not request.session.get('current_workspace_id'):
+            tenant, workspace = _bootstrap_user_workspace(request.user, request.session)
+        else:
+            tenant = Tenant.objects.get(id=request.session['current_tenant_id'])
+            workspace = Workspace.objects.get(id=request.session['current_workspace_id'], tenant=tenant)
+
+        account, _created = ExternalAccount.objects.update_or_create(
+            user=request.user,
+            provider=ExternalAccount.PROVIDER_MICROSOFT,
+            external_user_id=profile.get('id', ''),
+            defaults={
+                'tenant': tenant,
+                'workspace': workspace,
+                'email': profile.get('mail') or profile.get('userPrincipalName', ''),
+                'display_name': profile.get('displayName', ''),
+                'access_token': tokens.get('access_token', ''),
+                'refresh_token': tokens.get('refresh_token', ''),
+                'expires_at': tokens.get('expires_at'),
+                'scopes_json': settings.MS_GRAPH_SCOPES,
+                'metadata_json': profile,
+            },
+        )
+        messages.success(request, f'Connected Microsoft account for {account.email or account.display_name or "your account"}.')
+    except Exception as exc:
+        logger.exception('Microsoft OAuth callback failed for user=%s', request.user.id)
+        messages.error(request, f'Microsoft connection failed: {exc}')
+    return redirect('dashboard')
+
+
 def dashboard(request):
     if not request.user.is_authenticated:
         return redirect('login')
@@ -75,6 +134,7 @@ def dashboard(request):
     current_workspace_id = request.session.get('current_workspace_id')
     current_workspace = None
     documents = Document.objects.none()
+    external_accounts = ExternalAccount.objects.filter(user=request.user).order_by('-updated_at')
     chat_answer = ''
     chat_question = ''
     chat_results = []
@@ -191,6 +251,7 @@ def dashboard(request):
             'current_workspace': current_workspace,
             'available_workspaces': available_workspaces,
             'document_rows': document_rows,
+            'external_accounts': external_accounts,
             'chat_question': chat_question,
             'chat_answer': chat_answer,
             'chat_results': chat_results,

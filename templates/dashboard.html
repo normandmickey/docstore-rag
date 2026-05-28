@@ -64,6 +64,20 @@
     </div>
 
     <div class="card">
+      <h2>Microsoft / SharePoint connections</h2>
+      <p class="meta">Connect your own Microsoft account so this workspace can later sync SharePoint content.</p>
+      <p><a class="button" href="/connect/microsoft/">Connect Microsoft account</a></p>
+      {% for account in external_accounts %}
+        <div class="row">
+          <strong>{{ account.display_name|default:account.email|default:'Microsoft account' }}</strong><br>
+          <span class="meta">{{ account.provider }} · {{ account.email }}{% if account.workspace %} · Workspace: {{ account.workspace.name }}{% endif %}</span>
+        </div>
+      {% empty %}
+        <p>No external Microsoft accounts connected yet.</p>
+      {% endfor %}
+    </div>
+
+    <div class="card">
       <h2>Upload document</h2>
       {% if current_workspace %}
       <form method="post" enctype="multipart/form-data">

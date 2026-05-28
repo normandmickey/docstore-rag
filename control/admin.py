@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import APIKey, Tenant, TenantMembership, Workspace
+from .models import APIKey, ExternalAccount, Tenant, TenantMembership, Workspace
 
 
 @admin.register(Tenant)
@@ -29,3 +29,10 @@ class APIKeyAdmin(admin.ModelAdmin):
     list_display = ('label', 'tenant', 'workspace', 'key_prefix', 'active', 'last_used_at')
     search_fields = ('label', 'key_prefix', 'tenant__name', 'workspace__name')
     list_filter = ('tenant', 'active')
+
+
+@admin.register(ExternalAccount)
+class ExternalAccountAdmin(admin.ModelAdmin):
+    list_display = ('user', 'provider', 'email', 'display_name', 'tenant', 'workspace', 'expires_at')
+    search_fields = ('user__username', 'email', 'display_name', 'external_user_id')
+    list_filter = ('provider', 'tenant')

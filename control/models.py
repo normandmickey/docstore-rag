@@ -83,3 +83,32 @@ class APIKey(models.Model):
 
     def __str__(self):
         return f'{self.label} ({self.key_prefix})'
+
+
+class ExternalAccount(models.Model):
+    PROVIDER_MICROSOFT = 'microsoft'
+    PROVIDER_CHOICES = [
+        (PROVIDER_MICROSOFT, 'Microsoft'),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='external_accounts')
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='external_accounts')
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='external_accounts', null=True, blank=True)
+    provider = models.CharField(max_length=40, choices=PROVIDER_CHOICES)
+    external_user_id = models.CharField(max_length=255, blank=True, default='')
+    email = models.EmailField(blank=True, default='')
+    display_name = models.CharField(max_length=255, blank=True, default='')
+    access_token = models.TextField(blank=True, default='')
+    refresh_token = models.TextField(blank=True, default='')
+    expires_at = models.DateTimeField(null=True, blank=True)
+    scopes_json = models.JSONField(default=list, blank=True)
+    metadata_json = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['user__username', 'provider', 'created_at']
+        unique_together = [('user', 'provider', 'external_user_id')]
+
+    def __str__(self):
+        return f'{self.user} :: {self.provider} :: {self.email or self.external_user_id or "connected"}'
