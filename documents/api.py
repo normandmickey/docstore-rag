@@ -117,3 +117,32 @@ class URLIngestView(APIView):
             'failed': failed,
             'ingested': ingested,
         })
+
+
+class DocumentDeleteSerializer(serializers.Serializer):
+    tenant_id = serializers.IntegerField()
+    workspace_id = serializers.IntegerField()
+    document_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=False)
+
+
+class DocumentDeleteView(APIView):
+    def post(self, request):
+        serializer = DocumentDeleteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        tenant = Tenant.objects.get(id=data['tenant_id'])
+        workspace = Workspace.objects.get(id=data['workspace_id'], tenant=tenant)
+        documents = list(Document.objects.filter(
+            id__in=data['document_ids'],
+            tenant=tenant,
+            workspace=workspace,
+        ).exclude(status=Document.STATUS_DELETED))
+
+        for document in documents:
+            document.soft_delete()
+
+        return Response({
+            'soft_deleted': len(documents),
+            'document_ids': [doc.id for doc in documents],
+        })

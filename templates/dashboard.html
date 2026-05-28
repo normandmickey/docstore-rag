@@ -160,31 +160,41 @@
 
     <div class="card">
       <h2>Your documents</h2>
-      {% for row in document_rows %}
-        <div class="row">
-          <strong>{{ row.document.filename }}</strong><br>
-          <span class="meta">Status: {{ row.document.status }} · Collection: {{ row.document.collection|default:'—' }} · Uploaded: {{ row.document.created_at }}</span><br>
-          {% if row.source_url %}
-            <span class="meta">Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></span><br>
-          {% endif %}
-          <span class="meta">Versions: {{ row.version_count }}{% if row.latest_version %} · Latest v{{ row.latest_version.version_number }}{% endif %}{% if row.chunk_count %} · Chunks: {{ row.chunk_count }}{% endif %}</span><br>
-          {% if row.latest_job %}
-            <span class="status status-{{ row.latest_job.status }}">Job {{ row.latest_job.status }}</span>
-            <span class="meta">Stage: {{ row.latest_job.stage }}</span>
-          {% endif %}
-          {% if row.preview %}
-            <pre>{{ row.preview }}</pre>
-          {% endif %}
-          <form method="post" style="margin-top: 10px;">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="delete_document">
-            <input type="hidden" name="document_id" value="{{ row.document.id }}">
-            <button type="submit" style="background: #991b1b;">Delete</button>
-          </form>
-        </div>
-      {% empty %}
-        <p>No documents uploaded yet.</p>
-      {% endfor %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_document">
+        {% for row in document_rows %}
+          <div class="row">
+            <label style="display: flex; gap: 10px; align-items: flex-start;">
+              <input type="checkbox" name="document_ids" value="{{ row.document.id }}" style="width: auto; margin-top: 6px;">
+              <span style="flex: 1;">
+                <strong>{{ row.document.filename }}</strong><br>
+                <span class="meta">Status: {{ row.document.status }} · Collection: {{ row.document.collection|default:'—' }} · Uploaded: {{ row.document.created_at }}</span><br>
+                {% if row.source_url %}
+                  <span class="meta">Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></span><br>
+                {% endif %}
+                <span class="meta">Versions: {{ row.version_count }}{% if row.latest_version %} · Latest v{{ row.latest_version.version_number }}{% endif %}{% if row.chunk_count %} · Chunks: {{ row.chunk_count }}{% endif %}</span><br>
+                {% if row.latest_job %}
+                  <span class="status status-{{ row.latest_job.status }}">Job {{ row.latest_job.status }}</span>
+                  <span class="meta">Stage: {{ row.latest_job.stage }}</span>
+                {% endif %}
+                {% if row.preview %}
+                  <pre>{{ row.preview }}</pre>
+                {% endif %}
+              </span>
+            </label>
+          </div>
+        {% empty %}
+          <p>No documents uploaded yet.</p>
+        {% endfor %}
+        {% if document_rows %}
+          <label style="display: flex; gap: 10px; align-items: center; margin-top: 14px;">
+            <input type="checkbox" name="confirm_delete" value="yes" style="width: auto;">
+            <span>I understand this is a soft delete and the documents will disappear from the main dashboard.</span>
+          </label>
+          <button type="submit" style="background: #991b1b; margin-top: 12px;">Delete selected</button>
+        {% endif %}
+      </form>
     </div>
 
     <div class="card">

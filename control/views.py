@@ -150,7 +150,7 @@ def dashboard(request):
                 tenant_id=current_tenant_id,
                 workspace_id=current_workspace_id,
             ).exclude(
-                status=Document.STATUS_FAILED,
+                status__in=[Document.STATUS_FAILED, Document.STATUS_DELETED],
             ).prefetch_related('ingestion_jobs', 'chunks', 'versions').order_by('-created_at')[:25]
 
     if request.method == 'POST' and request.POST.get('action') == 'create_workspace':
@@ -177,23 +177,26 @@ def dashboard(request):
         return redirect('dashboard')
 
     if request.method == 'POST' and request.POST.get('action') == 'delete_document' and current_workspace:
-        document_id = request.POST.get('document_id')
-        document = Document.objects.filter(
-            id=document_id,
+        document_ids = request.POST.getlist('document_ids') or [request.POST.get('document_id')]
+        confirm = (request.POST.get('confirm_delete') or '').strip().lower()
+        document_ids = [doc_id for doc_id in document_ids if doc_id]
+        if confirm != 'yes':
+            messages.error(request, 'Delete not confirmed. Check the confirmation box to soft-delete documents.')
+            return redirect('dashboard')
+        documents_to_delete = list(Document.objects.filter(
+            id__in=document_ids,
             tenant=current_workspace.tenant,
             workspace=current_workspace,
-        ).first()
-        if not document:
-            messages.error(request, 'Document not found.')
+        ).exclude(status=Document.STATUS_DELETED))
+        if not documents_to_delete:
+            messages.error(request, 'No matching documents found.')
             return redirect('dashboard')
-        filename = document.filename
         try:
-            if document.file:
-                document.file.delete(save=False)
-            document.delete()
-            messages.success(request, f'Deleted {filename}.')
+            for document in documents_to_delete:
+                document.soft_delete()
+            messages.success(request, f'Soft-deleted {len(documents_to_delete)} document(s).')
         except Exception as exc:
-            logger.exception('Dashboard delete failed for user=%s workspace=%s document=%s', request.user.id, current_workspace.id, document_id)
+            logger.exception('Dashboard delete failed for user=%s workspace=%s documents=%s', request.user.id, current_workspace.id, document_ids)
             messages.error(request, f'Delete failed: {exc}')
         return redirect('dashboard')
 

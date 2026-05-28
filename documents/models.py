@@ -14,11 +14,13 @@ class Document(models.Model):
     STATUS_PROCESSING = 'processing'
     STATUS_READY = 'ready'
     STATUS_FAILED = 'failed'
+    STATUS_DELETED = 'deleted'
     STATUS_CHOICES = [
         (STATUS_PENDING, 'Pending'),
         (STATUS_PROCESSING, 'Processing'),
         (STATUS_READY, 'Ready'),
         (STATUS_FAILED, 'Failed'),
+        (STATUS_DELETED, 'Deleted'),
     ]
 
     SOURCE_UPLOAD = 'upload'
@@ -52,6 +54,10 @@ class Document(models.Model):
             models.Index(fields=['tenant', 'workspace', 'status']),
             models.Index(fields=['tenant', 'workspace', 'collection']),
         ]
+
+    def soft_delete(self):
+        self.status = self.STATUS_DELETED
+        self.save(update_fields=['status', 'updated_at'])
 
     def __str__(self):
         return f'{self.filename} [{self.workspace}]'
