@@ -1,6 +1,11 @@
 from django.contrib import admin
 from django.http import JsonResponse
+from django.shortcuts import render
 from django.urls import path
+
+
+def home(request):
+    return render(request, 'home.html')
 
 
 def health(_request):
@@ -8,6 +13,7 @@ def health(_request):
 
 
 urlpatterns = [
+    path('', home),
     path('admin/', admin.site.urls),
     path('healthz/', health),
 ]
