@@ -46,11 +46,18 @@
 
 ## Parsing / ingestion
 - [ ] Add better DOCX handling for headings/tables/lists
-- [ ] Consider OCR support for image-heavy PDFs later if needed
+- [ ] Add OCR fallback support for scanned/image-heavy PDFs
+- [ ] If extracted text is empty, do not mark the document/version as ready; surface a clear no-text-extracted failure state instead
 - [ ] Add richer HTML cleanup / readability extraction
 - [ ] Add support for additional formats only as needed (e.g. CSV, XLSX, PPTX)
 - [ ] Add ingestion metrics/logging for chunk counts, timing, and embedding failures
 - [ ] Add parse failure categorization (network, parser, embeddings, storage)
+- [ ] Evaluate ColPali / hybrid vision retrieval for layout-heavy PDFs and scanned documents
+  - [ ] render PDF pages to images for optional page-level vision retrieval
+  - [ ] keep text retrieval as the default path for normal documents
+  - [ ] use OCR fallback and/or vision retrieval when text extraction is empty or poor
+  - [ ] decide whether ColPali should run locally, on a separate service, or via another inference path
+  - [ ] design page-level/page-patch embedding storage and retrieval flow
 
 ## Deletion lifecycle
 - [ ] Add selective purge from Trash UI
