@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'ingestion',
     'retrieval',
     'audit',
+    'connectors',
 ]
 
 MIDDLEWARE = [
@@ -119,6 +120,9 @@ DEFAULT_EMBEDDING_MODEL = os.getenv('DEFAULT_EMBEDDING_MODEL', 'text-embedding-3
 DEFAULT_CHAT_MODEL = os.getenv('DEFAULT_CHAT_MODEL', 'gpt-4.1-mini')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL', '')
+MS_GRAPH_TENANT_ID = os.getenv('MS_GRAPH_TENANT_ID', '')
+MS_GRAPH_CLIENT_ID = os.getenv('MS_GRAPH_CLIENT_ID', '')
+MS_GRAPH_CLIENT_SECRET = os.getenv('MS_GRAPH_CLIENT_SECRET', '')
 
 S3_ENDPOINT_URL = os.getenv('S3_ENDPOINT_URL', '')
 S3_ACCESS_KEY = os.getenv('S3_ACCESS_KEY', '')
