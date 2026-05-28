@@ -2,7 +2,6 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.views import LoginView
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse_lazy
 from django.utils.text import slugify
 
 from documents.models import Document
@@ -63,7 +62,7 @@ def dashboard(request):
             documents = Document.objects.filter(
                 tenant_id=current_tenant_id,
                 workspace_id=current_workspace_id,
-            ).order_by('-created_at')[:25]
+            ).prefetch_related('ingestion_jobs', 'chunks').order_by('-created_at')[:25]
 
     if request.method == 'POST' and request.FILES.get('file') and current_workspace:
         upload = request.FILES['file']
@@ -98,6 +97,21 @@ def dashboard(request):
         messages.success(request, f'Uploaded {document.filename}. Ingestion job #{job.id} queued.')
         return redirect('dashboard')
 
+    document_rows = []
+    for document in documents:
+        latest_job = document.ingestion_jobs.order_by('-created_at').first()
+        latest_version = document.versions.order_by('-version_number', '-id').first()
+        chunk_count = document.chunks.count()
+        preview = ''
+        if latest_version:
+            preview = (latest_version.extraction_metadata_json or {}).get('raw_text_preview', '')
+        document_rows.append({
+            'document': document,
+            'latest_job': latest_job,
+            'chunk_count': chunk_count,
+            'preview': preview,
+        })
+
     return render(
         request,
         'dashboard.html',
@@ -106,6 +120,6 @@ def dashboard(request):
             'current_tenant_id': current_tenant_id,
             'current_workspace_id': current_workspace_id,
             'current_workspace': current_workspace,
-            'documents': documents,
+            'document_rows': document_rows,
         },
     )

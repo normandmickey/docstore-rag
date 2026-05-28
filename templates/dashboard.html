@@ -6,7 +6,7 @@
   <title>Dashboard · Docstore RAG</title>
   <style>
     body { font-family: system-ui, sans-serif; margin: 0; background: #0b1020; color: #eef2ff; }
-    .wrap { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
+    .wrap { max-width: 980px; margin: 0 auto; padding: 48px 24px; }
     .card { background: #121a33; border: 1px solid #243055; border-radius: 16px; padding: 28px; margin-bottom: 24px; }
     a { color: #93c5fd; }
     .row { padding: 14px 0; border-top: 1px solid #243055; }
@@ -15,6 +15,12 @@
     button { padding: 12px 16px; border: 0; border-radius: 10px; background: #2563eb; color: white; cursor: pointer; }
     .msg { background: #123524; border: 1px solid #1f7a4c; color: #d1fae5; padding: 12px 14px; border-radius: 10px; margin-bottom: 16px; }
     .meta { color: #94a3b8; font-size: 0.95rem; }
+    .status { display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 0.8rem; font-weight: 600; }
+    .status-queued { background: #3f3f46; color: #f4f4f5; }
+    .status-running { background: #1d4ed8; color: #dbeafe; }
+    .status-succeeded { background: #166534; color: #dcfce7; }
+    .status-failed { background: #991b1b; color: #fee2e2; }
+    pre { white-space: pre-wrap; background: #0f172a; padding: 12px; border-radius: 10px; color: #cbd5e1; }
   </style>
 </head>
 <body>
@@ -53,10 +59,17 @@
 
     <div class="card">
       <h2>Your documents</h2>
-      {% for document in documents %}
+      {% for row in document_rows %}
         <div class="row">
-          <strong>{{ document.filename }}</strong><br>
-          <span class="meta">Status: {{ document.status }} · Collection: {{ document.collection|default:'—' }} · Uploaded: {{ document.created_at }}</span>
+          <strong>{{ row.document.filename }}</strong><br>
+          <span class="meta">Status: {{ row.document.status }} · Collection: {{ row.document.collection|default:'—' }} · Uploaded: {{ row.document.created_at }}</span><br>
+          {% if row.latest_job %}
+            <span class="status status-{{ row.latest_job.status }}">Job {{ row.latest_job.status }}</span>
+            <span class="meta">Stage: {{ row.latest_job.stage }}{% if row.chunk_count %} · Chunks: {{ row.chunk_count }}{% endif %}</span>
+          {% endif %}
+          {% if row.preview %}
+            <pre>{{ row.preview }}</pre>
+          {% endif %}
         </div>
       {% empty %}
         <p>No documents uploaded yet.</p>
