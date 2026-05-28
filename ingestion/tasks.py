@@ -1,3 +1,4 @@
+import fitz
 from celery import shared_task
 from django.utils import timezone
 
@@ -11,6 +12,27 @@ def naive_chunks(text, chunk_size=800):
     if not text:
         return []
     return [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+
+
+def extract_document_text(document, version):
+    if not document.file:
+        return (version.extraction_metadata_json or {}).get('raw_text', '')
+
+    with document.file.open('rb') as fh:
+        raw = fh.read()
+
+    filename = (document.filename or '').lower()
+    mime_type = (document.mime_type or '').lower()
+
+    if filename.endswith('.pdf') or mime_type == 'application/pdf':
+        pdf = fitz.open(stream=raw, filetype='pdf')
+        try:
+            pages = [page.get_text('text') for page in pdf]
+        finally:
+            pdf.close()
+        return '\n\n'.join(page.strip() for page in pages if page and page.strip())
+
+    return raw.decode('utf-8', errors='ignore')
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 1})
@@ -29,15 +51,12 @@ def ingest_document_task(self, ingestion_job_id):
     document.save(update_fields=['status', 'updated_at'])
 
     try:
-        extracted_text = ''
-        if document.file:
-            with document.file.open('rb') as fh:
-                raw = fh.read()
-            extracted_text = raw.decode('utf-8', errors='ignore')
-        else:
-            extracted_text = version.extraction_metadata_json.get('raw_text', '')
-
+        extracted_text = extract_document_text(document, version)
         extracted_text = (extracted_text or '').replace('\x00', ' ')
+
+        job.stage = 'embedding'
+        job.save(update_fields=['stage'])
+
         chunks = naive_chunks(extracted_text, chunk_size=job.workspace.default_chunk_size or 800)
         vectors = embed_texts(chunks) if chunks else []
         Chunk.objects.filter(document_version=version).delete()
