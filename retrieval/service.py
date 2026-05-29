@@ -1,4 +1,5 @@
 import re
+from collections import defaultdict
 
 from pgvector.django import CosineDistance
 
@@ -26,6 +27,13 @@ def keyword_score(query, text):
     return score / max(1.0, len(query_tokens))
 
 
+def chunk_relevance_score(query, candidate):
+    relevance = 1.0 - float(getattr(candidate, 'distance', 1.0) or 1.0)
+    lexical = keyword_score(query, getattr(candidate, 'text', ''))
+    blended_score = (0.8 * relevance) + (0.2 * lexical)
+    return blended_score, relevance, lexical
+
+
 def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
     standalone_query = rewrite_question(query)
     query_vector = embed_texts([standalone_query])[0]
@@ -39,15 +47,74 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
         qs = qs.filter(document_id=document_id)
 
     candidate_count = max(top_k * 4, 12)
-    candidates = list(qs.annotate(distance=CosineDistance('embedding', query_vector)).order_by('distance')[:candidate_count])
-    scored = []
-    for candidate in candidates:
-        relevance = 1.0 - float(getattr(candidate, 'distance', 1.0) or 1.0)
-        lexical = keyword_score(standalone_query, getattr(candidate, 'text', ''))
-        blended_score = (0.8 * relevance) + (0.2 * lexical)
-        scored.append((blended_score, candidate))
-    scored.sort(key=lambda item: item[0], reverse=True)
-    results = [candidate for _score, candidate in scored[:top_k]]
+    broad_candidates = list(qs.annotate(distance=CosineDistance('embedding', query_vector)).order_by('distance')[:candidate_count])
+
+    scored_candidates = []
+    doc_scores = defaultdict(float)
+    for candidate in broad_candidates:
+        blended_score, relevance, lexical = chunk_relevance_score(standalone_query, candidate)
+        candidate.relevance_score = relevance
+        candidate.lexical_score = lexical
+        candidate.blended_score = blended_score
+        scored_candidates.append(candidate)
+        doc_scores[candidate.document_id] = max(doc_scores[candidate.document_id], blended_score)
+
+    scored_candidates.sort(key=lambda candidate: candidate.blended_score, reverse=True)
+    best_candidate = scored_candidates[0] if scored_candidates else None
+
+    local_expansion = []
+    local_window = 2
+    if best_candidate and not document_id:
+        neighbor_indexes = range(max(0, best_candidate.chunk_index - local_window), best_candidate.chunk_index + local_window + 1)
+        local_expansion = list(
+            Chunk.objects.filter(
+                tenant=tenant,
+                workspace=workspace,
+                document_id=best_candidate.document_id,
+                document__status=Document.STATUS_READY,
+                chunk_index__in=neighbor_indexes,
+            )
+            .select_related('document')
+            .order_by('chunk_index')
+        )
+        for chunk in local_expansion:
+            if not hasattr(chunk, 'distance'):
+                chunk.distance = getattr(best_candidate, 'distance', None)
+            if not hasattr(chunk, 'relevance_score'):
+                blended_score, relevance, lexical = chunk_relevance_score(standalone_query, chunk)
+                chunk.relevance_score = relevance
+                chunk.lexical_score = lexical
+                chunk.blended_score = blended_score
+
+    result_by_key = {}
+    ordered_results = []
+    for candidate in scored_candidates:
+        key = (candidate.document_id, candidate.chunk_index)
+        if key in result_by_key:
+            continue
+        result_by_key[key] = candidate
+        ordered_results.append(candidate)
+
+    if local_expansion:
+        insertion_index = 1 if ordered_results else 0
+        local_sorted = sorted(local_expansion, key=lambda chunk: (chunk.chunk_index != best_candidate.chunk_index, chunk.chunk_index))
+        for chunk in local_sorted:
+            key = (chunk.document_id, chunk.chunk_index)
+            if key in result_by_key:
+                continue
+            result_by_key[key] = chunk
+            ordered_results.insert(insertion_index, chunk)
+            insertion_index += 1
+
+    doc_diverse_results = []
+    seen_docs = set()
+    for candidate in ordered_results:
+        if candidate.document_id in seen_docs and len(doc_diverse_results) >= top_k:
+            continue
+        doc_diverse_results.append(candidate)
+        seen_docs.add(candidate.document_id)
+
+    results = doc_diverse_results[:top_k]
 
     RetrievalLog.objects.create(
         tenant=tenant,
@@ -57,10 +124,15 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
         result_count=len(results),
         latency_ms=0,
         metadata_json={
-            'mode': 'vector_search_keyword_boost',
+            'mode': 'two_pass_vector_keyword_local_expansion',
             'document_id': document_id,
             'candidate_count': candidate_count,
             'standalone_query': standalone_query,
+            'best_document_id': getattr(best_candidate, 'document_id', None),
+            'best_chunk_index': getattr(best_candidate, 'chunk_index', None),
+            'local_window': local_window if best_candidate and not document_id else 0,
+            'local_expansion_count': len(local_expansion),
+            'document_scores': {str(doc_id): score for doc_id, score in doc_scores.items()},
         },
     )
     return results
