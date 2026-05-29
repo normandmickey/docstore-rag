@@ -7,6 +7,7 @@ from pgvector.django import CosineDistance
 from audit.models import RetrievalLog
 from documents.models import Chunk, Document, ExtractedFact
 from providers import answer_with_context, embed_texts, rewrite_question
+from control.pii import redact_pii
 
 
 def tokenize_query(text):
@@ -191,10 +192,11 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
 
     results = doc_diverse_results[:top_k]
 
+    redacted_query = redact_pii(query)
     RetrievalLog.objects.create(
         tenant=tenant,
         workspace=workspace,
-        query_text=query,
+        query_text=redacted_query['text'],
         top_k=top_k,
         result_count=len(results),
         latency_ms=0,
@@ -213,6 +215,8 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
             'local_window': local_window if best_candidate and not document_id else 0,
             'local_expansion_count': len(local_expansion),
             'document_scores': {str(doc_id): score for doc_id, score in doc_scores.items()},
+            'contains_pii': redacted_query['contains_pii'],
+            'pii_types': redacted_query['pii_types'],
         },
     )
     return results

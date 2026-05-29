@@ -27,6 +27,7 @@ from .forms import SignUpForm
 from .models import APIKey, ExternalAccount, InviteToken, ProxiWebMessage, ProxiWebThread, Tenant, TenantMembership, Workspace
 from .api_auth import hash_api_key
 from .oauth import exchange_code_for_tokens, fetch_graph_me, microsoft_authorize_url
+from .pii import redact_pii
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -819,10 +820,17 @@ def dashboard_proxi_web(request):
                     context_blocks,
                     chat_history=chat_history,
                 ) if context_blocks else 'I could not find enough relevant context for that question yet.'
+                redacted_question = redact_pii(question)
+                redacted_answer = redact_pii(answer)
                 ProxiWebMessage.objects.create(
                     thread=thread,
                     role=ProxiWebMessage.ROLE_USER,
                     content=question,
+                    retrieval_metadata_json={
+                        'contains_pii': redacted_question['contains_pii'],
+                        'pii_types': redacted_question['pii_types'],
+                        'redacted_preview': redacted_question['text'][:500],
+                    },
                 )
                 ProxiWebMessage.objects.create(
                     thread=thread,
@@ -830,6 +838,9 @@ def dashboard_proxi_web(request):
                     content=answer,
                     retrieval_metadata_json={
                         'use_web_search': use_web,
+                        'contains_pii': redacted_answer['contains_pii'],
+                        'pii_types': redacted_answer['pii_types'],
+                        'redacted_preview': redacted_answer['text'][:500],
                         'result_count': len(retrieval_results),
                         'results': [
                             {
