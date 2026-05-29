@@ -809,6 +809,7 @@ def dashboard_proxi_web(request):
                             messages.error(request, f'Web search failed: {exc}')
                 for index, item in enumerate(web_results, start=1):
                     context_blocks.append(
+                        'UNTRUSTED WEB RESULT\n'
                         f'[Web {index}] {item.get("title") or item.get("url") or "Web result"}\n'
                         f'URL: {item.get("url", "")}\n'
                         f'{item.get("snippet", "")}'

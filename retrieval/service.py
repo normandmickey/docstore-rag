@@ -263,12 +263,14 @@ def build_context_blocks(results, facts=None):
     blocks = []
     for idx, fact in enumerate(facts or [], start=1):
         blocks.append(
+            'UNTRUSTED DOCUMENT FACT\n'
             f'[Fact {idx}] {fact.document.filename} · {fact.fact_type} · score={float(getattr(fact, "match_score", 0.0)):.4f}\n'
             f'{fact.label + ": " if fact.label else ""}{fact.value_text}'
         )
     source_offset = len(facts or [])
     for idx, row in enumerate(results, start=1):
         blocks.append(
+            'UNTRUSTED DOCUMENT EXCERPT\n'
             f'[Source {idx + source_offset}] {row.document.filename} · chunk {row.chunk_index} · distance={float(getattr(row, "distance", 0.0)):.4f}\n{row.text}'
         )
     return blocks
