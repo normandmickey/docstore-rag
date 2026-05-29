@@ -96,6 +96,8 @@
 - [ ] Consider connector support for Google Drive / Dropbox later only if needed
 
 ## Security / permissions
+- [ ] Add tenant Members management page for owner/admin roles (list members, invite users, change roles, remove memberships)
+- [ ] Start with tenant-wide membership roles only (owner/admin/member); add workspace-specific ACLs later only if truly needed
 - [ ] Encrypt or otherwise better-protect stored refresh tokens and external account secrets at rest
 - [ ] Review tenant/workspace ownership and permission checks across dashboard actions
 - [ ] Add explicit authorization tests for cross-tenant / cross-workspace access attempts
