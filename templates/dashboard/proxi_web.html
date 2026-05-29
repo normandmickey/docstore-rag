@@ -2,12 +2,23 @@
 {% load proxi_web_markdown %}
 {% block title %}Proxi-Web · Docstore{% endblock %}
 {% block content %}
+<style>
+  .proxi-web-layout {
+    grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    .proxi-web-layout {
+      grid-template-columns: 1fr !important;
+    }
+  }
+</style>
 <div class="card">
   <h2>Proxi-Web</h2>
   <p class="meta">A separate history-aware chat surface. This does not replace the existing Chat with Documents page.</p>
 </div>
 
-<div class="grid" style="grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); align-items: start;">
+<div class="grid proxi-web-layout" style="grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); align-items: start;">
   <div class="card" style="margin-bottom: 0;">
     <h3 style="margin-top: 0;">Chats</h3>
     {% if current_workspace %}
