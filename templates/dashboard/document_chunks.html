@@ -15,6 +15,10 @@
         <div style="margin-top: 10px; font-weight: 600;">Metadata text</div>
         <pre>{{ chunk.metadata_text }}</pre>
       {% endif %}
+      {% if chunk.question_text %}
+        <div style="margin-top: 10px; font-weight: 600;">Question text</div>
+        <pre>{{ chunk.question_text }}</pre>
+      {% endif %}
       <div style="margin-top: 10px; font-weight: 600;">Chunk text</div>
       <pre>{{ chunk.text }}</pre>
     </div>
