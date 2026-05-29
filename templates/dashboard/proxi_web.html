@@ -70,12 +70,19 @@
         <button type="submit" style="background: #991b1b;">Delete chat</button>
       </form>
 
-      <div style="margin-top: 20px;">
+      <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 14px;">
         {% for message in proxi_messages %}
-          <div class="row">
-            <strong>{% if message.role == 'user' %}You{% else %}Proxi-Web{% endif %}</strong>
-            <div class="meta">{{ message.created_at }}</div>
-            <pre>{{ message.content }}</pre>
+          <div class="row" style="border: 1px solid #243055; border-radius: 12px; padding: 14px;">
+            <div style="display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 8px;">
+              <div>
+                <strong>{% if message.role == 'user' %}You{% else %}Proxi-Web{% endif %}</strong>
+                <div class="meta">{{ message.created_at }}</div>
+              </div>
+              {% if message.role == 'assistant' %}
+                <button type="button" class="copy-response-button" data-copy-text="{{ message.content|escapejs }}" style="background: #1d4ed8; padding: 8px 12px; font-size: 0.9rem;">Copy</button>
+              {% endif %}
+            </div>
+            <pre style="margin: 0;">{{ message.content }}</pre>
           </div>
         {% empty %}
           <p>No messages yet.</p>
@@ -109,4 +116,28 @@
     {% endif %}
   </div>
 </div>
+<script>
+  (function () {
+    const buttons = document.querySelectorAll('.copy-response-button');
+    buttons.forEach(function (button) {
+      button.addEventListener('click', async function () {
+        const text = button.getAttribute('data-copy-text') || '';
+        try {
+          await navigator.clipboard.writeText(text);
+          const original = button.textContent;
+          button.textContent = 'Copied';
+          setTimeout(function () {
+            button.textContent = original;
+          }, 1200);
+        } catch (error) {
+          console.warn('Copy failed', error);
+          button.textContent = 'Copy failed';
+          setTimeout(function () {
+            button.textContent = 'Copy';
+          }, 1500);
+        }
+      });
+    });
+  })();
+</script>
 {% endblock %}

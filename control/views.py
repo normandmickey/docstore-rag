@@ -849,8 +849,9 @@ def dashboard_proxi_web(request):
                 return redirect(f'/dashboard/proxi-web/?thread={thread.id}')
 
         if base['proxi_thread']:
-            base['proxi_messages'] = list(base['proxi_thread'].messages.order_by('id'))
-            latest_assistant = next((msg for msg in reversed(base['proxi_messages']) if msg.role == ProxiWebMessage.ROLE_ASSISTANT), None)
+            chronological_messages = list(base['proxi_thread'].messages.order_by('id'))
+            base['proxi_messages'] = list(reversed(chronological_messages))
+            latest_assistant = next((msg for msg in reversed(chronological_messages) if msg.role == ProxiWebMessage.ROLE_ASSISTANT), None)
             if latest_assistant:
                 latest_meta = latest_assistant.retrieval_metadata_json or {}
                 base['proxi_results'] = latest_meta.get('results', [])
