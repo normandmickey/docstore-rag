@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import tempfile
 from io import BytesIO
 from pathlib import Path
 
@@ -147,11 +148,11 @@ def extract_pdf_text_docling(document):
     if not python_path.exists():
         raise RuntimeError(f'Docling venv not found at {python_path}')
 
-    with document.file.open('rb') as fh:
-        raw = fh.read()
+    suffix = Path(document.filename or 'document.pdf').suffix or '.pdf'
+    with document.file.open('rb') as fh, tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(fh.read())
+        source_path = Path(tmp.name)
 
-    source_path = Path('/tmp') / f'docling-{document.id}-{document.filename}'
-    source_path.write_bytes(raw)
     script = """
 from docling.document_converter import DocumentConverter
 import sys
@@ -169,6 +170,8 @@ print(text)
             check=True,
         )
         return completed.stdout.strip()
+    except subprocess.CalledProcessError as exc:
+        raise RuntimeError(exc.stderr.strip() or exc.stdout.strip() or 'Docling extraction failed')
     finally:
         try:
             source_path.unlink(missing_ok=True)
