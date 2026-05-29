@@ -167,34 +167,67 @@ def extract_document_text(document, version):
     return extract_text_document(raw)
 
 
-def extract_chunk_facts(chunk_text):
+def analyze_chunk_structure(chunk_text):
+    text = (chunk_text or '').strip()
+    raw_lines = [line.rstrip() for line in text.split('\n') if line.strip()]
+    cleaned_lines = [line.strip() for line in raw_lines]
+    heading_candidates = []
+    list_lines = []
+
+    for line in cleaned_lines[:8]:
+        normalized = re.sub(r'\s+', ' ', line).strip(' •\t-')
+        if not normalized:
+            continue
+        if len(normalized) <= 90 and ':' not in normalized and normalized == normalized.title():
+            heading_candidates.append(normalized)
+        if re.match(r'^(?:[\-•*]|\d+[.)])\s+', line):
+            list_lines.append(re.sub(r'^(?:[\-•*]|\d+[.)])\s+', '', normalized).strip())
+
+    dominant_heading = heading_candidates[0] if heading_candidates else ''
+    return {
+        'heading_candidates': heading_candidates,
+        'dominant_heading': dominant_heading,
+        'list_lines': list_lines,
+        'list_count': len(list_lines),
+        'line_count': len(cleaned_lines),
+        'has_heading': bool(heading_candidates),
+        'has_list': bool(list_lines),
+    }
+
+
+def extract_chunk_facts(chunk_text, structure=None):
     facts = []
     text = (chunk_text or '').strip()
     if not text:
         return facts
 
+    structure = structure or analyze_chunk_structure(chunk_text)
     lines = [line.strip(' •\t-') for line in text.split('\n') if line.strip()]
     for line in lines:
         normalized = re.sub(r'\s+', ' ', line).strip()
         if len(normalized) < 4:
             continue
-        if len(normalized) <= 80 and normalized == normalized.title() and ':' not in normalized:
+        if normalized in structure.get('heading_candidates', []):
             facts.append({
                 'fact_type': ExtractedFact.FACT_HEADING,
                 'label': normalized,
                 'value_text': normalized,
                 'normalized_text': normalized.lower(),
-                'confidence': 0.65,
-                'metadata_json': {'pattern': 'heading_like'},
+                'confidence': 0.75,
+                'metadata_json': {'pattern': 'heading_like', 'dominant_heading': structure.get('dominant_heading', '')},
             })
         if re.match(r'^(?:[\-•*]|\d+[.)])\s+', line):
             facts.append({
                 'fact_type': ExtractedFact.FACT_LIST_ITEM,
-                'label': '',
+                'label': structure.get('dominant_heading', '')[:255],
                 'value_text': normalized,
                 'normalized_text': normalized.lower(),
-                'confidence': 0.85,
-                'metadata_json': {'pattern': 'bullet_or_numbered_line'},
+                'confidence': 0.9,
+                'metadata_json': {
+                    'pattern': 'bullet_or_numbered_line',
+                    'dominant_heading': structure.get('dominant_heading', ''),
+                    'list_count': structure.get('list_count', 0),
+                },
             })
         elif ':' in normalized and len(normalized) <= 240:
             label, value = [part.strip() for part in normalized.split(':', 1)]
@@ -205,7 +238,10 @@ def extract_chunk_facts(chunk_text):
                     'value_text': value,
                     'normalized_text': f'{label} {value}'.lower(),
                     'confidence': 0.7,
-                    'metadata_json': {'pattern': 'label_value'},
+                    'metadata_json': {
+                        'pattern': 'label_value',
+                        'dominant_heading': structure.get('dominant_heading', ''),
+                    },
                 })
 
     sentences = re.split(r'(?<=[.!?])\s+', text)
@@ -217,11 +253,14 @@ def extract_chunk_facts(chunk_text):
         if any(keyword in lowered for keyword in ['holiday', 'pto', 'leave', 'eligible', 'coverage', 'benefit', 'schedule', 'vacation']):
             facts.append({
                 'fact_type': ExtractedFact.FACT_POLICY,
-                'label': '',
+                'label': structure.get('dominant_heading', '')[:255],
                 'value_text': sentence,
                 'normalized_text': lowered,
                 'confidence': 0.6,
-                'metadata_json': {'pattern': 'policy_sentence'},
+                'metadata_json': {
+                    'pattern': 'policy_sentence',
+                    'dominant_heading': structure.get('dominant_heading', ''),
+                },
             })
 
     deduped = []
@@ -264,7 +303,14 @@ def ingest_document_task(self, ingestion_job_id):
         Chunk.objects.filter(document_version=version).delete()
         ExtractedFact.objects.filter(document_version=version).delete()
         created_chunks = []
+        last_heading = ''
         for idx, chunk_text in enumerate(chunks):
+            structure = analyze_chunk_structure(chunk_text)
+            dominant_heading = structure.get('dominant_heading') or last_heading
+            if dominant_heading:
+                structure['dominant_heading'] = dominant_heading
+                last_heading = dominant_heading
+
             chunk = Chunk.objects.create(
                 tenant=job.tenant,
                 workspace=job.workspace,
@@ -273,12 +319,19 @@ def ingest_document_task(self, ingestion_job_id):
                 chunk_index=idx,
                 text=chunk_text,
                 token_count=max(1, len(chunk_text) // 4),
-                metadata_json={'stub': False},
+                metadata_json={
+                    'stub': False,
+                    'dominant_heading': dominant_heading,
+                    'heading_candidates': structure.get('heading_candidates', []),
+                    'list_count': structure.get('list_count', 0),
+                    'has_list': structure.get('has_list', False),
+                    'line_count': structure.get('line_count', 0),
+                },
                 embedding=vectors[idx] if idx < len(vectors) else None,
             )
             created_chunks.append(chunk)
 
-            for fact in extract_chunk_facts(chunk_text):
+            for fact in extract_chunk_facts(chunk_text, structure=structure):
                 ExtractedFact.objects.create(
                     tenant=job.tenant,
                     workspace=job.workspace,

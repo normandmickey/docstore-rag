@@ -179,18 +179,31 @@ def retrieve_facts(*, tenant, workspace, query, top_k=8, document_id=None):
         facts = facts.filter(document_id=document_id)
 
     scored = []
-    for fact in facts.order_by('-confidence')[:500]:
-        haystack = ' '.join(filter(None, [fact.label, fact.value_text, fact.normalized_text]))
+    heading_scores = defaultdict(float)
+    for fact in facts.order_by('-confidence')[:800]:
+        dominant_heading = ''
+        if fact.chunk:
+            dominant_heading = (fact.chunk.metadata_json or {}).get('dominant_heading', '')
+        haystack = ' '.join(filter(None, [fact.label, dominant_heading, fact.value_text, fact.normalized_text]))
         lexical = keyword_score(query, haystack)
         exact_bonus = 0.0
         lowered = haystack.lower()
         for token in query_tokens:
             if token in lowered:
                 exact_bonus += 0.1
-        score = (0.7 * lexical) + (0.2 * float(fact.confidence or 0.0)) + exact_bonus
+        list_bonus = 0.15 if fact.fact_type == ExtractedFact.FACT_LIST_ITEM else 0.0
+        heading_bonus = 0.2 if dominant_heading and any(token in dominant_heading.lower() for token in query_tokens) else 0.0
+        score = (0.65 * lexical) + (0.15 * float(fact.confidence or 0.0)) + exact_bonus + list_bonus + heading_bonus
         if score > 0:
             fact.match_score = score
+            fact.dominant_heading = dominant_heading
             scored.append(fact)
+            if dominant_heading:
+                heading_scores[dominant_heading] = max(heading_scores[dominant_heading], score)
+
+    for fact in scored:
+        if getattr(fact, 'dominant_heading', ''):
+            fact.match_score += 0.15 * heading_scores.get(fact.dominant_heading, 0.0)
 
     scored.sort(key=lambda fact: fact.match_score, reverse=True)
     return scored[:top_k]
