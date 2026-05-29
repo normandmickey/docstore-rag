@@ -26,30 +26,22 @@ They live in the checkout path and are intentionally excluded from sync/deploy u
 
 ## Current deploy flow
 
-Because VPS GitHub SSH auth is not yet working for this repo, the current safe flow is:
+Docstore now supports a proper git-based VPS deploy flow.
 
 1. Commit locally in `projects/docstore-rag`
-2. Sync local repo contents to VPS checkout with rsync, excluding `.env` and `.venv`
-3. Run `/home/norm/bin/deploy-docstore`
+2. Push `main` to GitHub
+3. Run `/home/norm/bin/deploy-docstore` on the VPS
 
-Example sync shape from the Pi:
-
-```bash
-rsync -av --delete \
-  --exclude '.venv/' \
-  --exclude '.env' \
-  --exclude '__pycache__/' \
-  --exclude '*.pyc' \
-  --exclude 'tmp_inspect_candidates.py' \
-  /home/pi/.openclaw/workspace/projects/docstore-rag/ \
-  norm@178.156.201.237:/home/norm/sites/docstore_checkout/
-```
-
-Then on the VPS:
+From the Pi repo, the helper script is:
 
 ```bash
-/home/norm/bin/deploy-docstore
+./scripts/deploy-docstore-vps.sh
 ```
+
+That script:
+- pushes local `main` to GitHub
+- SSHes to the VPS
+- runs the remote git-based deploy script
 
 ## Deploy script responsibilities
 
