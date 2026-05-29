@@ -19,6 +19,7 @@
     .status { margin-top: 16px; padding: 14px; border-radius: 12px; background: #0f172a; border: 1px solid #334155; }
     .cta { margin-top: 22px; }
     .button { display: inline-block; padding: 12px 16px; border-radius: 10px; background: #2563eb; color: white; }
+    .install-banner { margin-top: 18px; padding: 14px; border-radius: 12px; background: #0f172a; border: 1px solid #334155; display: none; }
   </style>
 </head>
 <body>
@@ -44,6 +45,11 @@
           <a class="button" href="/login/">Log in</a>
         </div>
       {% endif %}
+      <div id="install-banner" class="install-banner">
+        <strong>Install Docstore</strong>
+        <p id="install-help">Add Docstore to your home screen for a more app-like mobile experience.</p>
+        <a id="install-button" class="button" href="#">Install</a>
+      </div>
       <div class="links">
         <a href="https://github.com/normandmickey/docstore-rag" target="_blank" rel="noopener noreferrer">GitHub</a>
         {% if request.user.is_staff %}
@@ -69,6 +75,43 @@
         });
       });
     }
+
+    (function () {
+      let deferredPrompt = null;
+      const banner = document.getElementById('install-banner');
+      const button = document.getElementById('install-button');
+      const help = document.getElementById('install-help');
+      const ua = navigator.userAgent || '';
+      const isIOS = /iphone|ipad|ipod/i.test(ua);
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+      if (!banner || isStandalone) {
+        return;
+      }
+
+      if (isIOS) {
+        banner.style.display = 'block';
+        help.textContent = 'On iPhone, tap Share and then Add to Home Screen.';
+        button.style.display = 'none';
+      }
+
+      window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        deferredPrompt = event;
+        banner.style.display = 'block';
+      });
+
+      if (button) {
+        button.addEventListener('click', async function (event) {
+          event.preventDefault();
+          if (!deferredPrompt) return;
+          deferredPrompt.prompt();
+          await deferredPrompt.userChoice;
+          deferredPrompt = null;
+          banner.style.display = 'none';
+        });
+      }
+    })();
   </script>
 </body>
 </html>

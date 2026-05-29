@@ -29,10 +29,12 @@
     .status-succeeded { background: #166534; color: #dcfce7; }
     .status-failed { background: #991b1b; color: #fee2e2; }
     pre { white-space: pre-wrap; background: #0f172a; padding: 12px; border-radius: 10px; color: #cbd5e1; }
-    .doc-title { font-weight: 700; line-height: 1.35; }
+    .doc-title { font-weight: 700; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .doc-actions { margin-top: 6px; }
     .doc-meta-group { margin-top: 6px; display: grid; gap: 4px; }
     .preview-clamp { margin-top: 10px; max-height: 8.5em; overflow: hidden; font-size: 0.92rem; }
+    .install-banner { margin-top: 16px; padding: 12px 14px; border-radius: 12px; background: #0f172a; border: 1px solid #334155; display: none; }
+    .install-banner button { margin-top: 8px; }
     @media (max-width: 640px) {
       .wrap { padding: 20px 14px 36px; }
       .topbar, .card { padding: 16px; margin-bottom: 16px; border-radius: 14px; }
@@ -55,6 +57,11 @@
         </div>
       {% endif %}
       <p><strong>Current workspace:</strong> {% if current_workspace %}{{ current_workspace.name }} ({{ current_workspace.tenant.name }}){% else %}not set{% endif %}</p>
+      <div id="install-banner" class="install-banner">
+        <strong>Install Docstore</strong>
+        <div class="meta" id="install-help">Add Docstore to your home screen for a more app-like mobile experience.</div>
+        <button id="install-button" type="button">Install</button>
+      </div>
       <div class="nav">
         <a href="/dashboard/" class="{% if section == 'overview' %}active{% endif %}">Overview</a>
         <a href="/dashboard/documents/" class="{% if section == 'documents' %}active{% endif %}">Documents</a>
@@ -102,6 +109,42 @@
         });
       });
     }
+
+    (function () {
+      let deferredPrompt = null;
+      const banner = document.getElementById('install-banner');
+      const button = document.getElementById('install-button');
+      const help = document.getElementById('install-help');
+      const ua = navigator.userAgent || '';
+      const isIOS = /iphone|ipad|ipod/i.test(ua);
+      const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+      if (!banner || isStandalone) {
+        return;
+      }
+
+      if (isIOS) {
+        banner.style.display = 'block';
+        help.textContent = 'On iPhone, tap Share and then Add to Home Screen.';
+        button.style.display = 'none';
+      }
+
+      window.addEventListener('beforeinstallprompt', function (event) {
+        event.preventDefault();
+        deferredPrompt = event;
+        banner.style.display = 'block';
+      });
+
+      if (button) {
+        button.addEventListener('click', async function () {
+          if (!deferredPrompt) return;
+          deferredPrompt.prompt();
+          await deferredPrompt.userChoice;
+          deferredPrompt = null;
+          banner.style.display = 'none';
+        });
+      }
+    })();
   </script>
 </body>
 </html>
