@@ -4,12 +4,59 @@
 {% block content %}
 <style>
   .proxi-web-layout {
+    display: grid;
+    gap: 16px;
     grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
     align-items: start;
   }
+  .proxi-web-card {
+    margin-bottom: 0;
+    min-width: 0;
+  }
+  .proxi-web-rename-form {
+    margin-bottom: 14px;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+  }
+  .proxi-web-messages {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .proxi-web-message {
+    border: 1px solid #243055;
+    border-radius: 12px;
+    padding: 14px;
+    min-width: 0;
+  }
+  .proxi-web-message-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .proxi-web-copy-button {
+    background: #1d4ed8;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+  }
   @media (max-width: 860px) {
     .proxi-web-layout {
-      grid-template-columns: 1fr !important;
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .proxi-web-rename-form {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .proxi-web-message-header {
+      align-items: flex-start;
+      flex-direction: column;
+    }
+    .proxi-web-copy-button {
+      width: 100%;
     }
   }
 </style>
@@ -18,8 +65,8 @@
   <p class="meta">A separate history-aware chat surface. This does not replace the existing Chat with Documents page.</p>
 </div>
 
-<div class="grid proxi-web-layout" style="grid-template-columns: minmax(220px, 320px) minmax(0, 1fr); align-items: start;">
-  <div class="card" style="margin-bottom: 0;">
+<div class="proxi-web-layout">
+  <div class="card proxi-web-card">
     <h3 style="margin-top: 0;">Chats</h3>
     {% if current_workspace %}
       <form method="post" style="margin-bottom: 18px;">
@@ -40,7 +87,7 @@
     {% endif %}
   </div>
 
-  <div class="card" style="margin-bottom: 0;">
+  <div class="card proxi-web-card">
     <h3 style="margin-top: 0;">Conversation</h3>
     {% if not current_workspace %}
       <p>No workspace selected.</p>
@@ -49,7 +96,7 @@
     {% else %}
       <div class="meta" style="margin-bottom: 14px;">Current chat: <strong>{{ proxi_thread.title|default:'Untitled chat' }}</strong></div>
 
-      <form method="post" style="margin-bottom: 14px; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) auto; align-items: end;">
+      <form method="post" class="proxi-web-rename-form">
         {% csrf_token %}
         <input type="hidden" name="action" value="rename_proxi_thread">
         <input type="hidden" name="thread_id" value="{{ proxi_thread.id }}">
@@ -82,16 +129,16 @@
         <button type="submit" style="background: #991b1b;">Delete chat</button>
       </form>
 
-      <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 14px;">
+      <div class="proxi-web-messages">
         {% for message in proxi_messages %}
-          <div class="row" style="border: 1px solid #243055; border-radius: 12px; padding: 14px;">
-            <div style="display: flex; justify-content: space-between; gap: 12px; align-items: center; margin-bottom: 8px;">
+          <div class="row proxi-web-message">
+            <div class="proxi-web-message-header">
               <div>
                 <strong>{% if message.role == 'user' %}You{% else %}Proxi-Web{% endif %}</strong>
                 <div class="meta">{{ message.created_at }}</div>
               </div>
               {% if message.role == 'assistant' %}
-                <button type="button" class="copy-response-button" data-copy-text="{{ message.content|escapejs }}" style="background: #1d4ed8; padding: 8px 12px; font-size: 0.9rem;">Copy</button>
+                <button type="button" class="copy-response-button proxi-web-copy-button" data-copy-text="{{ message.content|escapejs }}">Copy</button>
               {% endif %}
             </div>
             {% if message.role == 'assistant' %}
