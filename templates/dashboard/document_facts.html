@@ -1,0 +1,30 @@
+{% extends 'dashboard/document_detail.html' %}
+{% block content %}
+{{ block.super }}
+<div class="card">
+  <h2>Facts</h2>
+  <form method="get" style="margin-bottom: 16px;">
+    <label>Fact type</label>
+    <select name="fact_type">
+      {% for value, label in fact_type_options %}
+        <option value="{{ value }}" {% if fact_type_filter == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Filter</button>
+  </form>
+  {% for fact in page_obj %}
+    <div class="row">
+      <div class="meta">{{ fact.fact_type }} · confidence {{ fact.confidence|floatformat:2 }}{% if fact.chunk %} · chunk {{ fact.chunk.chunk_index }}{% endif %}{% if fact.chunk and fact.chunk.metadata_json.dominant_heading %} · heading {{ fact.chunk.metadata_json.dominant_heading }}{% endif %}</div>
+      <div style="font-weight: 600; margin-top: 6px;">{% if fact.label %}{{ fact.label }}{% else %}Fact{% endif %}</div>
+      <pre style="margin-top: 8px;">{{ fact.value_text }}</pre>
+    </div>
+  {% empty %}
+    <p>No facts found for this filter.</p>
+  {% endfor %}
+  <div class="meta" style="margin-top: 16px;">
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}{% if fact_type_filter %}&fact_type={{ fact_type_filter }}{% endif %}">Previous</a>{% endif %}
+    {% if page_obj.has_next %} · <a href="?page={{ page_obj.next_page_number }}{% if fact_type_filter %}&fact_type={{ fact_type_filter }}{% endif %}">Next</a>{% endif %}
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends 'dashboard/document_detail.html' %}
+{% block content %}
+{{ block.super }}
+<div class="card">
+  <h2>Chunks</h2>
+  {% for chunk in page_obj %}
+    <div class="row">
+      <div style="font-weight: 700;">Chunk {{ chunk.chunk_index }}</div>
+      <div class="meta" style="margin-top: 6px;">
+        {% if chunk.metadata_json.dominant_heading %}<div>Heading: {{ chunk.metadata_json.dominant_heading }}</div>{% endif %}
+        <div>List count: {{ chunk.metadata_json.list_count|default:0 }} · Has list: {{ chunk.metadata_json.has_list|yesno:'yes,no' }}</div>
+        <div>Lines: {{ chunk.metadata_json.line_count|default:0 }}</div>
+      </div>
+      {% if chunk.metadata_text %}
+        <div style="margin-top: 10px; font-weight: 600;">Metadata text</div>
+        <pre>{{ chunk.metadata_text }}</pre>
+      {% endif %}
+      <div style="margin-top: 10px; font-weight: 600;">Chunk text</div>
+      <pre>{{ chunk.text }}</pre>
+    </div>
+  {% empty %}
+    <p>No chunks found for this document.</p>
+  {% endfor %}
+  <div class="meta" style="margin-top: 16px;">
+    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+    {% if page_obj.has_previous %}<a href="?page={{ page_obj.previous_page_number }}">Previous</a>{% endif %}
+    {% if page_obj.has_next %} · <a href="?page={{ page_obj.next_page_number }}">Next</a>{% endif %}
+  </div>
+</div>
+{% endblock %}

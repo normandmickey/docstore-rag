@@ -13,48 +13,23 @@
     {% if detail_latest_version %}<div>Latest version: v{{ detail_latest_version.version_number }}</div>{% endif %}
     {% if detail_document.source_url %}<div>Source URL: <a href="{{ detail_document.source_url }}" target="_blank" rel="noopener noreferrer">{{ detail_document.source_url }}</a></div>{% endif %}
   </div>
-  <div class="doc-actions" style="margin-top: 12px;">
-    {% if detail_document.file %}<a href="/documents/{{ detail_document.id }}/download/" target="_blank" rel="noopener noreferrer">Open document</a> · {% endif %}
-    <a href="/dashboard/chat/?document_id={{ detail_document.id }}">Chat with this document</a>
+  <div class="nav" style="margin-top: 16px;">
+    <a href="/documents/{{ detail_document.id }}/" class="{% if detail_section == 'overview' %}active{% endif %}">Overview</a>
+    <a href="/documents/{{ detail_document.id }}/facts/" class="{% if detail_section == 'facts' %}active{% endif %}">Facts</a>
+    <a href="/documents/{{ detail_document.id }}/chunks/" class="{% if detail_section == 'chunks' %}active{% endif %}">Chunks</a>
+    <a href="/documents/{{ detail_document.id }}/search/" class="{% if detail_section == 'search' %}active{% endif %}">Search</a>
+    {% if detail_document.file %}<a href="/documents/{{ detail_document.id }}/download/" target="_blank" rel="noopener noreferrer">Open document</a>{% endif %}
+    <a href="/dashboard/chat/?document_id={{ detail_document.id }}">Chat this document</a>
   </div>
 </div>
 
 <div class="card">
-  <h2>Extracted facts</h2>
-  {% if detail_facts %}
-    {% for fact in detail_facts %}
-      <div class="row">
-        <div class="meta">{{ fact.fact_type }} · confidence {{ fact.confidence|floatformat:2 }}{% if fact.chunk %} · chunk {{ fact.chunk.chunk_index }}{% endif %}{% if fact.chunk and fact.chunk.metadata_json.dominant_heading %} · heading {{ fact.chunk.metadata_json.dominant_heading }}{% endif %}</div>
-        <div style="font-weight: 600; margin-top: 6px;">{% if fact.label %}{{ fact.label }}{% else %}Fact{% endif %}</div>
-        <pre style="margin-top: 8px;">{{ fact.value_text }}</pre>
-      </div>
-    {% endfor %}
-  {% else %}
-    <p>No extracted facts yet for this document.</p>
-  {% endif %}
-</div>
-
-<div class="card">
-  <h2>Chunk metadata</h2>
-  {% if detail_chunks %}
-    {% for chunk in detail_chunks %}
-      <div class="row">
-        <div style="font-weight: 700;">Chunk {{ chunk.chunk_index }}</div>
-        <div class="meta" style="margin-top: 6px;">
-          {% if chunk.metadata_json.dominant_heading %}<div>Heading: {{ chunk.metadata_json.dominant_heading }}</div>{% endif %}
-          <div>List count: {{ chunk.metadata_json.list_count|default:0 }} · Has list: {{ chunk.metadata_json.has_list|yesno:'yes,no' }}</div>
-          <div>Lines: {{ chunk.metadata_json.line_count|default:0 }}</div>
-        </div>
-        {% if chunk.metadata_text %}
-          <div style="margin-top: 10px; font-weight: 600;">Metadata text</div>
-          <pre>{{ chunk.metadata_text }}</pre>
-        {% endif %}
-        <div style="margin-top: 10px; font-weight: 600;">Chunk text</div>
-        <pre>{{ chunk.text }}</pre>
-      </div>
-    {% endfor %}
-  {% else %}
-    <p>No chunks found for this document.</p>
-  {% endif %}
+  <h2>Overview</h2>
+  <p>This document now has separate pages for extracted facts, chunk inspection, and document-scoped search.</p>
+  <div class="grid">
+    <div class="stat"><strong>Facts</strong><div class="meta">{{ detail_fact_count }} extracted facts</div></div>
+    <div class="stat"><strong>Chunks</strong><div class="meta">{{ detail_chunk_count }} chunks</div></div>
+    <div class="stat"><strong>Document search</strong><div class="meta">Vector + metadata + lexical search scoped to this document</div></div>
+  </div>
 </div>
 {% endblock %}

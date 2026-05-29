@@ -6,6 +6,7 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.views import LoginView
 from django.contrib.auth import get_user_model
+from django.core.paginator import Paginator
 from django.db.models import Count
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -15,7 +16,7 @@ from django.utils.text import slugify
 from connectors.models import Connector
 from documents.models import Chunk, Document, ExtractedFact
 from documents.upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
-from retrieval.service import answer_question
+from retrieval.service import answer_question, retrieve_chunks
 
 from .forms import SignUpForm
 from .models import APIKey, ExternalAccount, InviteToken, Tenant, TenantMembership, Workspace
@@ -382,14 +383,11 @@ def document_download(request, document_id):
     return response
 
 
-def document_detail(request, document_id):
-    if not request.user.is_authenticated:
-        return redirect('login')
-
+def _document_detail_base(request, document_id):
     base = _dashboard_base(request)
     handled = _handle_workspace_actions(request, base)
     if handled:
-        return handled
+        return handled, None, None
 
     document = get_object_or_404(Document.objects.select_related('tenant', 'workspace'), id=document_id)
     membership = TenantMembership.objects.filter(user=request.user, tenant=document.tenant).exists()
@@ -397,19 +395,100 @@ def document_detail(request, document_id):
         raise Http404('Document not found.')
 
     latest_version = document.versions.order_by('-version_number', '-id').first()
-    facts = ExtractedFact.objects.filter(document=document).select_related('chunk').order_by('-confidence', 'id')[:250]
-    chunks = Chunk.objects.filter(document=document).order_by('chunk_index')[:80]
-
     base.update({
         'section': 'documents',
         'detail_document': document,
         'detail_latest_version': latest_version,
-        'detail_facts': facts,
-        'detail_chunks': chunks,
         'detail_fact_count': ExtractedFact.objects.filter(document=document).count(),
         'detail_chunk_count': Chunk.objects.filter(document=document).count(),
     })
+    return None, base, document
+
+
+def document_detail(request, document_id):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    handled, base, document = _document_detail_base(request, document_id)
+    if handled:
+        return handled
+
+    base['detail_section'] = 'overview'
     return render(request, 'dashboard/document_detail.html', base)
+
+
+def document_facts(request, document_id):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    handled, base, document = _document_detail_base(request, document_id)
+    if handled:
+        return handled
+
+    fact_type = (request.GET.get('fact_type') or '').strip()
+    facts = ExtractedFact.objects.filter(document=document).select_related('chunk').order_by('-confidence', 'id')
+    if fact_type in {ExtractedFact.FACT_HEADING, ExtractedFact.FACT_LIST_ITEM, ExtractedFact.FACT_POLICY}:
+        facts = facts.filter(fact_type=fact_type)
+    paginator = Paginator(facts, 50)
+    page_obj = paginator.get_page(request.GET.get('page'))
+
+    base.update({
+        'detail_section': 'facts',
+        'page_obj': page_obj,
+        'fact_type_filter': fact_type,
+        'fact_type_options': [
+            ('', 'All'),
+            (ExtractedFact.FACT_HEADING, 'Heading'),
+            (ExtractedFact.FACT_LIST_ITEM, 'List item'),
+            (ExtractedFact.FACT_POLICY, 'Policy'),
+        ],
+    })
+    return render(request, 'dashboard/document_facts.html', base)
+
+
+def document_chunks(request, document_id):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    handled, base, document = _document_detail_base(request, document_id)
+    if handled:
+        return handled
+
+    chunks = Chunk.objects.filter(document=document).order_by('chunk_index')
+    paginator = Paginator(chunks, 25)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    base.update({
+        'detail_section': 'chunks',
+        'page_obj': page_obj,
+    })
+    return render(request, 'dashboard/document_chunks.html', base)
+
+
+def document_search(request, document_id):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    handled, base, document = _document_detail_base(request, document_id)
+    if handled:
+        return handled
+
+    query = (request.GET.get('q') or '').strip()
+    results = []
+    if query:
+        results = retrieve_chunks(
+            tenant=document.tenant,
+            workspace=document.workspace,
+            query=query,
+            top_k=12,
+            document_id=document.id,
+        )
+
+    base.update({
+        'detail_section': 'search',
+        'search_query': query,
+        'search_results': results,
+    })
+    return render(request, 'dashboard/document_search.html', base)
 
 
 def dashboard_documents(request):

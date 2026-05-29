@@ -1,0 +1,33 @@
+{% extends 'dashboard/document_detail.html' %}
+{% block content %}
+{{ block.super }}
+<div class="card">
+  <h2>Search this document</h2>
+  <form method="get">
+    <label>Query</label>
+    <input type="text" name="q" value="{{ search_query }}" placeholder="e.g. paid holidays, eligibility, PTO carryover">
+    <button type="submit">Search</button>
+  </form>
+  {% if search_query %}
+    <p class="meta">Showing blended vector + metadata + lexical results for this document only.</p>
+    {% for row in search_results %}
+      <div class="row">
+        <div style="font-weight: 700;">Chunk {{ row.chunk_index }}</div>
+        <div class="meta" style="margin-top: 6px;">
+          <div>Blend score: {{ row.blended_score|floatformat:4 }}</div>
+          <div>Text relevance: {{ row.relevance_score|floatformat:4 }} · Metadata relevance: {{ row.metadata_relevance_score|floatformat:4 }} · Lexical: {{ row.lexical_score|floatformat:4 }}</div>
+          {% if row.metadata_json.dominant_heading %}<div>Heading: {{ row.metadata_json.dominant_heading }}</div>{% endif %}
+        </div>
+        {% if row.metadata_text %}
+          <div style="margin-top: 10px; font-weight: 600;">Metadata text</div>
+          <pre>{{ row.metadata_text }}</pre>
+        {% endif %}
+        <div style="margin-top: 10px; font-weight: 600;">Chunk text</div>
+        <pre>{{ row.text }}</pre>
+      </div>
+    {% empty %}
+      <p>No results found.</p>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

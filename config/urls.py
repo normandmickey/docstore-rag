@@ -4,7 +4,7 @@ from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import path
 from documents.api import DocumentCreateView, DocumentDeleteView, DocumentPurgeView, DocumentRestoreView, URLIngestView
-from control.views import AppLoginView, dashboard, dashboard_api_keys, dashboard_chat, dashboard_connectors, dashboard_documents, dashboard_urls, document_detail, document_download, logout_view, microsoft_connect_callback, microsoft_connect_start, signup, staff_dashboard
+from control.views import AppLoginView, dashboard, dashboard_api_keys, dashboard_chat, dashboard_connectors, dashboard_documents, dashboard_urls, document_chunks, document_detail, document_download, document_facts, document_search, logout_view, microsoft_connect_callback, microsoft_connect_start, signup, staff_dashboard
 from retrieval.api import ChatView, SearchView
 
 
@@ -41,6 +41,9 @@ urlpatterns = [
     path('dashboard/urls/', dashboard_urls, name='dashboard_urls'),
     path('dashboard/chat/', dashboard_chat, name='dashboard_chat'),
     path('documents/<int:document_id>/', document_detail, name='document_detail'),
+    path('documents/<int:document_id>/facts/', document_facts, name='document_facts'),
+    path('documents/<int:document_id>/chunks/', document_chunks, name='document_chunks'),
+    path('documents/<int:document_id>/search/', document_search, name='document_search'),
     path('documents/<int:document_id>/download/', document_download, name='document_download'),
     path('dashboard/connectors/', dashboard_connectors, name='dashboard_connectors'),
     path('dashboard/api-keys/', dashboard_api_keys, name='dashboard_api_keys'),
