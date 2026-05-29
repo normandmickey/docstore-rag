@@ -40,7 +40,7 @@ def embed_texts(texts, model=None):
 
 
 def rewrite_question(question, chat_history=None, model=None):
-    client = get_openai_client()
+    client = get_groq_client()
     history_text = ''
     if chat_history:
         history_lines = []
@@ -53,7 +53,7 @@ def rewrite_question(question, chat_history=None, model=None):
             history_text = '\n'.join(history_lines)
 
     response = client.responses.create(
-        model=model or getattr(settings, 'DEFAULT_CHAT_MODEL', 'gpt-4.1-mini'),
+        model=model or getattr(settings, 'DEFAULT_CHAT_MODEL', 'openai/gpt-oss-20b'),
         input=[
             {
                 'role': 'system',
@@ -82,10 +82,10 @@ def rewrite_question(question, chat_history=None, model=None):
 
 
 def answer_with_context(question, context_blocks, model=None):
-    client = get_openai_client()
+    client = get_groq_client()
     joined_context = "\n\n".join(context_blocks)
     response = client.responses.create(
-        model=model or getattr(settings, 'DEFAULT_CHAT_MODEL', 'gpt-4.1-mini'),
+        model=model or getattr(settings, 'DEFAULT_CHAT_MODEL', 'openai/gpt-oss-20b'),
         input=[
             {
                 'role': 'system',
