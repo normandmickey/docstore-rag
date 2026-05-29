@@ -756,13 +756,15 @@ def dashboard_proxi_web(request):
         base['proxi_thread'] = thread
 
         if request.method == 'POST' and request.POST.get('action') == 'send_proxi_message':
-            question = (request.POST.get('question') or '').strip()
+            raw_question = (request.POST.get('question') or '').strip()
             thread_id = (request.POST.get('thread_id') or '').strip()
             use_web = (request.POST.get('use_web_search') or '').strip() == '1'
             thread = threads.filter(id=thread_id).first() if thread_id.isdigit() else thread
             if not thread:
                 messages.error(request, 'Pick or create a Proxi-Web chat first.')
                 return redirect('dashboard_proxi_web')
+            redacted_question = redact_pii(raw_question)
+            question = redacted_question['text']
             base['proxi_thread'] = thread
             base['proxi_question'] = question
             base['proxi_web_enabled'] = use_web
@@ -820,12 +822,11 @@ def dashboard_proxi_web(request):
                     context_blocks,
                     chat_history=chat_history,
                 ) if context_blocks else 'I could not find enough relevant context for that question yet.'
-                redacted_question = redact_pii(question)
                 redacted_answer = redact_pii(answer)
                 ProxiWebMessage.objects.create(
                     thread=thread,
                     role=ProxiWebMessage.ROLE_USER,
-                    content=question,
+                    content=redacted_question['text'],
                     retrieval_metadata_json={
                         'contains_pii': redacted_question['contains_pii'],
                         'pii_types': redacted_question['pii_types'],
@@ -835,7 +836,7 @@ def dashboard_proxi_web(request):
                 ProxiWebMessage.objects.create(
                     thread=thread,
                     role=ProxiWebMessage.ROLE_ASSISTANT,
-                    content=answer,
+                    content=redacted_answer['text'],
                     retrieval_metadata_json={
                         'use_web_search': use_web,
                         'contains_pii': redacted_answer['contains_pii'],
