@@ -26,7 +26,7 @@
           <input type="checkbox" name="document_ids" value="{{ row.document.id }}" style="width: auto; margin-top: 6px;">
           <span style="flex: 1;">
             <div class="doc-title">{{ row.document.filename }}</div>
-            {% if row.document.file %}<div class="doc-actions"><a href="/documents/{{ row.document.id }}/download/" target="_blank" rel="noopener noreferrer">Open document</a></div>{% endif %}
+            <div class="doc-actions"><a href="/documents/{{ row.document.id }}/">View details</a>{% if row.document.file %} · <a href="/documents/{{ row.document.id }}/download/" target="_blank" rel="noopener noreferrer">Open document</a>{% endif %}</div>
             <div class="doc-meta-group meta">
               <div>Status: {{ row.document.status }}</div>
               <div>Collection: {{ row.document.collection|default:'—' }}</div>
@@ -63,7 +63,7 @@
             <input type="checkbox" name="document_ids" value="{{ row.document.id }}" style="width: auto; margin-top: 6px;">
             <span style="flex: 1;">
               <div class="doc-title">{{ row.document.filename }}</div>
-              {% if row.document.file %}<div class="doc-actions"><a href="/documents/{{ row.document.id }}/download/" target="_blank" rel="noopener noreferrer">Open document</a></div>{% endif %}
+              <div class="doc-actions"><a href="/documents/{{ row.document.id }}/">View details</a>{% if row.document.file %} · <a href="/documents/{{ row.document.id }}/download/" target="_blank" rel="noopener noreferrer">Open document</a>{% endif %}</div>
               <div class="doc-meta-group meta">
                 <div>Failed</div>
                 <div>Collection: {{ row.document.collection|default:'—' }}</div>
@@ -98,7 +98,7 @@
             <input type="checkbox" name="document_ids" value="{{ row.document.id }}" style="width: auto; margin-top: 6px;">
             <span style="flex: 1;">
               <div class="doc-title">{{ row.document.filename }}</div>
-              {% if row.document.file %}<div class="doc-actions"><a href="/documents/{{ row.document.id }}/download/" target="_blank" rel="noopener noreferrer">Open document</a></div>{% endif %}
+              <div class="doc-actions"><a href="/documents/{{ row.document.id }}/">View details</a>{% if row.document.file %} · <a href="/documents/{{ row.document.id }}/download/" target="_blank" rel="noopener noreferrer">Open document</a>{% endif %}</div>
               <div class="doc-meta-group meta">
                 <div>Deleted</div>
                 <div>Collection: {{ row.document.collection|default:'—' }}</div>

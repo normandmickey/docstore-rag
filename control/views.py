@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from connectors.models import Connector
-from documents.models import Document
+from documents.models import Chunk, Document, ExtractedFact
 from documents.upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
 from retrieval.service import answer_question
 
@@ -380,6 +380,36 @@ def document_download(request, document_id):
     if document.mime_type:
         response['Content-Type'] = document.mime_type
     return response
+
+
+def document_detail(request, document_id):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+
+    document = get_object_or_404(Document.objects.select_related('tenant', 'workspace'), id=document_id)
+    membership = TenantMembership.objects.filter(user=request.user, tenant=document.tenant).exists()
+    if not membership and not request.user.is_staff:
+        raise Http404('Document not found.')
+
+    latest_version = document.versions.order_by('-version_number', '-id').first()
+    facts = ExtractedFact.objects.filter(document=document).select_related('chunk').order_by('-confidence', 'id')[:250]
+    chunks = Chunk.objects.filter(document=document).order_by('chunk_index')[:80]
+
+    base.update({
+        'section': 'documents',
+        'detail_document': document,
+        'detail_latest_version': latest_version,
+        'detail_facts': facts,
+        'detail_chunks': chunks,
+        'detail_fact_count': ExtractedFact.objects.filter(document=document).count(),
+        'detail_chunk_count': Chunk.objects.filter(document=document).count(),
+    })
+    return render(request, 'dashboard/document_detail.html', base)
 
 
 def dashboard_documents(request):
