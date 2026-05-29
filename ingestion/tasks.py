@@ -250,6 +250,25 @@ def extract_document_text(document, version, extractor=IngestionJob.EXTRACTOR_ST
     return extract_text_document(raw)
 
 
+def is_heading_candidate(text):
+    text = re.sub(r'\s+', ' ', (text or '')).strip(' •\t-')
+    if not text:
+        return False
+    if len(text) < 3 or len(text) > 70:
+        return False
+    if ':' in text:
+        return False
+    lowered = text.lower()
+    if any(term in lowered for term in ['president', 'chief executive', 'kevin clayton']):
+        return False
+    words = text.split()
+    if len(words) >= 3 and all(word[:1].isupper() for word in words if word[:1].isalpha()):
+        policy_terms = ['holiday', 'pto', 'leave', 'benefit', 'conduct', 'policy', 'harassment', 'eligibility', 'compensation', 'attendance']
+        if not any(term in lowered for term in policy_terms):
+            return False
+    return text == text.title() or bool(re.match(r'^\d+[\-.]\s+', text))
+
+
 def analyze_chunk_structure(chunk_text):
     text = (chunk_text or '').strip()
     raw_lines = [line.rstrip() for line in text.split('\n') if line.strip()]
@@ -261,7 +280,7 @@ def analyze_chunk_structure(chunk_text):
         normalized = re.sub(r'\s+', ' ', line).strip(' •\t-')
         if not normalized:
             continue
-        if len(normalized) <= 90 and ':' not in normalized and normalized == normalized.title():
+        if is_heading_candidate(normalized):
             heading_candidates.append(normalized)
         if re.match(r'^(?:[\-•*]|\d+[.)])\s+', line):
             list_lines.append(re.sub(r'^(?:[\-•*]|\d+[.)])\s+', '', normalized).strip())
@@ -283,27 +302,48 @@ def infer_chunk_questions(document, chunk_text, structure=None):
     heading = structure.get('dominant_heading', '')
     lowered = (chunk_text or '').lower()
     questions = []
-    if heading:
-        questions.append(f'What does the {heading} section say in {document.filename}?')
+
     if 'holiday' in lowered:
         questions.extend([
             'What paid holidays does the company observe?',
             'What holidays are employees off?',
-            'Is the day after Thanksgiving a company holiday?',
+            'Which holidays are recognized by the company?',
+            'Is the day after Thanksgiving a paid holiday?',
         ])
     if any(token in lowered for token in ['pto', 'vacation', 'paid time off']):
         questions.extend([
             'How does PTO work?',
-            'How much vacation or paid time off do employees get?',
+            'How much paid time off do employees get?',
+            'What are the vacation or PTO rules?',
         ])
     if any(token in lowered for token in ['eligib', 'coverage', 'benefit']):
         questions.extend([
             'When are employees eligible for benefits?',
-            'What are the eligibility rules?',
+            'What are the benefits eligibility rules?',
+            'When does employee coverage begin?',
+        ])
+    if any(token in lowered for token in ['harassment', 'complaint', 'report', 'prohibited conduct']):
+        questions.extend([
+            'How should employees report harassment?',
+            'Who should prohibited conduct be reported to?',
+            'What happens after a harassment complaint is made?',
+        ])
+    if any(token in lowered for token in ['at-will', 'employment at will', 'contract', 'handbook']):
+        questions.extend([
+            'Does the handbook create an employment contract?',
+            'Is employment at will?',
+            'What is the purpose of this handbook?',
         ])
     if structure.get('has_list'):
         questions.append('What items are listed in this policy section?')
-    questions.append(f'What questions can this chunk answer from {document.filename}?')
+    if heading and is_heading_candidate(heading):
+        questions.append(f'What does the {heading} policy cover?')
+
+    if not questions:
+        questions.extend([
+            f'What policy or rules are described in {document.filename}?',
+            'What employee guidance is given in this section?',
+        ])
 
     deduped = []
     seen = set()
