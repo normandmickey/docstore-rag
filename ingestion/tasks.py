@@ -17,6 +17,7 @@ from providers import embed_texts
 from .models import IngestionJob
 
 DOCLING_VENV = os.getenv('DOCLING_VENV_PATH', '/mnt/HC_Volume_105592620/tools/docling/.venv')
+DOCLING_PDF_BACKEND = os.getenv('DOCLING_PDF_BACKEND', 'docling_parse')
 
 
 def repair_suspicious_pdf_tokens(text):
@@ -155,9 +156,10 @@ def extract_pdf_text_docling(document):
 
     script = """
 from docling.document_converter import DocumentConverter
+import os
 import sys
 converter = DocumentConverter()
-result = converter.convert(sys.argv[1])
+result = converter.convert(sys.argv[1], pdf_backend=os.environ.get('DOCLING_PDF_BACKEND', 'docling_parse'))
 doc = result.document
 text = doc.export_to_markdown() if hasattr(doc, 'export_to_markdown') else doc.export_to_text()
 print(text)
@@ -168,6 +170,7 @@ print(text)
             capture_output=True,
             text=True,
             check=True,
+            env={**os.environ, 'DOCLING_PDF_BACKEND': DOCLING_PDF_BACKEND},
         )
         return completed.stdout.strip()
     except subprocess.CalledProcessError as exc:
