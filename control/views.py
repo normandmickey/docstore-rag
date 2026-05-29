@@ -660,8 +660,12 @@ def dashboard_chat(request):
     base['chat_answer'] = ''
     base['chat_question'] = ''
     base['chat_results'] = []
+    base['chat_contains_pii'] = False
+    base['chat_pii_types'] = []
     if request.method == 'POST' and request.POST.get('action') == 'ask_question' and current_workspace:
-        chat_question = (request.POST.get('question') or '').strip()
+        raw_chat_question = (request.POST.get('question') or '').strip()
+        redacted_chat_question = redact_pii(raw_chat_question)
+        chat_question = redacted_chat_question['text']
         selected_document_id = (request.POST.get('document_id') or '').strip()
         document_scope = int(selected_document_id) if selected_document_id.isdigit() else None
         base['chat_question'] = chat_question
@@ -674,8 +678,11 @@ def dashboard_chat(request):
                     top_k=5,
                     document_id=document_scope,
                 )
-                base['chat_answer'] = chat_answer
+                redacted_chat_answer = redact_pii(chat_answer)
+                base['chat_answer'] = redacted_chat_answer['text']
                 base['chat_results'] = chat_results
+                base['chat_contains_pii'] = redacted_chat_answer['contains_pii'] or redacted_chat_question['contains_pii']
+                base['chat_pii_types'] = sorted(set(redacted_chat_question['pii_types'] + redacted_chat_answer['pii_types']))
             except Exception as exc:
                 logger.exception('Dashboard chat failed for user=%s workspace=%s', request.user.id, current_workspace.id)
                 messages.error(request, f'Chat failed: {exc}')

@@ -141,6 +141,7 @@
       </form>
       {% if chat_answer %}
         <h3>Answer</h3>
+        {% if chat_contains_pii %}<div class="msg">PII-like strings were masked in this chat. Types: {{ chat_pii_types|join:", " }}</div>{% endif %}
         <pre>{{ chat_answer }}</pre>
       {% endif %}
       {% if chat_results %}
