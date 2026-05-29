@@ -195,6 +195,30 @@ def analyze_chunk_structure(chunk_text):
     }
 
 
+def build_chunk_metadata_text(document, chunk_text, structure=None):
+    structure = structure or analyze_chunk_structure(chunk_text)
+    heading = structure.get('dominant_heading', '')
+    list_lines = structure.get('list_lines', [])[:5]
+    list_preview = '; '.join(list_lines)
+    keywords = []
+    lowered = (chunk_text or '').lower()
+    for token in ['holiday', 'holidays', 'paid', 'pto', 'leave', 'eligibility', 'benefits', 'vacation', 'coverage', 'schedule']:
+        if token in lowered:
+            keywords.append(token)
+    parts = [
+        f'Document: {document.filename}',
+        f'Heading: {heading or "(none)"}',
+        f'Chunk type: {"list" if structure.get("has_list") else "policy text"}',
+        f'List count: {structure.get("list_count", 0)}',
+    ]
+    if keywords:
+        parts.append(f'Keywords: {", ".join(keywords)}')
+    if list_preview:
+        parts.append(f'List preview: {list_preview}')
+    parts.append(f'Chunk summary: {(chunk_text or "")[:400].replace(chr(10), " ")}')
+    return '\n'.join(parts).strip()
+
+
 def extract_chunk_facts(chunk_text, structure=None):
     facts = []
     text = (chunk_text or '').strip()
@@ -299,13 +323,25 @@ def ingest_document_task(self, ingestion_job_id):
         chunk_size = job.workspace.default_chunk_size or 1000
         chunks = build_chunks(cleaned_text, chunk_size=chunk_size, overlap=max(80, int(chunk_size * 0.2)))
         chunks = enforce_embedding_limit(chunks)
+        metadata_texts = []
+        chunk_structures = []
+        last_heading_for_metadata = ''
+        for chunk_text in chunks:
+            structure = analyze_chunk_structure(chunk_text)
+            dominant_heading = structure.get('dominant_heading') or last_heading_for_metadata
+            if dominant_heading:
+                structure['dominant_heading'] = dominant_heading
+                last_heading_for_metadata = dominant_heading
+            chunk_structures.append(structure)
+            metadata_texts.append(build_chunk_metadata_text(document, chunk_text, structure=structure))
         vectors = embed_texts(chunks) if chunks else []
+        metadata_vectors = embed_texts(metadata_texts) if metadata_texts else []
         Chunk.objects.filter(document_version=version).delete()
         ExtractedFact.objects.filter(document_version=version).delete()
         created_chunks = []
         last_heading = ''
         for idx, chunk_text in enumerate(chunks):
-            structure = analyze_chunk_structure(chunk_text)
+            structure = chunk_structures[idx] if idx < len(chunk_structures) else analyze_chunk_structure(chunk_text)
             dominant_heading = structure.get('dominant_heading') or last_heading
             if dominant_heading:
                 structure['dominant_heading'] = dominant_heading
@@ -318,6 +354,7 @@ def ingest_document_task(self, ingestion_job_id):
                 document_version=version,
                 chunk_index=idx,
                 text=chunk_text,
+                metadata_text=metadata_texts[idx] if idx < len(metadata_texts) else '',
                 token_count=max(1, len(chunk_text) // 4),
                 metadata_json={
                     'stub': False,
@@ -328,6 +365,7 @@ def ingest_document_task(self, ingestion_job_id):
                     'line_count': structure.get('line_count', 0),
                 },
                 embedding=vectors[idx] if idx < len(vectors) else None,
+                metadata_embedding=metadata_vectors[idx] if idx < len(metadata_vectors) else None,
             )
             created_chunks.append(chunk)
 
