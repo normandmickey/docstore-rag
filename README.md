@@ -190,6 +190,7 @@ Conclusion:
 - `/dashboard/urls/`
 - `/dashboard/chat/`
 - `/dashboard/connectors/`
+- `/dashboard/proxi-web/`
 - `/dashboard/api-keys/`
 - `/dashboard/staff/`
 - `/documents/<id>/`
