@@ -105,3 +105,37 @@ class Chunk(models.Model):
 
     def __str__(self):
         return f'Chunk {self.chunk_index} of {self.document.filename}'
+
+
+class ExtractedFact(models.Model):
+    FACT_LIST_ITEM = 'list_item'
+    FACT_POLICY = 'policy'
+    FACT_HEADING = 'heading'
+    FACT_CHOICES = [
+        (FACT_LIST_ITEM, 'List item'),
+        (FACT_POLICY, 'Policy statement'),
+        (FACT_HEADING, 'Heading'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='extracted_facts')
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='extracted_facts')
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='extracted_facts')
+    document_version = models.ForeignKey(DocumentVersion, on_delete=models.CASCADE, related_name='extracted_facts')
+    chunk = models.ForeignKey(Chunk, on_delete=models.CASCADE, related_name='extracted_facts', null=True, blank=True)
+    fact_type = models.CharField(max_length=32, choices=FACT_CHOICES, default=FACT_POLICY)
+    label = models.CharField(max_length=255, blank=True, default='')
+    value_text = models.TextField()
+    normalized_text = models.TextField(blank=True, default='')
+    metadata_json = models.JSONField(default=dict, blank=True)
+    confidence = models.FloatField(default=0.0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['document_id', 'id']
+        indexes = [
+            models.Index(fields=['tenant', 'workspace', 'document']),
+            models.Index(fields=['tenant', 'workspace', 'fact_type']),
+        ]
+
+    def __str__(self):
+        return f'{self.fact_type}: {self.label or self.value_text[:60]}'

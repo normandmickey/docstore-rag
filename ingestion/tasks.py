@@ -8,7 +8,7 @@ from docx import Document as DocxDocument
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from markdownify import markdownify as html_to_markdown
 
-from documents.models import Chunk, Document
+from documents.models import Chunk, Document, ExtractedFact
 from providers import embed_texts
 from .models import IngestionJob
 
@@ -167,6 +167,74 @@ def extract_document_text(document, version):
     return extract_text_document(raw)
 
 
+def extract_chunk_facts(chunk_text):
+    facts = []
+    text = (chunk_text or '').strip()
+    if not text:
+        return facts
+
+    lines = [line.strip(' •\t-') for line in text.split('\n') if line.strip()]
+    for line in lines:
+        normalized = re.sub(r'\s+', ' ', line).strip()
+        if len(normalized) < 4:
+            continue
+        if len(normalized) <= 80 and normalized == normalized.title() and ':' not in normalized:
+            facts.append({
+                'fact_type': ExtractedFact.FACT_HEADING,
+                'label': normalized,
+                'value_text': normalized,
+                'normalized_text': normalized.lower(),
+                'confidence': 0.65,
+                'metadata_json': {'pattern': 'heading_like'},
+            })
+        if re.match(r'^(?:[\-•*]|\d+[.)])\s+', line):
+            facts.append({
+                'fact_type': ExtractedFact.FACT_LIST_ITEM,
+                'label': '',
+                'value_text': normalized,
+                'normalized_text': normalized.lower(),
+                'confidence': 0.85,
+                'metadata_json': {'pattern': 'bullet_or_numbered_line'},
+            })
+        elif ':' in normalized and len(normalized) <= 240:
+            label, value = [part.strip() for part in normalized.split(':', 1)]
+            if label and value:
+                facts.append({
+                    'fact_type': ExtractedFact.FACT_POLICY,
+                    'label': label[:255],
+                    'value_text': value,
+                    'normalized_text': f'{label} {value}'.lower(),
+                    'confidence': 0.7,
+                    'metadata_json': {'pattern': 'label_value'},
+                })
+
+    sentences = re.split(r'(?<=[.!?])\s+', text)
+    for sentence in sentences:
+        sentence = re.sub(r'\s+', ' ', sentence).strip()
+        if len(sentence) < 30 or len(sentence) > 320:
+            continue
+        lowered = sentence.lower()
+        if any(keyword in lowered for keyword in ['holiday', 'pto', 'leave', 'eligible', 'coverage', 'benefit', 'schedule', 'vacation']):
+            facts.append({
+                'fact_type': ExtractedFact.FACT_POLICY,
+                'label': '',
+                'value_text': sentence,
+                'normalized_text': lowered,
+                'confidence': 0.6,
+                'metadata_json': {'pattern': 'policy_sentence'},
+            })
+
+    deduped = []
+    seen = set()
+    for fact in facts:
+        key = (fact['fact_type'], fact['label'], fact['normalized_text'])
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(fact)
+    return deduped
+
+
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, retry_kwargs={'max_retries': 1})
 def ingest_document_task(self, ingestion_job_id):
     job = IngestionJob.objects.select_related('document', 'document_version', 'tenant', 'workspace').get(id=ingestion_job_id)
@@ -194,8 +262,10 @@ def ingest_document_task(self, ingestion_job_id):
         chunks = enforce_embedding_limit(chunks)
         vectors = embed_texts(chunks) if chunks else []
         Chunk.objects.filter(document_version=version).delete()
+        ExtractedFact.objects.filter(document_version=version).delete()
+        created_chunks = []
         for idx, chunk_text in enumerate(chunks):
-            Chunk.objects.create(
+            chunk = Chunk.objects.create(
                 tenant=job.tenant,
                 workspace=job.workspace,
                 document=document,
@@ -206,12 +276,29 @@ def ingest_document_task(self, ingestion_job_id):
                 metadata_json={'stub': False},
                 embedding=vectors[idx] if idx < len(vectors) else None,
             )
+            created_chunks.append(chunk)
+
+            for fact in extract_chunk_facts(chunk_text):
+                ExtractedFact.objects.create(
+                    tenant=job.tenant,
+                    workspace=job.workspace,
+                    document=document,
+                    document_version=version,
+                    chunk=chunk,
+                    fact_type=fact['fact_type'],
+                    label=fact.get('label', '')[:255],
+                    value_text=fact['value_text'],
+                    normalized_text=fact.get('normalized_text', ''),
+                    metadata_json=fact.get('metadata_json', {}),
+                    confidence=fact.get('confidence', 0.0),
+                )
 
         version.parse_status = 'ready'
         version.extraction_metadata_json = {
             **(version.extraction_metadata_json or {}),
             'raw_text_preview': cleaned_text[:500],
             'chunk_count': len(chunks),
+            'fact_count': ExtractedFact.objects.filter(document_version=version).count(),
         }
         version.save(update_fields=['parse_status', 'extraction_metadata_json'])
 

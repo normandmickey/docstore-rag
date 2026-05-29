@@ -5,7 +5,7 @@ from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from pgvector.django import CosineDistance
 
 from audit.models import RetrievalLog
-from documents.models import Chunk, Document
+from documents.models import Chunk, Document, ExtractedFact
 from providers import answer_with_context, embed_texts, rewrite_question
 
 
@@ -168,16 +168,57 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
     return results
 
 
-def build_context_blocks(results):
+def retrieve_facts(*, tenant, workspace, query, top_k=8, document_id=None):
+    query_tokens = tokenize_query(query)
+    facts = ExtractedFact.objects.filter(
+        tenant=tenant,
+        workspace=workspace,
+        document__status=Document.STATUS_READY,
+    ).select_related('document', 'chunk')
+    if document_id:
+        facts = facts.filter(document_id=document_id)
+
+    scored = []
+    for fact in facts.order_by('-confidence')[:500]:
+        haystack = ' '.join(filter(None, [fact.label, fact.value_text, fact.normalized_text]))
+        lexical = keyword_score(query, haystack)
+        exact_bonus = 0.0
+        lowered = haystack.lower()
+        for token in query_tokens:
+            if token in lowered:
+                exact_bonus += 0.1
+        score = (0.7 * lexical) + (0.2 * float(fact.confidence or 0.0)) + exact_bonus
+        if score > 0:
+            fact.match_score = score
+            scored.append(fact)
+
+    scored.sort(key=lambda fact: fact.match_score, reverse=True)
+    return scored[:top_k]
+
+
+def build_context_blocks(results, facts=None):
     blocks = []
+    for idx, fact in enumerate(facts or [], start=1):
+        blocks.append(
+            f'[Fact {idx}] {fact.document.filename} · {fact.fact_type} · score={float(getattr(fact, "match_score", 0.0)):.4f}\n'
+            f'{fact.label + ": " if fact.label else ""}{fact.value_text}'
+        )
+    source_offset = len(facts or [])
     for idx, row in enumerate(results, start=1):
         blocks.append(
-            f'[Source {idx}] {row.document.filename} · chunk {row.chunk_index} · distance={float(getattr(row, "distance", 0.0)):.4f}\n{row.text}'
+            f'[Source {idx + source_offset}] {row.document.filename} · chunk {row.chunk_index} · distance={float(getattr(row, "distance", 0.0)):.4f}\n{row.text}'
         )
     return blocks
 
 
 def answer_question(*, tenant, workspace, query, top_k=5, document_id=None):
+    facts = retrieve_facts(
+        tenant=tenant,
+        workspace=workspace,
+        query=query,
+        top_k=min(6, max(3, top_k)),
+        document_id=document_id,
+    )
     results = retrieve_chunks(
         tenant=tenant,
         workspace=workspace,
@@ -185,6 +226,6 @@ def answer_question(*, tenant, workspace, query, top_k=5, document_id=None):
         top_k=top_k,
         document_id=document_id,
     )
-    context_blocks = build_context_blocks(results)
+    context_blocks = build_context_blocks(results, facts=facts)
     answer = answer_with_context(query, context_blocks) if context_blocks else 'I could not find relevant document context for that question yet.'
     return answer, results
