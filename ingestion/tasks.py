@@ -363,7 +363,7 @@ def infer_chunk_questions(document, chunk_text, structure=None, use_llm=False):
     if use_llm and should_generate_llm_questions(chunk_text, structure=structure):
         llm_questions = generate_chunk_questions(chunk_text)
         if llm_questions:
-            questions = llm_questions + questions
+            questions = llm_questions
 
     if not questions:
         questions.extend([
