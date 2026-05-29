@@ -1,6 +1,7 @@
 import re
 from collections import defaultdict
 
+from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from pgvector.django import CosineDistance
 
 from audit.models import RetrievalLog
@@ -30,7 +31,8 @@ def keyword_score(query, text):
 def chunk_relevance_score(query, candidate):
     relevance = 1.0 - float(getattr(candidate, 'distance', 1.0) or 1.0)
     lexical = keyword_score(query, getattr(candidate, 'text', ''))
-    blended_score = (0.8 * relevance) + (0.2 * lexical)
+    lexical_rank = float(getattr(candidate, 'lexical_rank', 0.0) or 0.0)
+    blended_score = (0.65 * relevance) + (0.2 * lexical) + (0.15 * lexical_rank)
     return blended_score, relevance, lexical
 
 
@@ -46,8 +48,33 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
     if document_id:
         qs = qs.filter(document_id=document_id)
 
-    candidate_count = max(top_k * 4, 12)
-    broad_candidates = list(qs.annotate(distance=CosineDistance('embedding', query_vector)).order_by('distance')[:candidate_count])
+    candidate_count = max(top_k * 6, 24)
+    vector_candidates = list(qs.annotate(distance=CosineDistance('embedding', query_vector)).order_by('distance')[:candidate_count])
+
+    search_query = SearchQuery(standalone_query, search_type='plain')
+    lexical_candidates = list(
+        qs.annotate(
+            search_vector=SearchVector('text'),
+            lexical_rank=SearchRank(SearchVector('text'), search_query),
+        )
+        .filter(search_vector=search_query)
+        .order_by('-lexical_rank')[:candidate_count]
+    )
+
+    broad_candidate_map = {}
+    for candidate in vector_candidates:
+        broad_candidate_map[(candidate.document_id, candidate.chunk_index)] = candidate
+    for candidate in lexical_candidates:
+        key = (candidate.document_id, candidate.chunk_index)
+        if key in broad_candidate_map:
+            existing = broad_candidate_map[key]
+            existing.lexical_rank = max(float(getattr(existing, 'lexical_rank', 0.0) or 0.0), float(getattr(candidate, 'lexical_rank', 0.0) or 0.0))
+        else:
+            if not hasattr(candidate, 'distance'):
+                candidate.distance = 1.0
+            broad_candidate_map[key] = candidate
+
+    broad_candidates = list(broad_candidate_map.values())
 
     scored_candidates = []
     doc_scores = defaultdict(float)
@@ -124,9 +151,12 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
         result_count=len(results),
         latency_ms=0,
         metadata_json={
-            'mode': 'two_pass_vector_keyword_local_expansion',
+            'mode': 'two_pass_hybrid_local_expansion',
             'document_id': document_id,
             'candidate_count': candidate_count,
+            'vector_candidate_count': len(vector_candidates),
+            'lexical_candidate_count': len(lexical_candidates),
+            'merged_candidate_count': len(broad_candidates),
             'standalone_query': standalone_query,
             'best_document_id': getattr(best_candidate, 'document_id', None),
             'best_chunk_index': getattr(best_candidate, 'chunk_index', None),
