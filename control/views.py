@@ -16,6 +16,8 @@ from django.utils.text import slugify
 from connectors.models import Connector
 from documents.models import Chunk, Document, ExtractedFact
 from documents.upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
+from ingestion.models import IngestionJob
+from ingestion.tasks import ingest_document_task
 from retrieval.service import answer_question, retrieve_chunks
 
 from .forms import SignUpForm
@@ -395,10 +397,12 @@ def _document_detail_base(request, document_id):
         raise Http404('Document not found.')
 
     latest_version = document.versions.order_by('-version_number', '-id').first()
+    latest_job = document.ingestion_jobs.order_by('-created_at').first()
     base.update({
         'section': 'documents',
         'detail_document': document,
         'detail_latest_version': latest_version,
+        'detail_latest_job': latest_job,
         'detail_fact_count': ExtractedFact.objects.filter(document=document).count(),
         'detail_chunk_count': Chunk.objects.filter(document=document).count(),
     })
@@ -412,6 +416,27 @@ def document_detail(request, document_id):
     handled, base, document = _document_detail_base(request, document_id)
     if handled:
         return handled
+
+    if request.method == 'POST' and request.POST.get('action') == 'reingest_document':
+        extractor = (request.POST.get('extractor') or IngestionJob.EXTRACTOR_STANDARD).strip()
+        if extractor not in {IngestionJob.EXTRACTOR_STANDARD, IngestionJob.EXTRACTOR_DOCLING}:
+            extractor = IngestionJob.EXTRACTOR_STANDARD
+        version = document.versions.order_by('-version_number', '-id').first()
+        if not version:
+            messages.error(request, 'No document version available to reingest.')
+            return redirect(request.path)
+        job = IngestionJob.objects.create(
+            tenant=document.tenant,
+            workspace=document.workspace,
+            document=document,
+            document_version=version,
+            extractor=extractor,
+            status=IngestionJob.STATUS_QUEUED,
+            stage='queued',
+        )
+        ingest_document_task.delay(job.id)
+        messages.success(request, f'Reingest queued using extractor: {extractor}.')
+        return redirect(request.path)
 
     base['detail_section'] = 'overview'
     return render(request, 'dashboard/document_detail.html', base)
@@ -518,6 +543,7 @@ def dashboard_documents(request):
                     size_bytes=getattr(upload, 'size', 0) or 0,
                     collection=collection,
                     uploaded_by=request.user,
+                    extractor=IngestionJob.EXTRACTOR_STANDARD,
                 )
                 if result['mode'] == 'duplicate':
                     duplicates += 1

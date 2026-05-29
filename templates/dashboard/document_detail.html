@@ -11,6 +11,7 @@
     <div>Uploaded: {{ detail_document.created_at }}</div>
     <div>Chunks: {{ detail_chunk_count }} · Facts: {{ detail_fact_count }}</div>
     {% if detail_latest_version %}<div>Latest version: v{{ detail_latest_version.version_number }}</div>{% endif %}
+    {% if detail_latest_job %}<div>Latest extractor: {{ detail_latest_job.extractor }}</div>{% endif %}
     {% if detail_document.source_url %}<div>Source URL: <a href="{{ detail_document.source_url }}" target="_blank" rel="noopener noreferrer">{{ detail_document.source_url }}</a></div>{% endif %}
   </div>
   <div class="nav" style="margin-top: 16px;">
@@ -31,5 +32,20 @@
     <div class="stat"><strong>Chunks</strong><div class="meta">{{ detail_chunk_count }} chunks</div></div>
     <div class="stat"><strong>Document search</strong><div class="meta">Vector + metadata + lexical search scoped to this document</div></div>
   </div>
+</div>
+
+<div class="card">
+  <h2>Reingest</h2>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="reingest_document">
+    <label>Extractor</label>
+    <select name="extractor">
+      <option value="standard">Standard</option>
+      <option value="docling">Docling</option>
+    </select>
+    <p class="meta">Docling is an alternate extraction backend for harder PDFs. It requires the separate Docling environment to exist on the VPS.</p>
+    <button type="submit">Reingest document</button>
+  </form>
 </div>
 {% endblock %}

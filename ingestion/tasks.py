@@ -1,5 +1,8 @@
+import os
 import re
+import subprocess
 from io import BytesIO
+from pathlib import Path
 
 import fitz
 from celery import shared_task
@@ -11,6 +14,8 @@ from markdownify import markdownify as html_to_markdown
 from documents.models import Chunk, Document, ExtractedFact
 from providers import embed_texts
 from .models import IngestionJob
+
+DOCLING_VENV = os.getenv('DOCLING_VENV_PATH', '/mnt/HC_Volume_105592620/tools/docling/.venv')
 
 
 def repair_suspicious_pdf_tokens(text):
@@ -135,6 +140,42 @@ def extract_pdf_text(raw):
     return '\n\n'.join(page.strip() for page in pages if page and page.strip())
 
 
+def extract_pdf_text_docling(document):
+    if not document.file:
+        return ''
+    python_path = Path(DOCLING_VENV) / 'bin' / 'python'
+    if not python_path.exists():
+        raise RuntimeError(f'Docling venv not found at {python_path}')
+
+    with document.file.open('rb') as fh:
+        raw = fh.read()
+
+    source_path = Path('/tmp') / f'docling-{document.id}-{document.filename}'
+    source_path.write_bytes(raw)
+    script = """
+from docling.document_converter import DocumentConverter
+import sys
+converter = DocumentConverter()
+result = converter.convert(sys.argv[1])
+doc = result.document
+text = doc.export_to_markdown() if hasattr(doc, 'export_to_markdown') else doc.export_to_text()
+print(text)
+"""
+    try:
+        completed = subprocess.run(
+            [str(python_path), '-c', script, str(source_path)],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        return completed.stdout.strip()
+    finally:
+        try:
+            source_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
 def extract_docx_text(raw):
     doc = DocxDocument(BytesIO(raw))
     parts = []
@@ -160,7 +201,7 @@ def extract_html_text(raw):
     return html_to_markdown(html)
 
 
-def extract_document_text(document, version):
+def extract_document_text(document, version, extractor=IngestionJob.EXTRACTOR_STANDARD):
     if not document.file:
         return (version.extraction_metadata_json or {}).get('raw_text', '')
 
@@ -171,6 +212,8 @@ def extract_document_text(document, version):
     mime_type = (document.mime_type or '').lower()
 
     if filename.endswith('.pdf') or mime_type == 'application/pdf':
+        if extractor == IngestionJob.EXTRACTOR_DOCLING:
+            return extract_pdf_text_docling(document)
         return extract_pdf_text(raw)
     if filename.endswith('.docx') or mime_type in {
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -334,7 +377,7 @@ def ingest_document_task(self, ingestion_job_id):
     document.save(update_fields=['status', 'updated_at'])
 
     try:
-        extracted_text = extract_document_text(document, version)
+        extracted_text = extract_document_text(document, version, extractor=job.extractor)
         cleaned_text = normalize_extracted_text(extracted_text)
 
         job.stage = 'embedding'
@@ -410,6 +453,7 @@ def ingest_document_task(self, ingestion_job_id):
             'raw_text_preview': cleaned_text[:500],
             'chunk_count': len(chunks),
             'fact_count': ExtractedFact.objects.filter(document_version=version).count(),
+            'extractor': job.extractor,
         }
         version.save(update_fields=['parse_status', 'extraction_metadata_json'])
 

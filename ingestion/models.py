@@ -9,6 +9,13 @@ class IngestionJob(models.Model):
     STATUS_RUNNING = 'running'
     STATUS_SUCCEEDED = 'succeeded'
     STATUS_FAILED = 'failed'
+
+    EXTRACTOR_STANDARD = 'standard'
+    EXTRACTOR_DOCLING = 'docling'
+    EXTRACTOR_CHOICES = [
+        (EXTRACTOR_STANDARD, 'Standard'),
+        (EXTRACTOR_DOCLING, 'Docling'),
+    ]
     STATUS_CHOICES = [
         (STATUS_QUEUED, 'Queued'),
         (STATUS_RUNNING, 'Running'),
@@ -20,6 +27,7 @@ class IngestionJob(models.Model):
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='ingestion_jobs')
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='ingestion_jobs')
     document_version = models.ForeignKey(DocumentVersion, on_delete=models.CASCADE, related_name='ingestion_jobs')
+    extractor = models.CharField(max_length=20, choices=EXTRACTOR_CHOICES, default=EXTRACTOR_STANDARD)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_QUEUED)
     stage = models.CharField(max_length=120, blank=True, default='queued')
     error_text = models.TextField(blank=True, default='')

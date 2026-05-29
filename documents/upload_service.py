@@ -22,7 +22,7 @@ def _file_sha256(uploaded_file):
     return hasher.hexdigest()
 
 
-def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime_type='', size_bytes=0, collection='', uploaded_by=None, raw_text='', source_type=Document.SOURCE_UPLOAD, source_url=''):
+def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime_type='', size_bytes=0, collection='', uploaded_by=None, raw_text='', source_type=Document.SOURCE_UPLOAD, source_url='', extractor=IngestionJob.EXTRACTOR_STANDARD):
     content_hash = _file_sha256(uploaded_file) if uploaded_file else ''
 
     exact_duplicate = Document.objects.filter(
@@ -100,6 +100,7 @@ def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime
             workspace=workspace,
             document=document,
             document_version=version,
+            extractor=extractor,
             status=IngestionJob.STATUS_QUEUED,
             stage='queued',
         )
