@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import APIKey, ExternalAccount, InviteToken, Tenant, TenantMembership, Workspace
+from .models import APIKey, ExternalAccount, InviteToken, ProxiWebMessage, ProxiWebThread, Tenant, TenantMembership, Workspace
 
 
 @admin.register(Tenant)
@@ -43,3 +43,17 @@ class InviteTokenAdmin(admin.ModelAdmin):
     list_display = ('email', 'tenant', 'workspace', 'role', 'active', 'created_by', 'claimed_by', 'expires_at', 'created_at')
     search_fields = ('email', 'token', 'tenant__name', 'workspace__name', 'created_by__username', 'claimed_by__username')
     list_filter = ('active', 'role', 'tenant')
+
+
+@admin.register(ProxiWebThread)
+class ProxiWebThreadAdmin(admin.ModelAdmin):
+    list_display = ('id', 'title', 'tenant', 'workspace', 'user', 'updated_at', 'created_at')
+    search_fields = ('title', 'tenant__name', 'workspace__name', 'user__username', 'user__email')
+    list_filter = ('tenant', 'workspace')
+
+
+@admin.register(ProxiWebMessage)
+class ProxiWebMessageAdmin(admin.ModelAdmin):
+    list_display = ('id', 'thread', 'role', 'created_at')
+    search_fields = ('content', 'thread__title', 'thread__user__username', 'thread__workspace__name')
+    list_filter = ('role', 'thread__tenant', 'thread__workspace')

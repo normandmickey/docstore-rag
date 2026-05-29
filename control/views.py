@@ -21,7 +21,7 @@ from ingestion.tasks import ingest_document_task
 from retrieval.service import answer_question, retrieve_chunks
 
 from .forms import SignUpForm
-from .models import APIKey, ExternalAccount, InviteToken, Tenant, TenantMembership, Workspace
+from .models import APIKey, ExternalAccount, InviteToken, ProxiWebMessage, ProxiWebThread, Tenant, TenantMembership, Workspace
 from .api_auth import hash_api_key
 from .oauth import exchange_code_for_tokens, fetch_graph_me, microsoft_authorize_url
 
@@ -679,6 +679,130 @@ def dashboard_chat(request):
             messages.error(request, 'Ask a question first.')
     base['section'] = 'chat'
     return render(request, 'dashboard/chat.html', base)
+
+
+def dashboard_proxi_web(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+
+    current_workspace = base['current_workspace']
+    base['section'] = 'proxi_web'
+    base['proxi_threads'] = ProxiWebThread.objects.none()
+    base['proxi_thread'] = None
+    base['proxi_messages'] = []
+    base['proxi_question'] = ''
+    base['proxi_results'] = []
+
+    if current_workspace:
+        threads = ProxiWebThread.objects.filter(
+            tenant=current_workspace.tenant,
+            workspace=current_workspace,
+            user=request.user,
+        ).order_by('-updated_at', '-id')
+        base['proxi_threads'] = threads
+
+        if request.method == 'POST' and request.POST.get('action') == 'create_proxi_thread':
+            title = (request.POST.get('title') or '').strip() or 'New Proxi-Web chat'
+            thread = ProxiWebThread.objects.create(
+                tenant=current_workspace.tenant,
+                workspace=current_workspace,
+                user=request.user,
+                title=title,
+            )
+            messages.success(request, 'Created a new Proxi-Web chat.')
+            return redirect(f'/dashboard/proxi-web/?thread={thread.id}')
+
+        selected_thread_id = (request.GET.get('thread') or request.POST.get('thread_id') or '').strip()
+        thread = None
+        if selected_thread_id.isdigit():
+            thread = threads.filter(id=int(selected_thread_id)).first()
+        if thread is None:
+            thread = threads.first()
+        base['proxi_thread'] = thread
+
+        if request.method == 'POST' and request.POST.get('action') == 'send_proxi_message':
+            question = (request.POST.get('question') or '').strip()
+            thread_id = (request.POST.get('thread_id') or '').strip()
+            thread = threads.filter(id=thread_id).first() if thread_id.isdigit() else thread
+            if not thread:
+                messages.error(request, 'Pick or create a Proxi-Web chat first.')
+                return redirect('dashboard_proxi_web')
+            base['proxi_thread'] = thread
+            base['proxi_question'] = question
+            if not question:
+                messages.error(request, 'Ask something first.')
+            else:
+                history_messages = list(thread.messages.order_by('id'))
+                retrieval_results = retrieve_chunks(
+                    tenant=current_workspace.tenant,
+                    workspace=current_workspace,
+                    query=question,
+                    top_k=5,
+                )
+                context_blocks = []
+                for result in retrieval_results:
+                    context_blocks.append(
+                        f'[Source] {result.document.filename} · chunk {result.chunk_index}\n{result.text}'
+                    )
+                history_blocks = []
+                for message in history_messages[-10:]:
+                    role_label = 'User' if message.role == ProxiWebMessage.ROLE_USER else 'Assistant'
+                    history_blocks.append(f'{role_label}: {message.content}')
+                prompt = question
+                if history_blocks:
+                    prompt = (
+                        'Use the prior conversation only as extra context. Keep answers grounded in retrieved document context when available. '
+                        'If the retrieved context is weak or missing, say so plainly.\n\n'
+                        'Conversation so far:\n'
+                        + '\n'.join(history_blocks)
+                        + '\n\nCurrent user question:\n'
+                        + question
+                    )
+                answer = answer_question(
+                    tenant=current_workspace.tenant,
+                    workspace=current_workspace,
+                    query=prompt,
+                    top_k=5,
+                )[0] if context_blocks else 'I could not find relevant document context for that question yet.'
+                ProxiWebMessage.objects.create(
+                    thread=thread,
+                    role=ProxiWebMessage.ROLE_USER,
+                    content=question,
+                )
+                ProxiWebMessage.objects.create(
+                    thread=thread,
+                    role=ProxiWebMessage.ROLE_ASSISTANT,
+                    content=answer,
+                    retrieval_metadata_json={
+                        'result_count': len(retrieval_results),
+                        'results': [
+                            {
+                                'document_id': result.document_id,
+                                'document': result.document.filename,
+                                'chunk_index': result.chunk_index,
+                                'distance': float(getattr(result, 'distance', 0.0) or 0.0),
+                            }
+                            for result in retrieval_results
+                        ],
+                    },
+                )
+                if (thread.title or '').strip() in {'', 'New Proxi-Web chat'}:
+                    thread.title = (question[:80] or 'New Proxi-Web chat').strip()
+                thread.save(update_fields=['title', 'updated_at'])
+                messages.success(request, 'Message added to Proxi-Web chat.')
+                return redirect(f'/dashboard/proxi-web/?thread={thread.id}')
+
+        if base['proxi_thread']:
+            base['proxi_messages'] = list(base['proxi_thread'].messages.order_by('id'))
+            latest_assistant = next((msg for msg in reversed(base['proxi_messages']) if msg.role == ProxiWebMessage.ROLE_ASSISTANT), None)
+            if latest_assistant:
+                base['proxi_results'] = (latest_assistant.retrieval_metadata_json or {}).get('results', [])
+
+    return render(request, 'dashboard/proxi_web.html', base)
 
 
 def dashboard_connectors(request):

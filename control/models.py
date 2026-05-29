@@ -114,6 +114,9 @@ class ExternalAccount(models.Model):
         return f'{self.user} :: {self.provider} :: {self.email or self.external_user_id or "connected"}'
 
 
+from .proxi_web import ProxiWebMessage, ProxiWebThread
+
+
 class InviteToken(models.Model):
     ROLE_OWNER = TenantMembership.ROLE_OWNER
     ROLE_ADMIN = TenantMembership.ROLE_ADMIN
