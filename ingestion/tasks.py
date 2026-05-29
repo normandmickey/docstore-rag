@@ -13,8 +13,11 @@ from langchain_text_splitters import RecursiveCharacterTextSplitter
 from markdownify import markdownify as html_to_markdown
 
 from documents.models import Chunk, Document, ExtractedFact
-from providers import embed_texts
+from providers import embed_texts, generate_chunk_questions
 from .models import IngestionJob
+
+QUESTION_GEN_MIN_CHARS = int(os.getenv('QUESTION_GEN_MIN_CHARS', '300'))
+QUESTION_GEN_MAX_CHUNKS = int(os.getenv('QUESTION_GEN_MAX_CHUNKS', '120'))
 
 DOCLING_VENV = os.getenv('DOCLING_VENV_PATH', '/mnt/HC_Volume_105592620/tools/docling/.venv')
 DOCLING_PDF_BACKEND = os.getenv('DOCLING_PDF_BACKEND', 'docling_parse')
@@ -297,7 +300,25 @@ def analyze_chunk_structure(chunk_text):
     }
 
 
-def infer_chunk_questions(document, chunk_text, structure=None):
+def should_generate_llm_questions(chunk_text, structure=None):
+    structure = structure or analyze_chunk_structure(chunk_text)
+    text = (chunk_text or '').strip()
+    if len(text) < QUESTION_GEN_MIN_CHARS:
+        return False
+    lowered = text.lower()
+    if 'contents' in lowered and '........' in lowered:
+        return False
+    if lowered.count('�') >= 3:
+        return False
+    if re.fullmatch(r'[\W\d_\s]+', text):
+        return False
+    useful_terms = ['holiday', 'pto', 'leave', 'benefit', 'eligib', 'coverage', 'harassment', 'complaint', 'report', 'conduct', 'policy', 'handbook', 'at-will']
+    if structure.get('has_list'):
+        return True
+    return any(term in lowered for term in useful_terms)
+
+
+def infer_chunk_questions(document, chunk_text, structure=None, use_llm=False):
     structure = structure or analyze_chunk_structure(chunk_text)
     heading = structure.get('dominant_heading', '')
     lowered = (chunk_text or '').lower()
@@ -338,6 +359,11 @@ def infer_chunk_questions(document, chunk_text, structure=None):
         questions.append('What items are listed in this policy section?')
     if heading and is_heading_candidate(heading):
         questions.append(f'What does the {heading} policy cover?')
+
+    if use_llm and should_generate_llm_questions(chunk_text, structure=structure):
+        llm_questions = generate_chunk_questions(chunk_text)
+        if llm_questions:
+            questions = llm_questions + questions
 
     if not questions:
         questions.extend([
@@ -488,6 +514,7 @@ def ingest_document_task(self, ingestion_job_id):
         question_texts = []
         chunk_structures = []
         last_heading_for_metadata = ''
+        llm_question_budget = QUESTION_GEN_MAX_CHUNKS
         for chunk_text in chunks:
             structure = analyze_chunk_structure(chunk_text)
             dominant_heading = structure.get('dominant_heading') or last_heading_for_metadata
@@ -496,7 +523,11 @@ def ingest_document_task(self, ingestion_job_id):
                 last_heading_for_metadata = dominant_heading
             chunk_structures.append(structure)
             metadata_texts.append(build_chunk_metadata_text(document, chunk_text, structure=structure))
-            question_texts.append(infer_chunk_questions(document, chunk_text, structure=structure))
+            use_llm = llm_question_budget > 0 and should_generate_llm_questions(chunk_text, structure=structure)
+            question_text = infer_chunk_questions(document, chunk_text, structure=structure, use_llm=use_llm)
+            if use_llm:
+                llm_question_budget -= 1
+            question_texts.append(question_text)
         vectors = embed_texts(chunks) if chunks else []
         metadata_vectors = embed_texts(metadata_texts) if metadata_texts else []
         question_vectors = embed_texts(question_texts) if question_texts else []

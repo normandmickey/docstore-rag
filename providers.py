@@ -104,3 +104,51 @@ def answer_with_context(question, context_blocks, model=None):
         ],
     )
     return response.output_text
+
+
+def generate_chunk_questions(chunk_text, model=None):
+    chunk_text = (chunk_text or '').strip()
+    if not chunk_text:
+        return []
+
+    client = get_openai_client()
+    response = client.responses.create(
+        model=model or getattr(settings, 'QUESTION_GEN_MODEL', 'gpt-4.1-mini'),
+        input=[
+            {
+                'role': 'system',
+                'content': [
+                    {
+                        'type': 'input_text',
+                        'text': (
+                            'Generate exactly 2 short, realistic user questions that this exact chunk can answer. '
+                            'Make them specific to the chunk, not generic to the entire document. '
+                            'If the chunk is low-value, noisy, table-of-contents-like, or not useful for retrieval, return exactly NONE. '
+                            'Return only plain text: either NONE or one question per line.'
+                        ),
+                    }
+                ],
+            },
+            {
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'input_text',
+                        'text': chunk_text[:1800],
+                    }
+                ],
+            },
+        ],
+    )
+    output = (response.output_text or '').strip()
+    if not output or output.upper() == 'NONE':
+        return []
+    questions = [line.strip('-• ').strip() for line in output.splitlines() if line.strip()]
+    deduped = []
+    seen = set()
+    for question in questions:
+        if not question or question in seen:
+            continue
+        seen.add(question)
+        deduped.append(question)
+    return deduped[:2]
