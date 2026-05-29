@@ -1,96 +1,182 @@
 # Docstore RAG
 
-A multi-tenant document storage, retrieval, and chat service for RAG workflows, built with Django for admin visibility and operational control.
+A multi-tenant document storage, retrieval, and chat service for document-grounded workflows, built with Django for admin visibility and operational control.
 
-## Current Status
-
-Docstore is live at:
+## Live
 
 - `https://docstore.oddsmith.net`
 
-Current stack and behavior are now beyond the initial scaffold stage:
+## Current Status
 
-- Django app with signup/login/logout
-- tenant + workspace onboarding
-- dashboard-based file uploads
+Docstore is now well past the initial scaffold stage. The live product currently includes:
+
+- Django auth + tenant/workspace onboarding
+- dashboard uploads and URL ingestion
 - async ingestion with Celery + Redis
-- Postgres + pgvector chunk storage
+- Postgres + pgvector storage
 - OpenAI embeddings
-- workspace search
-- basic dashboard chat with documents
-- duplicate detection + versioning
-- SharePoint connector foundation scaffolded
+- Groq-hosted GPT-OSS for question generation, rewrite, and chat answers
+- duplicate/version handling
+- soft delete / trash / restore / purge
+- dashboard API key management
+- document detail / facts / chunks / search inspection pages
+- invite-only signup
+- SharePoint OAuth foundation
+- MinIO-backed production file storage
 
 ## What Works Now
 
 ### Authentication and onboarding
-- user signup/login/logout
+- user login/logout
+- invite-only signup flow
 - automatic tenant + default workspace bootstrap
 - workspace creation and switching from the dashboard
 - dashboard API key management (create + revoke)
 
 ### Document ingestion
 - dashboard upload flow
-- local filesystem storage fallback in production when S3/MinIO is not configured
+- URL ingestion flow
+- duplicate detection + versioning
 - per-document ingestion jobs via Celery
-- document status tracking in the dashboard
-- failed documents hidden from the main dashboard list
+- document/job status tracking in the dashboard
+- failed docs visible separately with delete controls
+- standard extractor path is production-safe and fast
+- Docling exists as an experimental alternate extractor path, but is currently shelved for regular use on the VPS because runtime is too slow
 
 ### Supported file types
-- PDF via `PyMuPDF`
+- PDF via `PyMuPDF` (current production path)
 - DOCX via `python-docx`
 - Markdown (`.md`)
 - plain text (`.txt`)
-- basic HTML ingestion
+- HTML via markdownified extraction
 
 ### Retrieval and chat
-- embeddings stored in Postgres via pgvector
-- `/api/v1/search/` uses vector similarity search
-- `/api/v1/chat/` returns answer + cited source chunks
-- dashboard “chat with documents” UI retrieves chunks and generates an answer with source context
+- pgvector-backed chunk embeddings in Postgres
+- multi-signal retrieval using:
+  - raw chunk embedding
+  - metadata embedding
+  - question embedding
+  - lexical/full-text score
+- strict context-only answer generation
+- dashboard document-scoped search/inspection page
+- dashboard chat with source-backed answers
+- retrieval logging
 
-### Duplicate/version handling
-- exact duplicate uploads in the same workspace are skipped using content hash comparison
-- same filename + changed content becomes a new `DocumentVersion`
-- dashboard shows version count and latest version number
-
-### Connector groundwork
-- `connectors` app exists
-- SharePoint connector models/admin/migration exist
-- Microsoft Graph helper exists
-- manual SharePoint sync command scaffold exists
-- per-user Microsoft OAuth account connection scaffold exists
+### Facts / introspection
+- extracted facts per document
+- document detail pages for:
+  - overview
+  - facts
+  - chunks
+  - document-scoped search
+- chunk pages show:
+  - metadata text
+  - question text
+  - raw chunk text
 
 ## Architecture
 
 ## Core concepts
-- **Tenant**: top-level account/org boundary
-- **Workspace**: logical knowledge base inside a tenant
-- **Collection**: optional namespace/tag within a workspace
-- **Document**: stored source file and document-level metadata
+- **Tenant**: top-level org/account boundary
+- **Workspace**: logical knowledge base within a tenant
+- **Collection**: optional namespace/tag inside a workspace
+- **Document**: stored source file + document-level metadata
 - **DocumentVersion**: version history for a logical document
-- **Chunk**: retrievable text unit with embedding
+- **Chunk**: retrievable text unit with embeddings + metadata
+- **ExtractedFact**: heuristic fact/list/policy snippets tied to a chunk
 - **IngestionJob**: async parse/chunk/embed job
-- **ExternalAccount**: user-owned OAuth-linked external provider account (currently Microsoft scaffold)
-- **Connector**: sync configuration for external systems like SharePoint
+- **ExternalAccount**: user-owned OAuth-linked provider account (currently Microsoft scaffold)
+- **Connector**: external sync configuration
 
 ## App layout
-- `control` — auth flow, tenants, workspaces, API keys, external accounts
-- `documents` — document records, versions, upload handling, duplicate/version logic
-- `ingestion` — parsing, chunking, embeddings, Celery jobs
-- `retrieval` — vector search, answer assembly, dashboard chat
+- `control` — auth flow, tenants, workspaces, API keys, external accounts, dashboard pages
+- `documents` — documents, versions, chunks, facts, upload handling, duplicate/version logic
+- `ingestion` — parsing, chunking, question generation, embeddings, Celery jobs
+- `retrieval` — chunk retrieval, answer assembly, dashboard chat/search
 - `audit` — retrieval logging
 - `connectors` — SharePoint connector models, Graph helper, sync runs, bindings
 
-## Key implementation decisions
-- use Postgres + pgvector as the primary retrieval store
-- use OpenAI embeddings (`text-embedding-3-large` by default)
-- keep original files out of Postgres
-- prefer local filesystem storage until a real S3/MinIO endpoint exists
-- queue ingestion one document/job at a time through Celery
-- isolate docstore Celery onto its own queue (`docstore`)
-- enqueue ingestion only after DB transaction commit
-- use content-hash-aware duplicate detection instead of filename-only logic
+## Retrieval design (current)
+
+Docstore no longer relies on a single raw chunk embedding alone.
+
+Each chunk can now carry multiple retrieval signals:
+
+- `text` + `embedding`
+- `metadata_text` + `metadata_embedding`
+- `question_text` + `question_embedding`
+
+### Multi-signal retrieval flow
+1. rewrite the user question into a standalone question
+2. embed the standalone question
+3. retrieve candidates across:
+   - raw chunk embeddings
+   - metadata embeddings
+   - question embeddings
+   - Postgres full-text lexical search
+4. blend those signals into one ranking score
+5. do local same-document chunk expansion around the strongest hit
+6. answer only from the selected context
+
+### Why this exists
+This grew out of handbook/policy retrieval problems where:
+- raw embeddings alone were too fuzzy
+- metadata helped but was still document-centric
+- question-style retrieval text better matched how humans actually ask
+
+## Facts layer (current)
+
+Docstore also builds a lightweight extracted-facts layer during ingestion.
+
+Current fact types:
+- `heading`
+- `list_item`
+- `policy`
+
+This layer is useful for:
+- debugging extraction quality
+- surfacing structured snippets in the dashboard
+- providing an additional retrieval/context path
+
+It is not yet intended as a complete ontology or knowledge graph.
+
+## Provider split (current)
+
+Docstore now uses different providers for different tasks.
+
+### OpenAI
+Used for:
+- embeddings only
+
+Current default:
+- `text-embedding-3-large`
+
+### Groq
+Used for:
+- chunk question generation
+- question rewrite
+- chat answer generation
+
+Current configured chat/question model family:
+- `openai/gpt-oss-20b`
+
+This split keeps embeddings stable while using a cheaper/faster generative path for retrieval-language generation and answers.
+
+## Experimental / shelved work
+
+### Docling
+Docling is installed separately on the VPS and extractor selection support exists in code.
+
+What we learned:
+- Docling can be installed and invoked
+- Docling improves structure in some cases
+- Docling did not solve glyph corruption cleanly for the target handbook
+- Docling runtime on the current VPS was too slow for regular use
+
+Conclusion:
+- keep Docling as an experimental alternate extractor backend
+- do **not** use it as the normal production path on this VPS for now
+- likely revisit on a GPU machine or faster host later
 
 ## Important Routes
 
@@ -100,7 +186,17 @@ Current stack and behavior are now beyond the initial scaffold stage:
 - `/login/`
 - `/logout/`
 - `/dashboard/`
-- `/admin/`
+- `/dashboard/documents/`
+- `/dashboard/urls/`
+- `/dashboard/chat/`
+- `/dashboard/connectors/`
+- `/dashboard/api-keys/`
+- `/dashboard/staff/`
+- `/documents/<id>/`
+- `/documents/<id>/facts/`
+- `/documents/<id>/chunks/`
+- `/documents/<id>/search/`
+- `/documents/<id>/download/`
 - `/healthz/`
 - `/connect/microsoft/`
 - `/connect/microsoft/callback/`
@@ -122,11 +218,13 @@ Current stack and behavior are now beyond the initial scaffold stage:
 - `TenantMembership`
 - `APIKey`
 - `ExternalAccount`
+- `InviteToken`
 
 ### documents
 - `Document`
 - `DocumentVersion`
 - `Chunk`
+- `ExtractedFact`
 
 ### ingestion
 - `IngestionJob`
@@ -138,18 +236,37 @@ Current stack and behavior are now beyond the initial scaffold stage:
 
 ## Environment Notes
 
-### OpenAI
-Required for embeddings and current answer generation:
-
+### OpenAI embeddings
 ```env
 OPENAI_API_KEY=...
 OPENAI_BASE_URL=https://api.openai.com/v1
 DEFAULT_EMBEDDING_MODEL=text-embedding-3-large
-DEFAULT_CHAT_MODEL=gpt-4.1-mini
 ```
 
+### Groq generation/chat
+```env
+GROQ_API_KEY=...
+GROQ_BASE_URL=https://api.groq.com/openai/v1
+DEFAULT_CHAT_MODEL=openai/gpt-oss-20b
+QUESTION_GEN_MODEL=openai/gpt-oss-20b
+```
+
+### LLM question-generation guardrails
+Current enrichment guardrails:
+
+```env
+QUESTION_GEN_MIN_CHARS=300
+QUESTION_GEN_MAX_CHUNKS=40
+```
+
+Meaning:
+- only chunks above a minimum size are eligible
+- only a capped number of chunks per ingestion run use the LLM question-generation path
+- noisy chunks still fall back to heuristic question generation
+
 ### Storage
-If no real S3/MinIO endpoint is configured, the app falls back to local filesystem storage.
+Production currently uses MinIO-backed object storage.
+User-facing download URLs are streamed through Django so raw internal MinIO URLs are not exposed.
 
 ### Celery
 Docstore uses its own queue:
@@ -162,7 +279,8 @@ CELERY_RESULT_BACKEND=redis://localhost:6379/1
 Worker should consume the `docstore` queue.
 
 ### Microsoft / SharePoint OAuth scaffold
-Not fully configured yet in production. When resumed, these env vars are expected:
+Still foundation-level, not fully productized.
+Expected env:
 
 ```env
 MS_GRAPH_CLIENT_ID=...
@@ -172,385 +290,32 @@ MS_GRAPH_TENANT_ID=common
 MS_GRAPH_SCOPES=openid profile email offline_access Files.Read Sites.Read.All User.Read
 ```
 
-### Microsoft app registration setup
-Use this when resuming user-owned SharePoint connections.
-
-#### 1. Create the app registration
-In Azure / Microsoft Entra:
-
-- go to `Microsoft Entra ID`
-- go to `App registrations`
-- click `New registration`
-
-Recommended values:
-
-- **Name:** `docstore-rag`
-- **Supported account types:**
-  - use **Accounts in any organizational directory and personal Microsoft accounts** if you want broad compatibility
-  - use an org-only option if this should only work for one Microsoft 365 tenant
-- **Redirect URI:**
-  - Platform: `Web`
-  - URI: `https://docstore.oddsmith.net/connect/microsoft/callback/`
-
-After creation, copy:
-
-- **Application (client) ID** → `MS_GRAPH_CLIENT_ID`
-- **Directory (tenant) ID** → use as `MS_GRAPH_TENANT_ID` if you want tenant-specific auth
-  - otherwise set `MS_GRAPH_TENANT_ID=common` for multi-tenant behavior
-
-#### 2. Create the client secret
-In the app registration:
-
-- go to `Certificates & secrets`
-- click `New client secret`
-- create one and copy the **Value** immediately
-
-Use that value as:
-
-- `MS_GRAPH_CLIENT_SECRET`
-
-Important: use the **secret value**, not the secret ID.
-
-#### 3. Configure authentication
-In the app registration:
-
-- go to `Authentication`
-- confirm the redirect URI exists exactly as:
-  - `https://docstore.oddsmith.net/connect/microsoft/callback/`
-
-No SPA/mobile setup is needed for the current server-side auth-code flow.
-
-#### 4. Add Microsoft Graph API permissions
-In the app registration:
-
-- go to `API permissions`
-- click `Add a permission`
-- choose `Microsoft Graph`
-- choose `Delegated permissions`
-
-Add:
-
-- `openid`
-- `profile`
-- `email`
-- `offline_access`
-- `User.Read`
-- `Files.Read`
-- `Sites.Read.All`
-
-If needed for your tenant, grant admin consent after adding permissions.
-
-#### 5. Set the production env vars
-Add these to the VPS `.env` for docstore:
-
-```env
-MS_GRAPH_CLIENT_ID=YOUR_CLIENT_ID
-MS_GRAPH_CLIENT_SECRET=YOUR_SECRET_VALUE
-MS_GRAPH_REDIRECT_URI=https://docstore.oddsmith.net/connect/microsoft/callback/
-MS_GRAPH_TENANT_ID=common
-MS_GRAPH_SCOPES=openid profile email offline_access Files.Read Sites.Read.All User.Read
-```
-
-#### 6. Restart the app after updating env
-After editing `/home/norm/sites/docstore_rag/.env` on the VPS, restart:
-
-```bash
-sudo systemctl restart docstore-rag.service docstore-rag-celery.service
-```
-
-## SharePoint Status
-
-SharePoint support is partially scaffolded, not finished.
-
-### Already built
-- connector models and admin
-- Graph helper
-- manual sync command scaffold
-- per-user Microsoft account connection scaffold
-
-### Still needed
-- real Azure app registration/config in production
-- user-facing site/drive/folder picker
-- token refresh handling
-- user-token-based SharePoint browsing/sync
-- scheduled/incremental sync
-- cleaner connector UX in dashboard
-
-## Operational Notes
-- production deploy path uses Pi -> VPS rsync
-- `.env` is intentionally excluded from deploy sync
-- generated vectors live in Postgres, not SQLite
-- chat quality depends on extraction quality + chunk quality
-- PDF parsing is now real; OCR/layout-heavy docs are still not a focus yet
-
 ## API keys
 
-Dashboard users can now create and revoke API keys from:
-
+Dashboard users can create and revoke API keys from:
 - `/dashboard/api-keys/`
 
-Current behavior:
-- raw key is shown once at creation time
-- only the prefix + SHA-256 hash are stored
-- keys can be scoped to current workspace or whole tenant
-- revoke disables a key without deleting the DB record
-- helper exists for Bearer-token lookup and `last_used_at` updates (`control/api_auth.py`)
+Behavior:
+- raw key shown once
+- only prefix + hash stored
+- revoke disables without deleting the DB record
+- workspace-scoped and tenant-wide keys supported
+- custom API-key guard handles tenant/workspace inference where possible
 
-Current behavior now:
-- unauthenticated API requests must provide a Bearer API key
-- tenant context is inferred from the API key
-- workspace-scoped keys can use the API without sending `tenant_id` or `workspace_id`
-- tenant-wide keys can omit `tenant_id` but still need `workspace_id`
-- successful API-key lookups update `last_used_at`
+## Operational Notes
+- production deploy path uses Pi → VPS rsync
+- `.env` is intentionally excluded from deploy sync
+- generated vectors live in Postgres, not SQLite
+- current production-safe extraction path is the standard extractor
+- retrieval quality still depends heavily on extraction quality for PDFs with glyph/encoding problems
+- document-scoped search pages are now a first-class debugging tool and should be used heavily during tuning
 
-Current limitation:
-- signed-in session requests still use explicit `tenant_id` + `workspace_id`
-- not every future endpoint is wired yet; new endpoints should use the same guard pattern in `control/api_guard.py`
-
-## API examples
-
-All unauthenticated API requests should include a Bearer API key:
-
-```http
-Authorization: Bearer ds_...
-```
-
-### Search
-
-For workspace-scoped API keys, you can omit tenant/workspace IDs entirely:
-
-```bash
-curl -X POST https://docstore.oddsmith.net/api/v1/search/ \
-  -H "Authorization: Bearer ds_YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "What does this workspace say about authentication?",
-    "top_k": 5
-  }'
-```
-
-```python
-import requests
-
-resp = requests.post(
-    "https://docstore.oddsmith.net/api/v1/search/",
-    headers={
-        "Authorization": "Bearer ds_YOUR_KEY",
-        "Content-Type": "application/json",
-    },
-    json={
-        "query": "What does this workspace say about authentication?",
-        "top_k": 5,
-    },
-    timeout=60,
-)
-resp.raise_for_status()
-print(resp.json())
-```
-
-### Chat
-
-```bash
-curl -X POST https://docstore.oddsmith.net/api/v1/chat/ \
-  -H "Authorization: Bearer ds_YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "Summarize the policy described in these docs.",
-    "top_k": 5
-  }'
-```
-
-```python
-import requests
-
-resp = requests.post(
-    "https://docstore.oddsmith.net/api/v1/chat/",
-    headers={
-        "Authorization": "Bearer ds_YOUR_KEY",
-        "Content-Type": "application/json",
-    },
-    json={
-        "question": "Summarize the policy described in these docs.",
-        "top_k": 5,
-    },
-    timeout=120,
-)
-resp.raise_for_status()
-data = resp.json()
-print(data["answer"])
-for source in data["sources"]:
-    print(source["document"], source["chunk_index"])
-```
-
-Optional document-scoped chat:
-
-```bash
-curl -X POST https://docstore.oddsmith.net/api/v1/chat/ \
-  -H "Authorization: Bearer ds_YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "What does this specific document say about onboarding?",
-    "document_id": 42,
-    "top_k": 5
-  }'
-```
-
-```python
-import requests
-
-resp = requests.post(
-    "https://docstore.oddsmith.net/api/v1/chat/",
-    headers={
-        "Authorization": "Bearer ds_YOUR_KEY",
-        "Content-Type": "application/json",
-    },
-    json={
-        "question": "What does this specific document say about onboarding?",
-        "document_id": 42,
-        "top_k": 5,
-    },
-    timeout=120,
-)
-resp.raise_for_status()
-print(resp.json())
-```
-
-For tenant-wide API keys, keep sending `workspace_id` but you can omit `tenant_id`.
-
-### URL ingest
-
-```bash
-curl -X POST https://docstore.oddsmith.net/api/v1/urls/ingest/ \
-  -H "Authorization: Bearer ds_YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "urls": [
-      "https://example.com/docs/start",
-      "https://example.com/help/article"
-    ],
-    "collection": "docs",
-    "crawl_mode": "single",
-    "max_pages": 10
-  }'
-```
-
-```python
-import requests
-
-resp = requests.post(
-    "https://docstore.oddsmith.net/api/v1/urls/ingest/",
-    headers={
-        "Authorization": "Bearer ds_YOUR_KEY",
-        "Content-Type": "application/json",
-    },
-    json={
-        "urls": [
-            "https://example.com/docs/start",
-            "https://example.com/help/article",
-        ],
-        "collection": "docs",
-        "crawl_mode": "single",
-        "max_pages": 10,
-    },
-    timeout=180,
-)
-resp.raise_for_status()
-print(resp.json())
-```
-
-### Document delete / restore / purge
-
-For workspace-scoped keys, document lifecycle calls can also omit tenant/workspace IDs.
-
-Soft delete:
-
-```bash
-curl -X POST https://docstore.oddsmith.net/api/v1/documents/delete/ \
-  -H "Authorization: Bearer ds_YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "document_ids": [12, 13]
-  }'
-```
-
-```python
-import requests
-
-resp = requests.post(
-    "https://docstore.oddsmith.net/api/v1/documents/delete/",
-    headers={
-        "Authorization": "Bearer ds_YOUR_KEY",
-        "Content-Type": "application/json",
-    },
-    json={
-        "document_ids": [12, 13],
-    },
-    timeout=60,
-)
-resp.raise_for_status()
-print(resp.json())
-```
-
-Restore:
-
-```bash
-curl -X POST https://docstore.oddsmith.net/api/v1/documents/restore/ \
-  -H "Authorization: Bearer ds_YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "document_ids": [12, 13]
-  }'
-```
-
-```python
-import requests
-
-resp = requests.post(
-    "https://docstore.oddsmith.net/api/v1/documents/restore/",
-    headers={
-        "Authorization": "Bearer ds_YOUR_KEY",
-        "Content-Type": "application/json",
-    },
-    json={
-        "document_ids": [12, 13],
-    },
-    timeout=60,
-)
-resp.raise_for_status()
-print(resp.json())
-```
-
-Purge:
-
-```bash
-curl -X POST https://docstore.oddsmith.net/api/v1/documents/purge/ \
-  -H "Authorization: Bearer ds_YOUR_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "document_ids": [12, 13]
-  }'
-```
-
-```python
-import requests
-
-resp = requests.post(
-    "https://docstore.oddsmith.net/api/v1/documents/purge/",
-    headers={
-        "Authorization": "Bearer ds_YOUR_KEY",
-        "Content-Type": "application/json",
-    },
-    json={
-        "document_ids": [12, 13],
-    },
-    timeout=60,
-)
-resp.raise_for_status()
-print(resp.json())
-```
+## Related docs
+- see `docs/workflows/retrieval-and-ingestion.md` for the current workflow and tuning notes
 
 ## Good Next Steps
-- add document detail + reingest flow
-- add SharePoint site/drive/folder picker using connected Microsoft accounts
-- improve token handling and connector UX
-- extend parser coverage further only as needed
+- keep improving chunk-question quality and cost discipline
+- improve exact-list ranking for near-miss chunks (e.g. “floating holidays” vs “paid holidays”)
+- improve PDF cleanup / extraction quality further
+- continue SharePoint productization
+- add more retrieval evaluation fixtures / benchmark questions
