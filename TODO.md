@@ -90,6 +90,9 @@
 - [ ] Add better connector setup docs in-app
 - [ ] Add disconnect / reconnect Microsoft account flows
 - [ ] Add external account health/status indicators (token expired, permissions missing, etc.)
+- [ ] Add Confluence connector support (space/page sync, page metadata, updated-page re-sync)
+- [ ] Add Jira connector support (project/JQL sync, issue + comment ingestion, operational knowledge model)
+- [ ] Consider a broader Atlassian connector layer/shared auth if both Confluence and Jira ship
 - [ ] Consider connector support for Google Drive / Dropbox later only if needed
 
 ## Security / permissions
