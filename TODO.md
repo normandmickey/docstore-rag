@@ -80,6 +80,7 @@
 - [ ] Add JSON schema or OpenAPI generation for the public API
 
 ## Connectors
+- [ ] Add ElevenLabs connector for voice workflows (voice selection, TTS generation, and possible audio response/export hooks)
 - [ ] Add SharePoint site/drive/folder picker UI
 - [ ] Link Connector records to per-user ExternalAccount records
 - [ ] Use user-owned Microsoft tokens for Graph browsing/sync
