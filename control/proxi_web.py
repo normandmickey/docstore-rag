@@ -15,7 +15,7 @@ class ProxiWebThread(models.Model):
     class Meta:
         ordering = ['-updated_at', '-id']
         indexes = [
-            models.Index(fields=['tenant', 'workspace', 'user']),
+            models.Index(fields=['tenant', 'workspace', 'user'], name='control_pro_tenant__488d2b_idx'),
         ]
 
     def __str__(self):
@@ -39,7 +39,7 @@ class ProxiWebMessage(models.Model):
     class Meta:
         ordering = ['id']
         indexes = [
-            models.Index(fields=['thread', 'id']),
+            models.Index(fields=['thread', 'id'], name='control_pro_thread__a07dff_idx'),
         ]
 
     def __str__(self):

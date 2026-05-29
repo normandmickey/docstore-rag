@@ -24,7 +24,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'ordering': ['-updated_at', '-id'],
-                'indexes': [models.Index(fields=['tenant', 'workspace', 'user'], name='control_prox_tenant__adbcba_idx')],
+                'indexes': [models.Index(fields=['tenant', 'workspace', 'user'], name='control_pro_tenant__488d2b_idx')],
             },
         ),
         migrations.CreateModel(
@@ -39,7 +39,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'ordering': ['id'],
-                'indexes': [models.Index(fields=['thread', 'id'], name='control_prox_thread__19d0a3_idx')],
+                'indexes': [models.Index(fields=['thread', 'id'], name='control_pro_thread__a07dff_idx')],
             },
         ),
     ]

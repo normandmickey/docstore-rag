@@ -34,7 +34,7 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(max_length=200)),
                 ('slug', models.SlugField()),
                 ('default_embedding_model', models.CharField(default='text-embedding-3-large', max_length=200)),
-                ('default_chunk_size', models.PositiveIntegerField(default=800)),
+                ('default_chunk_size', models.PositiveIntegerField(default=1000)),
                 ('metadata_json', models.JSONField(blank=True, default=dict)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),

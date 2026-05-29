@@ -20,7 +20,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('collection', models.CharField(blank=True, default='', max_length=120)),
-                ('status', models.CharField(choices=[('pending', 'Pending'), ('processing', 'Processing'), ('ready', 'Ready'), ('failed', 'Failed')], default='pending', max_length=20)),
+                ('status', models.CharField(choices=[('pending', 'Pending'), ('processing', 'Processing'), ('ready', 'Ready'), ('failed', 'Failed'), ('deleted', 'Deleted')], default='pending', max_length=20)),
                 ('filename', models.CharField(max_length=255)),
                 ('mime_type', models.CharField(blank=True, default='', max_length=120)),
                 ('size_bytes', models.BigIntegerField(default=0)),

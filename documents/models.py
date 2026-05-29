@@ -137,8 +137,8 @@ class ExtractedFact(models.Model):
     class Meta:
         ordering = ['document_id', 'id']
         indexes = [
-            models.Index(fields=['tenant', 'workspace', 'document']),
-            models.Index(fields=['tenant', 'workspace', 'fact_type']),
+            models.Index(fields=['tenant', 'workspace', 'document'], name='documents_e_tenant__d7f512_idx'),
+            models.Index(fields=['tenant', 'workspace', 'fact_type'], name='documents_e_tenant__238d5f_idx'),
         ]
 
     def __str__(self):
