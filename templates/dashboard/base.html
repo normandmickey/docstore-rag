@@ -47,12 +47,21 @@
     .markdown-response h1, .markdown-response h2, .markdown-response h3, .markdown-response h4, .markdown-response h5, .markdown-response h6 { margin: 16px 0 10px; line-height: 1.3; }
     .markdown-response hr { border: 0; border-top: 1px solid #243055; margin: 16px 0; }
     .install-banner button { margin-top: 8px; }
+    .workspace-strip { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+    .workspace-strip .workspace-current { min-width: 220px; flex: 1 1 220px; }
+    .workspace-strip .workspace-form { display: flex; gap: 10px; align-items: end; flex: 2 1 420px; flex-wrap: wrap; }
+    .workspace-strip .workspace-form > div { min-width: 180px; flex: 1 1 180px; }
+    .workspace-strip label { display: block; margin-bottom: 4px; font-size: 0.9rem; color: #cbd5e1; }
+    .workspace-strip select, .workspace-strip input[type="text"] { margin: 0; }
+    .workspace-strip button { white-space: nowrap; }
     @media (max-width: 640px) {
       .wrap { padding: 20px 14px 36px; }
       .topbar, .card { padding: 16px; margin-bottom: 16px; border-radius: 14px; }
       .nav a { padding: 8px 10px; }
       .preview-clamp { max-height: 6.8em; font-size: 0.88rem; }
       .doc-meta-group { gap: 6px; }
+      .workspace-strip, .workspace-strip .workspace-form { flex-direction: column; align-items: stretch; }
+      .workspace-strip .workspace-current, .workspace-strip .workspace-form, .workspace-strip .workspace-form > div { min-width: 0; flex: 1 1 auto; }
     }
   </style>
 </head>
@@ -90,26 +99,35 @@
       </div>
     </div>
 
-    <div class="card">
-      <h2>Workspace</h2>
-      <form method="post">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="switch_workspace">
-        <label>Select workspace</label>
-        <select name="workspace_id">
-          {% for workspace in available_workspaces %}
-            <option value="{{ workspace.id }}" {% if current_workspace and workspace.id == current_workspace.id %}selected{% endif %}>{{ workspace.name }}</option>
-          {% endfor %}
-        </select>
-        <button type="submit">Switch workspace</button>
-      </form>
-      <form method="post" style="margin-top: 18px;">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="create_workspace">
-        <label>Create workspace</label>
-        <input type="text" name="workspace_name" placeholder="e.g. Sales Docs">
-        <button type="submit">Create workspace</button>
-      </form>
+    <div class="card" style="padding: 16px 20px;">
+      <div class="workspace-strip">
+        <div class="workspace-current">
+          <div class="meta">Workspace</div>
+          <div><strong>{% if current_workspace %}{{ current_workspace.name }}{% else %}Not set{% endif %}</strong>{% if current_workspace %} <span class="meta">· {{ current_workspace.tenant.name }}</span>{% endif %}</div>
+        </div>
+        <form method="post" class="workspace-form" style="margin: 0;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="switch_workspace">
+          <div>
+            <label for="workspace_id">Switch workspace</label>
+            <select id="workspace_id" name="workspace_id">
+              {% for workspace in available_workspaces %}
+                <option value="{{ workspace.id }}" {% if current_workspace and workspace.id == current_workspace.id %}selected{% endif %}>{{ workspace.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit">Switch</button>
+        </form>
+        <form method="post" class="workspace-form" style="margin: 0;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create_workspace">
+          <div>
+            <label for="workspace_name">New workspace</label>
+            <input id="workspace_name" type="text" name="workspace_name" placeholder="e.g. Sales Docs">
+          </div>
+          <button type="submit">Create</button>
+        </form>
+      </div>
     </div>
 
     {% block content %}{% endblock %}
