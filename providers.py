@@ -2,11 +2,21 @@ from openai import OpenAI
 from django.conf import settings
 
 
-def get_openai_client():
-    kwargs = {'api_key': settings.OPENAI_API_KEY}
-    if settings.OPENAI_BASE_URL:
-        kwargs['base_url'] = settings.OPENAI_BASE_URL
+def _build_client(api_key, base_url=''):
+    kwargs = {'api_key': api_key}
+    if base_url:
+        kwargs['base_url'] = base_url
     return OpenAI(**kwargs)
+
+
+def get_openai_client():
+    return _build_client(settings.OPENAI_API_KEY, settings.OPENAI_BASE_URL)
+
+
+def get_groq_client():
+    if not getattr(settings, 'GROQ_API_KEY', ''):
+        raise RuntimeError('GROQ_API_KEY is not configured')
+    return _build_client(settings.GROQ_API_KEY, getattr(settings, 'GROQ_BASE_URL', 'https://api.groq.com/openai/v1'))
 
 
 EMBED_BATCH_SIZE = 128
@@ -111,9 +121,9 @@ def generate_chunk_questions(chunk_text, model=None):
     if not chunk_text:
         return []
 
-    client = get_openai_client()
+    client = get_groq_client()
     response = client.responses.create(
-        model=model or getattr(settings, 'QUESTION_GEN_MODEL', 'gpt-4.1-mini'),
+        model=model or getattr(settings, 'QUESTION_GEN_MODEL', 'openai/gpt-oss-20b'),
         input=[
             {
                 'role': 'system',
