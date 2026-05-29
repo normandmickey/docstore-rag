@@ -100,7 +100,8 @@
           {% for result in proxi_results %}
             <div class="row">
               <strong>{{ result.document }}</strong><br>
-              <span class="meta">Chunk {{ result.chunk_index }} · Distance {{ result.distance|floatformat:4 }}</span>
+              <span class="meta">Chunk {{ result.chunk_index }} · Distance {{ result.distance|floatformat:4 }}</span><br>
+              <span class="meta"><a href="{{ result.detail_url }}" target="_blank" rel="noopener noreferrer">View document details</a> · <a href="{{ result.download_url }}" target="_blank" rel="noopener noreferrer">Open source document</a></span>
             </div>
           {% endfor %}
         </div>

@@ -836,6 +836,8 @@ def dashboard_proxi_web(request):
                                 'document': result.document.filename,
                                 'chunk_index': result.chunk_index,
                                 'distance': float(getattr(result, 'distance', 0.0) or 0.0),
+                                'detail_url': f'/documents/{result.document_id}/',
+                                'download_url': f'/documents/{result.document_id}/download/',
                             }
                             for result in retrieval_results
                         ],
