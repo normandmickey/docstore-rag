@@ -31,10 +31,11 @@ def keyword_score(query, text):
 def chunk_relevance_score(query, candidate):
     text_relevance = 1.0 - float(getattr(candidate, 'distance', 1.0) or 1.0)
     metadata_relevance = 1.0 - float(getattr(candidate, 'metadata_distance', 1.0) or 1.0)
-    lexical = keyword_score(query, ' '.join(filter(None, [getattr(candidate, 'text', ''), getattr(candidate, 'metadata_text', '')])))
+    question_relevance = 1.0 - float(getattr(candidate, 'question_distance', 1.0) or 1.0)
+    lexical = keyword_score(query, ' '.join(filter(None, [getattr(candidate, 'text', ''), getattr(candidate, 'metadata_text', ''), getattr(candidate, 'question_text', '')])))
     lexical_rank = float(getattr(candidate, 'lexical_rank', 0.0) or 0.0)
-    blended_score = (0.45 * text_relevance) + (0.25 * metadata_relevance) + (0.15 * lexical) + (0.15 * lexical_rank)
-    return blended_score, text_relevance, metadata_relevance, lexical
+    blended_score = (0.35 * text_relevance) + (0.2 * metadata_relevance) + (0.2 * question_relevance) + (0.1 * lexical) + (0.15 * lexical_rank)
+    return blended_score, text_relevance, metadata_relevance, question_relevance, lexical
 
 
 def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
@@ -55,6 +56,11 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
         qs.filter(metadata_embedding__isnull=False)
         .annotate(metadata_distance=CosineDistance('metadata_embedding', query_vector))
         .order_by('metadata_distance')[:candidate_count]
+    )
+    question_candidates = list(
+        qs.filter(question_embedding__isnull=False)
+        .annotate(question_distance=CosineDistance('question_embedding', query_vector))
+        .order_by('question_distance')[:candidate_count]
     )
 
     search_query = SearchQuery(standalone_query, search_type='plain')
@@ -84,6 +90,20 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
             if not hasattr(candidate, 'distance'):
                 candidate.distance = 1.0
             broad_candidate_map[key] = candidate
+    for candidate in question_candidates:
+        key = (candidate.document_id, candidate.chunk_index)
+        if key in broad_candidate_map:
+            existing = broad_candidate_map[key]
+            existing.question_distance = min(
+                float(getattr(existing, 'question_distance', 1.0) or 1.0),
+                float(getattr(candidate, 'question_distance', 1.0) or 1.0),
+            )
+            if not getattr(existing, 'question_text', ''):
+                existing.question_text = getattr(candidate, 'question_text', '')
+        else:
+            if not hasattr(candidate, 'distance'):
+                candidate.distance = 1.0
+            broad_candidate_map[key] = candidate
     for candidate in lexical_candidates:
         key = (candidate.document_id, candidate.chunk_index)
         if key in broad_candidate_map:
@@ -99,9 +119,10 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
     scored_candidates = []
     doc_scores = defaultdict(float)
     for candidate in broad_candidates:
-        blended_score, text_relevance, metadata_relevance, lexical = chunk_relevance_score(standalone_query, candidate)
+        blended_score, text_relevance, metadata_relevance, question_relevance, lexical = chunk_relevance_score(standalone_query, candidate)
         candidate.relevance_score = text_relevance
         candidate.metadata_relevance_score = metadata_relevance
+        candidate.question_relevance_score = question_relevance
         candidate.lexical_score = lexical
         candidate.blended_score = blended_score
         scored_candidates.append(candidate)
@@ -130,10 +151,13 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
                 chunk.distance = getattr(best_candidate, 'distance', None)
             if not hasattr(chunk, 'metadata_distance'):
                 chunk.metadata_distance = getattr(best_candidate, 'metadata_distance', None)
+            if not hasattr(chunk, 'question_distance'):
+                chunk.question_distance = getattr(best_candidate, 'question_distance', None)
             if not hasattr(chunk, 'relevance_score'):
-                blended_score, text_relevance, metadata_relevance, lexical = chunk_relevance_score(standalone_query, chunk)
+                blended_score, text_relevance, metadata_relevance, question_relevance, lexical = chunk_relevance_score(standalone_query, chunk)
                 chunk.relevance_score = text_relevance
                 chunk.metadata_relevance_score = metadata_relevance
+                chunk.question_relevance_score = question_relevance
                 chunk.lexical_score = lexical
                 chunk.blended_score = blended_score
 
@@ -180,6 +204,7 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
             'candidate_count': candidate_count,
             'vector_candidate_count': len(vector_candidates),
             'metadata_candidate_count': len(metadata_candidates),
+            'question_candidate_count': len(question_candidates),
             'lexical_candidate_count': len(lexical_candidates),
             'merged_candidate_count': len(broad_candidates),
             'standalone_query': standalone_query,

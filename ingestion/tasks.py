@@ -278,6 +278,44 @@ def analyze_chunk_structure(chunk_text):
     }
 
 
+def infer_chunk_questions(document, chunk_text, structure=None):
+    structure = structure or analyze_chunk_structure(chunk_text)
+    heading = structure.get('dominant_heading', '')
+    lowered = (chunk_text or '').lower()
+    questions = []
+    if heading:
+        questions.append(f'What does the {heading} section say in {document.filename}?')
+    if 'holiday' in lowered:
+        questions.extend([
+            'What paid holidays does the company observe?',
+            'What holidays are employees off?',
+            'Is the day after Thanksgiving a company holiday?',
+        ])
+    if any(token in lowered for token in ['pto', 'vacation', 'paid time off']):
+        questions.extend([
+            'How does PTO work?',
+            'How much vacation or paid time off do employees get?',
+        ])
+    if any(token in lowered for token in ['eligib', 'coverage', 'benefit']):
+        questions.extend([
+            'When are employees eligible for benefits?',
+            'What are the eligibility rules?',
+        ])
+    if structure.get('has_list'):
+        questions.append('What items are listed in this policy section?')
+    questions.append(f'What questions can this chunk answer from {document.filename}?')
+
+    deduped = []
+    seen = set()
+    for question in questions:
+        normalized = question.strip()
+        if not normalized or normalized in seen:
+            continue
+        seen.add(normalized)
+        deduped.append(normalized)
+    return '\n'.join(deduped[:5])
+
+
 def build_chunk_metadata_text(document, chunk_text, structure=None):
     structure = structure or analyze_chunk_structure(chunk_text)
     heading = structure.get('dominant_heading', '')
@@ -407,6 +445,7 @@ def ingest_document_task(self, ingestion_job_id):
         chunks = build_chunks(cleaned_text, chunk_size=chunk_size, overlap=max(80, int(chunk_size * 0.2)))
         chunks = enforce_embedding_limit(chunks)
         metadata_texts = []
+        question_texts = []
         chunk_structures = []
         last_heading_for_metadata = ''
         for chunk_text in chunks:
@@ -417,8 +456,10 @@ def ingest_document_task(self, ingestion_job_id):
                 last_heading_for_metadata = dominant_heading
             chunk_structures.append(structure)
             metadata_texts.append(build_chunk_metadata_text(document, chunk_text, structure=structure))
+            question_texts.append(infer_chunk_questions(document, chunk_text, structure=structure))
         vectors = embed_texts(chunks) if chunks else []
         metadata_vectors = embed_texts(metadata_texts) if metadata_texts else []
+        question_vectors = embed_texts(question_texts) if question_texts else []
         Chunk.objects.filter(document_version=version).delete()
         ExtractedFact.objects.filter(document_version=version).delete()
         created_chunks = []
@@ -438,6 +479,7 @@ def ingest_document_task(self, ingestion_job_id):
                 chunk_index=idx,
                 text=chunk_text,
                 metadata_text=metadata_texts[idx] if idx < len(metadata_texts) else '',
+                question_text=question_texts[idx] if idx < len(question_texts) else '',
                 token_count=max(1, len(chunk_text) // 4),
                 metadata_json={
                     'stub': False,
@@ -449,6 +491,7 @@ def ingest_document_task(self, ingestion_job_id):
                 },
                 embedding=vectors[idx] if idx < len(vectors) else None,
                 metadata_embedding=metadata_vectors[idx] if idx < len(metadata_vectors) else None,
+                question_embedding=question_vectors[idx] if idx < len(question_vectors) else None,
             )
             created_chunks.append(chunk)
 

@@ -92,10 +92,12 @@ class Chunk(models.Model):
     chunk_index = models.PositiveIntegerField()
     text = models.TextField()
     metadata_text = models.TextField(blank=True, default='')
+    question_text = models.TextField(blank=True, default='')
     token_count = models.PositiveIntegerField(default=0)
     metadata_json = models.JSONField(default=dict, blank=True)
     embedding = VectorField(dimensions=3072, null=True, blank=True)
     metadata_embedding = VectorField(dimensions=3072, null=True, blank=True)
+    question_embedding = VectorField(dimensions=3072, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
