@@ -154,28 +154,42 @@ def extract_pdf_text_docling(document):
         tmp.write(fh.read())
         source_path = Path(tmp.name)
 
-    script = """
-from docling.document_converter import DocumentConverter
-import os
-import sys
-converter = DocumentConverter()
-result = converter.convert(sys.argv[1], pdf_backend=os.environ.get('DOCLING_PDF_BACKEND', 'docling_parse'))
-doc = result.document
-text = doc.export_to_markdown() if hasattr(doc, 'export_to_markdown') else doc.export_to_text()
-print(text)
-"""
+    cli_path = Path(DOCLING_VENV) / 'bin' / 'docling'
+    if not cli_path.exists():
+        raise RuntimeError(f'Docling CLI not found at {cli_path}')
+    output_dir = Path(tempfile.mkdtemp(prefix='docling-out-'))
     try:
-        completed = subprocess.run(
-            [str(python_path), '-c', script, str(source_path)],
-            capture_output=True,
-            text=True,
-            check=True,
-            env={**os.environ, 'DOCLING_PDF_BACKEND': DOCLING_PDF_BACKEND},
-        )
-        return completed.stdout.strip()
-    except subprocess.CalledProcessError as exc:
-        raise RuntimeError(exc.stderr.strip() or exc.stdout.strip() or 'Docling extraction failed')
+        try:
+            completed = subprocess.run(
+                [
+                    str(cli_path),
+                    '--from', 'pdf',
+                    '--to', 'md',
+                    '--output', str(output_dir),
+                    '--pdf-backend', DOCLING_PDF_BACKEND,
+                    str(source_path),
+                ],
+                capture_output=True,
+                text=True,
+                check=True,
+                env={**os.environ, 'DOCLING_PDF_BACKEND': DOCLING_PDF_BACKEND},
+            )
+            md_files = sorted(output_dir.glob('*.md'))
+            if not md_files:
+                raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or 'Docling produced no markdown output')
+            return md_files[0].read_text().strip()
+        except subprocess.CalledProcessError as exc:
+            raise RuntimeError(exc.stderr.strip() or exc.stdout.strip() or 'Docling extraction failed')
     finally:
+        for path in output_dir.glob('*'):
+            try:
+                path.unlink()
+            except Exception:
+                pass
+        try:
+            output_dir.rmdir()
+        except Exception:
+            pass
         try:
             source_path.unlink(missing_ok=True)
         except Exception:
