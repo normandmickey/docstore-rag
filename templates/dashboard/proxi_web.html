@@ -1,4 +1,5 @@
 {% extends 'dashboard/base.html' %}
+{% load proxi_web_markdown %}
 {% block title %}Proxi-Web · Docstore{% endblock %}
 {% block content %}
 <div class="card">
@@ -82,7 +83,11 @@
                 <button type="button" class="copy-response-button" data-copy-text="{{ message.content|escapejs }}" style="background: #1d4ed8; padding: 8px 12px; font-size: 0.9rem;">Copy</button>
               {% endif %}
             </div>
-            <pre style="margin: 0;">{{ message.content }}</pre>
+            {% if message.role == 'assistant' %}
+              <div class="markdown-response">{{ message.content|render_markdown }}</div>
+            {% else %}
+              <pre style="margin: 0;">{{ message.content }}</pre>
+            {% endif %}
           </div>
         {% empty %}
           <p>No messages yet.</p>
