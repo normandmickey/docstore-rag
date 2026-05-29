@@ -13,8 +13,28 @@ from providers import embed_texts
 from .models import IngestionJob
 
 
+def repair_suspicious_pdf_tokens(text):
+    text = text or ''
+
+    def repair_token(match):
+        token = match.group(0)
+        letters = sum(ch.isalpha() for ch in token)
+        digits = sum(ch.isdigit() for ch in token)
+        if letters < 2 or digits == 0:
+            return token
+        repaired = token
+        repaired = re.sub(r'(?<=[A-Za-z])0(?=[A-Za-z])', 't', repaired)
+        repaired = re.sub(r'(?<=[A-Za-z])@(?=[A-Za-z])', 'fi', repaired)
+        repaired = re.sub(r'(?<=[A-Za-z])§(?=[A-Za-z])', 'ff', repaired)
+        repaired = re.sub(r'(?<=[A-Za-z])¢(?=[A-Za-z])', 'ti', repaired)
+        return repaired
+
+    text = re.sub(r'\b[\w@§¢]+\b', repair_token, text)
+    return text
+
+
 def normalize_extracted_text(text):
-    text = (text or '').replace('\x00', ' ')
+    text = repair_suspicious_pdf_tokens((text or '').replace('\x00', ' '))
     text = text.replace('\r\n', '\n').replace('\r', '\n')
     text = re.sub(r'[ \t]+', ' ', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
