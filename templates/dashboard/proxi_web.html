@@ -138,11 +138,11 @@
                 <div class="meta">{{ message.created_at }}</div>
               </div>
               {% if message.role == 'assistant' %}
-                <button type="button" class="copy-response-button proxi-web-copy-button" data-copy-text="{{ message.content|escapejs }}">Copy</button>
+                <button type="button" class="copy-response-button proxi-web-copy-button">Copy</button>
               {% endif %}
             </div>
             {% if message.role == 'assistant' %}
-              <div class="markdown-response">{{ message.content|render_markdown }}</div>
+              <div class="markdown-response" data-copy-source="true">{{ message.content|render_markdown }}</div>
             {% else %}
               <pre style="margin: 0;">{{ message.content }}</pre>
             {% endif %}
@@ -185,7 +185,9 @@
     const buttons = document.querySelectorAll('.copy-response-button');
     buttons.forEach(function (button) {
       button.addEventListener('click', async function () {
-        const text = button.getAttribute('data-copy-text') || '';
+        const messageCard = button.closest('.proxi-web-message');
+        const source = messageCard ? messageCard.querySelector('[data-copy-source="true"]') : null;
+        const text = source ? (source.innerText || source.textContent || '').trim() : '';
         try {
           await navigator.clipboard.writeText(text);
           const original = button.textContent;
