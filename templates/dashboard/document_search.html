@@ -22,6 +22,10 @@
           <div style="margin-top: 10px; font-weight: 600;">Metadata text</div>
           <pre>{{ row.metadata_text }}</pre>
         {% endif %}
+        {% if row.question_text %}
+          <div style="margin-top: 10px; font-weight: 600;">Question text</div>
+          <pre>{{ row.question_text }}</pre>
+        {% endif %}
         <div style="margin-top: 10px; font-weight: 600;">Chunk text</div>
         <pre>{{ row.text }}</pre>
       </div>
