@@ -29,6 +29,17 @@
     .status-succeeded { background: #166534; color: #dcfce7; }
     .status-failed { background: #991b1b; color: #fee2e2; }
     pre { white-space: pre-wrap; background: #0f172a; padding: 12px; border-radius: 10px; color: #cbd5e1; }
+    .doc-title { font-weight: 700; line-height: 1.35; }
+    .doc-actions { margin-top: 6px; }
+    .doc-meta-group { margin-top: 6px; display: grid; gap: 4px; }
+    .preview-clamp { margin-top: 10px; max-height: 8.5em; overflow: hidden; font-size: 0.92rem; }
+    @media (max-width: 640px) {
+      .wrap { padding: 20px 14px 36px; }
+      .topbar, .card { padding: 16px; margin-bottom: 16px; border-radius: 14px; }
+      .nav a { padding: 8px 10px; }
+      .preview-clamp { max-height: 6.8em; font-size: 0.88rem; }
+      .doc-meta-group { gap: 6px; }
+    }
   </style>
 </head>
 <body>
