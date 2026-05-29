@@ -1,6 +1,8 @@
 import logging
 import secrets
 
+import requests
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import login, logout
@@ -18,7 +20,8 @@ from documents.models import Chunk, Document, ExtractedFact
 from documents.upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
 from ingestion.models import IngestionJob
 from ingestion.tasks import ingest_document_task
-from retrieval.service import answer_question, retrieve_chunks
+from retrieval.service import answer_question, build_context_blocks, retrieve_chunks
+from providers import answer_with_general_context
 
 from .forms import SignUpForm
 from .models import APIKey, ExternalAccount, InviteToken, ProxiWebMessage, ProxiWebThread, Tenant, TenantMembership, Workspace
@@ -696,6 +699,7 @@ def dashboard_proxi_web(request):
     base['proxi_messages'] = []
     base['proxi_question'] = ''
     base['proxi_results'] = []
+    base['proxi_web_enabled'] = False
 
     if current_workspace:
         threads = ProxiWebThread.objects.filter(
@@ -716,6 +720,32 @@ def dashboard_proxi_web(request):
             messages.success(request, 'Created a new Proxi-Web chat.')
             return redirect(f'/dashboard/proxi-web/?thread={thread.id}')
 
+        if request.method == 'POST' and request.POST.get('action') == 'rename_proxi_thread':
+            thread_id = (request.POST.get('thread_id') or '').strip()
+            new_title = (request.POST.get('title') or '').strip()
+            thread = threads.filter(id=thread_id).first() if thread_id.isdigit() else None
+            if not thread:
+                messages.error(request, 'Chat not found.')
+                return redirect('dashboard_proxi_web')
+            thread.title = new_title or thread.title or 'Untitled chat'
+            thread.save(update_fields=['title', 'updated_at'])
+            messages.success(request, 'Chat renamed.')
+            return redirect(f'/dashboard/proxi-web/?thread={thread.id}')
+
+        if request.method == 'POST' and request.POST.get('action') == 'delete_proxi_thread':
+            thread_id = (request.POST.get('thread_id') or '').strip()
+            confirm = (request.POST.get('confirm_delete_thread') or '').strip().lower()
+            thread = threads.filter(id=thread_id).first() if thread_id.isdigit() else None
+            if not thread:
+                messages.error(request, 'Chat not found.')
+                return redirect('dashboard_proxi_web')
+            if confirm != 'delete':
+                messages.error(request, 'Delete not confirmed. Type DELETE to remove the chat.')
+                return redirect(f'/dashboard/proxi-web/?thread={thread.id}')
+            thread.delete()
+            messages.success(request, 'Proxi-Web chat deleted.')
+            return redirect('dashboard_proxi_web')
+
         selected_thread_id = (request.GET.get('thread') or request.POST.get('thread_id') or '').strip()
         thread = None
         if selected_thread_id.isdigit():
@@ -727,47 +757,67 @@ def dashboard_proxi_web(request):
         if request.method == 'POST' and request.POST.get('action') == 'send_proxi_message':
             question = (request.POST.get('question') or '').strip()
             thread_id = (request.POST.get('thread_id') or '').strip()
+            use_web = (request.POST.get('use_web_search') or '').strip() == '1'
             thread = threads.filter(id=thread_id).first() if thread_id.isdigit() else thread
             if not thread:
                 messages.error(request, 'Pick or create a Proxi-Web chat first.')
                 return redirect('dashboard_proxi_web')
             base['proxi_thread'] = thread
             base['proxi_question'] = question
+            base['proxi_web_enabled'] = use_web
             if not question:
                 messages.error(request, 'Ask something first.')
             else:
                 history_messages = list(thread.messages.order_by('id'))
+                chat_history = [
+                    {'role': message.role, 'content': message.content}
+                    for message in history_messages[-12:]
+                ]
                 retrieval_results = retrieve_chunks(
                     tenant=current_workspace.tenant,
                     workspace=current_workspace,
                     query=question,
                     top_k=5,
                 )
-                context_blocks = []
-                for result in retrieval_results:
+                context_blocks = build_context_blocks(retrieval_results)
+                web_results = []
+                if use_web:
+                    if not getattr(settings, 'BRAVE_API_KEY', ''):
+                        messages.error(request, 'Web search is not configured yet.')
+                    else:
+                        try:
+                            response = requests.get(
+                                'https://api.search.brave.com/res/v1/web/search',
+                                params={'q': question, 'count': 5},
+                                headers={
+                                    'Accept': 'application/json',
+                                    'Accept-Encoding': 'gzip',
+                                    'X-Subscription-Token': settings.BRAVE_API_KEY,
+                                },
+                                timeout=20,
+                            )
+                            response.raise_for_status()
+                            payload = response.json() or {}
+                            for item in ((payload.get('web') or {}).get('results') or [])[:5]:
+                                web_results.append({
+                                    'title': item.get('title', ''),
+                                    'url': item.get('url', ''),
+                                    'snippet': item.get('description', ''),
+                                })
+                        except Exception as exc:
+                            logger.exception('Proxi-Web web search failed for user=%s workspace=%s', request.user.id, current_workspace.id)
+                            messages.error(request, f'Web search failed: {exc}')
+                for index, item in enumerate(web_results, start=1):
                     context_blocks.append(
-                        f'[Source] {result.document.filename} · chunk {result.chunk_index}\n{result.text}'
+                        f'[Web {index}] {item.get("title") or item.get("url") or "Web result"}\n'
+                        f'URL: {item.get("url", "")}\n'
+                        f'{item.get("snippet", "")}'
                     )
-                history_blocks = []
-                for message in history_messages[-10:]:
-                    role_label = 'User' if message.role == ProxiWebMessage.ROLE_USER else 'Assistant'
-                    history_blocks.append(f'{role_label}: {message.content}')
-                prompt = question
-                if history_blocks:
-                    prompt = (
-                        'Use the prior conversation only as extra context. Keep answers grounded in retrieved document context when available. '
-                        'If the retrieved context is weak or missing, say so plainly.\n\n'
-                        'Conversation so far:\n'
-                        + '\n'.join(history_blocks)
-                        + '\n\nCurrent user question:\n'
-                        + question
-                    )
-                answer = answer_question(
-                    tenant=current_workspace.tenant,
-                    workspace=current_workspace,
-                    query=prompt,
-                    top_k=5,
-                )[0] if context_blocks else 'I could not find relevant document context for that question yet.'
+                answer = answer_with_general_context(
+                    question,
+                    context_blocks,
+                    chat_history=chat_history,
+                ) if context_blocks else 'I could not find enough relevant context for that question yet.'
                 ProxiWebMessage.objects.create(
                     thread=thread,
                     role=ProxiWebMessage.ROLE_USER,
@@ -778,6 +828,7 @@ def dashboard_proxi_web(request):
                     role=ProxiWebMessage.ROLE_ASSISTANT,
                     content=answer,
                     retrieval_metadata_json={
+                        'use_web_search': use_web,
                         'result_count': len(retrieval_results),
                         'results': [
                             {
@@ -788,6 +839,7 @@ def dashboard_proxi_web(request):
                             }
                             for result in retrieval_results
                         ],
+                        'web_results': web_results,
                     },
                 )
                 if (thread.title or '').strip() in {'', 'New Proxi-Web chat'}:
@@ -800,7 +852,10 @@ def dashboard_proxi_web(request):
             base['proxi_messages'] = list(base['proxi_thread'].messages.order_by('id'))
             latest_assistant = next((msg for msg in reversed(base['proxi_messages']) if msg.role == ProxiWebMessage.ROLE_ASSISTANT), None)
             if latest_assistant:
-                base['proxi_results'] = (latest_assistant.retrieval_metadata_json or {}).get('results', [])
+                latest_meta = latest_assistant.retrieval_metadata_json or {}
+                base['proxi_results'] = latest_meta.get('results', [])
+                base['proxi_web_results'] = latest_meta.get('web_results', [])
+                base['proxi_web_enabled'] = bool(latest_meta.get('use_web_search'))
 
     return render(request, 'dashboard/proxi_web.html', base)
 

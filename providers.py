@@ -1,6 +1,9 @@
 from openai import OpenAI
 from django.conf import settings
 
+from urllib.parse import quote_plus
+
+
 
 def _build_client(api_key, base_url=''):
     kwargs = {'api_key': api_key}
@@ -162,3 +165,65 @@ def generate_chunk_questions(chunk_text, model=None):
         seen.add(question)
         deduped.append(question)
     return deduped[:2]
+
+
+def answer_with_general_context(question, context_blocks, chat_history=None, model=None):
+    client = get_groq_client()
+    joined_context = "\n\n".join(context_blocks)
+    history_text = ''
+    if chat_history:
+        history_lines = []
+        for item in chat_history:
+            role = item.get('role', 'user')
+            text = (item.get('content') or '').strip()
+            if text:
+                history_lines.append(f'{role}: {text}')
+        if history_lines:
+            history_text = '\n'.join(history_lines)
+
+    response = client.responses.create(
+        model=model or getattr(settings, 'DEFAULT_CHAT_MODEL', 'openai/gpt-oss-20b'),
+        input=[
+            {
+                'role': 'system',
+                'content': [
+                    {
+                        'type': 'input_text',
+                        'text': (
+                            'You are a history-aware assistant. Use prior chat history only to resolve follow-ups and references. '
+                            'Prefer the provided context blocks when answering. '
+                            'Do not invent facts. If the supplied context is insufficient, say so plainly. '
+                            'When the answer comes from the provided context, end with a short Sources section.'
+                        ),
+                    }
+                ],
+            },
+            {
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'input_text',
+                        'text': (
+                            f'Conversation history:\n{history_text or "(none)"}\n\n'
+                            f'Question:\n{question}\n\n'
+                            f'Context:\n{joined_context or "(none)"}'
+                        ),
+                    }
+                ],
+            },
+        ],
+    )
+    return response.output_text
+
+
+def web_search_context(query, count=5):
+    encoded = quote_plus((query or '').strip())
+    if not encoded:
+        return []
+    return [
+        {
+            'title': 'Live web search requested',
+            'url': f'https://search.brave.com/search?q={encoded}',
+            'snippet': 'Use assistant-side Brave search tool results at runtime; this placeholder function exists only for local provider composition.',
+        }
+    ]

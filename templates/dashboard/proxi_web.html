@@ -36,13 +36,38 @@
       <p>Create a chat to start using Proxi-Web.</p>
     {% else %}
       <div class="meta" style="margin-bottom: 14px;">Current chat: <strong>{{ proxi_thread.title|default:'Untitled chat' }}</strong></div>
+
+      <form method="post" style="margin-bottom: 14px; display: grid; gap: 10px; grid-template-columns: minmax(0, 1fr) auto; align-items: end;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="rename_proxi_thread">
+        <input type="hidden" name="thread_id" value="{{ proxi_thread.id }}">
+        <div>
+          <label>Rename chat</label>
+          <input type="text" name="title" value="{{ proxi_thread.title }}" placeholder="Chat title">
+        </div>
+        <button type="submit">Rename</button>
+      </form>
+
       <form method="post">
         {% csrf_token %}
         <input type="hidden" name="action" value="send_proxi_message">
         <input type="hidden" name="thread_id" value="{{ proxi_thread.id }}">
         <label>Ask Proxi-Web</label>
         <textarea name="question" rows="4" placeholder="Ask a follow-up question that benefits from chat history...">{{ proxi_question }}</textarea>
+        <label style="display: flex; gap: 10px; align-items: center; margin: 8px 0 16px;">
+          <input type="checkbox" name="use_web_search" value="1" {% if proxi_web_enabled %}checked{% endif %} style="width: auto; margin: 0;">
+          <span>Search the web too (optional; off by default)</span>
+        </label>
         <button type="submit">Send</button>
+      </form>
+
+      <form method="post" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid #243055;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="delete_proxi_thread">
+        <input type="hidden" name="thread_id" value="{{ proxi_thread.id }}">
+        <label>Type <strong>DELETE</strong> to remove this chat</label>
+        <input type="text" name="confirm_delete_thread" placeholder="DELETE">
+        <button type="submit" style="background: #991b1b;">Delete chat</button>
       </form>
 
       <div style="margin-top: 20px;">
@@ -59,11 +84,24 @@
 
       {% if proxi_results %}
         <div style="margin-top: 24px;">
-          <h3>Latest retrieved context</h3>
+          <h3>Latest retrieved document context</h3>
           {% for result in proxi_results %}
             <div class="row">
               <strong>{{ result.document }}</strong><br>
               <span class="meta">Chunk {{ result.chunk_index }} · Distance {{ result.distance|floatformat:4 }}</span>
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      {% if proxi_web_results %}
+        <div style="margin-top: 24px;">
+          <h3>Latest web results</h3>
+          {% for result in proxi_web_results %}
+            <div class="row">
+              <strong>{{ result.title|default:result.url }}</strong><br>
+              <span class="meta"><a href="{{ result.url }}" target="_blank" rel="noopener noreferrer">{{ result.url }}</a></span>
+              {% if result.snippet %}<pre>{{ result.snippet }}</pre>{% endif %}
             </div>
           {% endfor %}
         </div>
