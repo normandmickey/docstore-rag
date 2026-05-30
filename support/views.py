@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest
@@ -12,6 +14,8 @@ from .forms import SupportChannelForm, SupportConversationUpdateForm, SupportRep
 from .models import SupportChannel, SupportContact, SupportConversation, SupportMessage
 from .services import ingest_inbound_sms, update_message_delivery_status
 from .twilio import TwilioRestException, send_sms, twilio_enabled, validate_twilio_request
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -234,29 +238,36 @@ def support_conversation_detail(request, conversation_id):
 @csrf_exempt
 @require_POST
 def twilio_sms_inbound(request):
-    if not validate_twilio_request(request):
-        return HttpResponse(status=403)
-
     to_number = request.POST.get('To', '')
     from_number = request.POST.get('From', '')
-    body = request.POST.get('Body', '')
     message_sid = request.POST.get('MessageSid', '')
+    logger.info('Twilio inbound webhook hit to=%s from=%s sid=%s', to_number, from_number, message_sid)
+
+    if not validate_twilio_request(request):
+        logger.warning('Twilio inbound signature validation failed to=%s from=%s sid=%s url=%s', to_number, from_number, message_sid, request.build_absolute_uri())
+        return HttpResponse(status=403)
+
+    body = request.POST.get('Body', '')
     profile_name = request.POST.get('ProfileName', '')
 
     if not to_number or not from_number:
+        logger.warning('Twilio inbound missing To/From sid=%s', message_sid)
         return HttpResponseBadRequest('Missing To/From')
 
     try:
-        ingest_inbound_sms(
+        conversation, message = ingest_inbound_sms(
             to_number=to_number,
             from_number=from_number,
             body=body,
             provider_message_sid=message_sid,
             profile_name=profile_name,
         )
+        logger.info('Twilio inbound stored conversation_id=%s message_id=%s sid=%s', conversation.id, message.id, message_sid)
     except SupportChannel.DoesNotExist:
+        logger.warning('Twilio inbound no support channel found to=%s from=%s sid=%s', to_number, from_number, message_sid)
         return HttpResponse(status=404)
     except Exception:
+        logger.exception('Twilio inbound ingest failed to=%s from=%s sid=%s', to_number, from_number, message_sid)
         return HttpResponse(status=500)
 
     return HttpResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', content_type='text/xml')
@@ -265,10 +276,12 @@ def twilio_sms_inbound(request):
 @csrf_exempt
 @require_POST
 def twilio_sms_status(request):
-    if not validate_twilio_request(request):
-        return HttpResponse(status=403)
-
     message_sid = request.POST.get('MessageSid', '')
     message_status = request.POST.get('MessageStatus', '')
+    if not validate_twilio_request(request):
+        logger.warning('Twilio status signature validation failed sid=%s status=%s url=%s', message_sid, message_status, request.build_absolute_uri())
+        return HttpResponse(status=403)
+
     update_message_delivery_status(provider_message_sid=message_sid, delivery_status=message_status)
+    logger.info('Twilio status updated sid=%s status=%s', message_sid, message_status)
     return HttpResponse('ok')
