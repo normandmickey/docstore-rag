@@ -13,6 +13,7 @@ from .models import ChatbotConversation, ChatbotDefinition, ChatbotEndpoint, Cha
 class ChatbotResolveSerializer(serializers.Serializer):
     platform = serializers.ChoiceField(choices=ChatbotIntegration.PLATFORM_CHOICES)
     integration_id = serializers.IntegerField(required=False)
+    runner_key = serializers.CharField(required=False, allow_blank=True)
     external_bot_id = serializers.CharField(required=False, allow_blank=True)
     external_app_id = serializers.CharField(required=False, allow_blank=True)
     external_id = serializers.CharField(required=False, allow_blank=True)
@@ -73,6 +74,9 @@ class ChatbotResolveView(APIView):
         integration_id = data.get('integration_id')
         if integration_id:
             integrations = integrations.filter(id=integration_id)
+        runner_key = (data.get('runner_key') or '').strip()
+        if runner_key:
+            integrations = integrations.filter(runner_key=runner_key)
         external_bot_id = (data.get('external_bot_id') or '').strip()
         if external_bot_id:
             integrations = integrations.filter(external_bot_id=external_bot_id)
@@ -120,6 +124,13 @@ class ChatbotResolveView(APIView):
                 'name': integration.name,
                 'platform': integration.platform,
                 'status': integration.status,
+                'runner_key': integration.runner_key,
+                'external_app_id': integration.external_app_id,
+                'external_bot_id': integration.external_bot_id,
+                'webhook_url': integration.webhook_url,
+                'webhook_status': integration.webhook_status,
+                'credentials_json': integration.credentials_json,
+                'metadata_json': integration.metadata_json,
             },
             'endpoint': {
                 'id': endpoint.id if endpoint else None,

@@ -30,6 +30,7 @@
           <div>
             <div><strong>{{ integration.name }}</strong></div>
             <div class="meta">{{ integration.get_platform_display }} · Status: {{ integration.status }}{% if integration.external_bot_id %} · Bot ID: {{ integration.external_bot_id }}{% endif %}</div>
+            <div class="meta">Runner key: <code>{{ integration.runner_key }}</code></div>
           </div>
           <div class="meta">Updated {{ integration.updated_at }}</div>
         </div>

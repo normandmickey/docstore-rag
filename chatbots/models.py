@@ -1,3 +1,5 @@
+import secrets
+
 from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
@@ -37,6 +39,7 @@ class ChatbotIntegration(models.Model):
     external_bot_id = models.CharField(max_length=255, blank=True, default='')
     webhook_url = models.URLField(blank=True, default='')
     webhook_status = models.CharField(max_length=64, blank=True, default='')
+    runner_key = models.CharField(max_length=64, blank=True, default='', db_index=True)
     credentials_json = models.JSONField(default=dict, blank=True)
     metadata_json = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -44,6 +47,11 @@ class ChatbotIntegration(models.Model):
 
     class Meta:
         ordering = ['tenant__name', 'platform', 'name']
+
+    def save(self, *args, **kwargs):
+        if not self.runner_key:
+            self.runner_key = secrets.token_urlsafe(18)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f'{self.tenant.name} :: {self.name} ({self.platform})'
