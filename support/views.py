@@ -38,7 +38,7 @@ def support_index(request):
 
     conversations = SupportConversation.objects.select_related(
         'tenant', 'channel', 'contact', 'workspace_context', 'assigned_user'
-    ).filter(tenant=tenant)
+    ).filter(tenant=tenant).exclude(metadata_json__voice_menu_option__isnull=False)
     if status_filter != 'all':
         conversations = conversations.filter(status=status_filter)
 
