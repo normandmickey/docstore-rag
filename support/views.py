@@ -12,8 +12,8 @@ from control.views import _dashboard_base, _handle_workspace_actions
 
 from .forms import SupportChannelForm, SupportConversationUpdateForm, SupportReplyForm
 from .models import SupportChannel, SupportContact, SupportConversation, SupportMessage
-from .services import ingest_inbound_sms, update_message_delivery_status
-from .twilio import TwilioRestException, send_sms, twilio_enabled, validate_twilio_request
+from .services import attach_voicemail_to_call, ingest_inbound_call, ingest_inbound_sms, update_message_delivery_status
+from .twilio import TwilioRestException, build_voicemail_twiml, send_sms, twilio_enabled, validate_twilio_request
 
 logger = logging.getLogger(__name__)
 
@@ -284,4 +284,73 @@ def twilio_sms_status(request):
 
     update_message_delivery_status(provider_message_sid=message_sid, delivery_status=message_status)
     logger.info('Twilio status updated sid=%s status=%s', message_sid, message_status)
+    return HttpResponse('ok')
+
+
+@csrf_exempt
+@require_POST
+def twilio_voice_inbound(request):
+    to_number = request.POST.get('To', '')
+    from_number = request.POST.get('From', '')
+    call_sid = request.POST.get('CallSid', '')
+    caller_name = request.POST.get('CallerName', '')
+    logger.info('Twilio voice webhook hit to=%s from=%s call_sid=%s', to_number, from_number, call_sid)
+
+    if not validate_twilio_request(request):
+        logger.warning('Twilio voice signature validation failed to=%s from=%s call_sid=%s url=%s', to_number, from_number, call_sid, request.build_absolute_uri())
+        return HttpResponse(status=403)
+
+    if not to_number or not from_number or not call_sid:
+        logger.warning('Twilio voice missing To/From/CallSid call_sid=%s', call_sid)
+        return HttpResponseBadRequest('Missing To/From/CallSid')
+
+    try:
+        conversation, call = ingest_inbound_call(
+            to_number=to_number,
+            from_number=from_number,
+            call_sid=call_sid,
+            caller_name=caller_name,
+        )
+        logger.info('Twilio voice stored conversation_id=%s call_id=%s call_sid=%s', conversation.id, call.id, call_sid)
+    except SupportChannel.DoesNotExist:
+        logger.warning('Twilio voice no support channel found to=%s from=%s call_sid=%s', to_number, from_number, call_sid)
+        return HttpResponse(status=404)
+    except Exception:
+        logger.exception('Twilio voice ingest failed to=%s from=%s call_sid=%s', to_number, from_number, call_sid)
+        return HttpResponse(status=500)
+
+    action_url = request.build_absolute_uri().replace('/voice/inbound/', '/voice/recording/')
+    twiml = build_voicemail_twiml(
+        greeting='Thanks for calling Employee Support. Please leave your name, callback number, and question after the tone.',
+        action_url=action_url,
+    )
+    return HttpResponse(twiml, content_type='text/xml')
+
+
+@csrf_exempt
+@require_POST
+def twilio_voice_recording(request):
+    call_sid = request.POST.get('CallSid', '')
+    recording_url = request.POST.get('RecordingUrl', '')
+    recording_sid = request.POST.get('RecordingSid', '')
+    transcription_text = request.POST.get('TranscriptionText', '')
+    call_status = request.POST.get('CallStatus', '') or request.POST.get('RecordingStatus', '')
+    logger.info('Twilio voice recording callback call_sid=%s recording_sid=%s', call_sid, recording_sid)
+
+    if not validate_twilio_request(request):
+        logger.warning('Twilio voice recording signature validation failed call_sid=%s recording_sid=%s url=%s', call_sid, recording_sid, request.build_absolute_uri())
+        return HttpResponse(status=403)
+
+    call, message = attach_voicemail_to_call(
+        call_sid=call_sid,
+        recording_url=recording_url,
+        recording_sid=recording_sid,
+        transcription_text=transcription_text,
+        call_status=call_status,
+    )
+    if call is None:
+        logger.warning('Twilio voice recording had no matching call for call_sid=%s', call_sid)
+        return HttpResponse(status=404)
+
+    logger.info('Twilio voice recording stored call_id=%s message_id=%s call_sid=%s', call.id, getattr(message, 'id', None), call_sid)
     return HttpResponse('ok')

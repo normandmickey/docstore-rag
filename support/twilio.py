@@ -4,6 +4,7 @@ from urllib.parse import urljoin
 from twilio.base.exceptions import TwilioRestException
 from twilio.request_validator import RequestValidator
 from twilio.rest import Client
+from twilio.twiml.voice_response import VoiceResponse
 
 
 def twilio_enabled() -> bool:
@@ -47,8 +48,26 @@ def send_sms(*, from_number: str, to_number: str, body: str):
     return client.messages.create(**kwargs)
 
 
+def build_voicemail_twiml(*, greeting: str, action_url: str) -> str:
+    response = VoiceResponse()
+    response.say(greeting, voice='alice')
+    response.record(
+        max_length=120,
+        play_beep=True,
+        trim='trim-silence',
+        transcribe=True,
+        recording_status_callback=action_url,
+        recording_status_callback_method='POST',
+    )
+    response.say('We did not receive a recording. Please try again later.', voice='alice')
+    response.hangup()
+    return str(response)
+
+
 __all__ = [
     'TwilioRestException',
+    'VoiceResponse',
+    'build_voicemail_twiml',
     'send_sms',
     'status_callback_url',
     'twilio_enabled',

@@ -92,9 +92,13 @@ class SupportMessage(models.Model):
     ]
 
     KIND_SMS = 'sms'
+    KIND_CALL_NOTE = 'call_note'
+    KIND_VOICEMAIL = 'voicemail'
     KIND_SYSTEM = 'system'
     KIND_CHOICES = [
         (KIND_SMS, 'SMS'),
+        (KIND_CALL_NOTE, 'Call Note'),
+        (KIND_VOICEMAIL, 'Voicemail'),
         (KIND_SYSTEM, 'System'),
     ]
 
@@ -114,3 +118,27 @@ class SupportMessage(models.Model):
 
     def __str__(self):
         return f'{self.conversation_id} :: {self.direction} :: {self.kind}'
+
+
+class SupportCall(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='support_calls')
+    channel = models.ForeignKey(SupportChannel, on_delete=models.CASCADE, related_name='calls')
+    conversation = models.ForeignKey(SupportConversation, on_delete=models.CASCADE, related_name='calls')
+    contact = models.ForeignKey(SupportContact, on_delete=models.CASCADE, related_name='calls')
+    call_sid = models.CharField(max_length=64, unique=True, db_index=True)
+    from_number = models.CharField(max_length=32, blank=True, default='')
+    to_number = models.CharField(max_length=32, blank=True, default='')
+    caller_name = models.CharField(max_length=255, blank=True, default='')
+    recording_sid = models.CharField(max_length=64, blank=True, default='')
+    recording_url = models.TextField(blank=True, default='')
+    transcription_text = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=40, blank=True, default='')
+    metadata_json = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f'{self.call_sid} :: {self.from_number} -> {self.to_number}'
