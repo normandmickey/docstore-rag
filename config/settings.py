@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     'audit',
     'connectors',
     'support',
+    'integrations.voice',
 ]
 
 MIDDLEWARE = [
@@ -164,3 +165,5 @@ CELERY_TASK_DEFAULT_QUEUE = 'docstore'
 CELERY_TASK_ROUTES = {
     'ingestion.tasks.ingest_document_task': {'queue': 'docstore'},
 }
+
+VOICE_INTEGRATION_ENABLED = os.getenv('VOICE_INTEGRATION_ENABLED', 'false').lower() == 'true'
