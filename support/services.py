@@ -80,6 +80,22 @@ def ingest_inbound_call(*, to_number: str, from_number: str, call_sid: str = '',
     call_sid = (call_sid or '').strip()
     caller_name = (caller_name or '').strip()
 
+    existing_call = SupportCall.objects.select_related('conversation', 'channel', 'contact').filter(call_sid=call_sid).first() if call_sid else None
+    if existing_call is not None:
+        changed_fields = []
+        if caller_name and not existing_call.caller_name:
+            existing_call.caller_name = caller_name
+            changed_fields.append('caller_name')
+        if from_number and existing_call.from_number != from_number:
+            existing_call.from_number = from_number
+            changed_fields.append('from_number')
+        if to_number and existing_call.to_number != to_number:
+            existing_call.to_number = to_number
+            changed_fields.append('to_number')
+        if changed_fields:
+            existing_call.save(update_fields=changed_fields + ['updated_at'])
+        return existing_call.conversation, existing_call
+
     channel = SupportChannel.objects.select_related('tenant', 'default_workspace').filter(
         twilio_phone_number=to_number,
         active=True,
