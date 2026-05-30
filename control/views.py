@@ -23,7 +23,7 @@ from ingestion.tasks import ingest_document_task
 from retrieval.service import answer_question, build_context_blocks, retrieve_chunks
 from providers import answer_with_general_context
 
-from .forms import SignUpForm
+from .forms import SignUpForm, TenantSettingsForm
 from .models import APIKey, ExternalAccount, InviteToken, ProxiWebMessage, ProxiWebThread, Tenant, TenantMembership, Workspace
 from .api_auth import hash_api_key
 from .oauth import exchange_code_for_tokens, fetch_graph_me, microsoft_authorize_url
@@ -107,6 +107,8 @@ def _dashboard_base(request):
     documents = Document.objects.none()
     deleted_documents = Document.objects.none()
 
+    current_tenant = Tenant.objects.filter(id=current_tenant_id).first() if current_tenant_id else None
+
     if current_tenant_id and current_workspace_id:
         current_workspace = Workspace.objects.select_related('tenant').filter(
             id=current_workspace_id,
@@ -158,9 +160,15 @@ def _dashboard_base(request):
     url_document_rows = [row for row in all_document_rows if row['document'].source_type == Document.SOURCE_URL]
     file_document_rows = [row for row in all_document_rows if row['document'].source_type != Document.SOURCE_URL]
 
+    current_membership = memberships.filter(tenant_id=current_tenant_id).first() if current_tenant_id else None
+    can_manage_tenant = bool(current_membership and current_membership.role in {TenantMembership.ROLE_OWNER, TenantMembership.ROLE_ADMIN})
+
     return {
         'memberships': memberships,
         'current_tenant_id': current_tenant_id,
+        'current_tenant': current_tenant,
+        'current_membership': current_membership,
+        'can_manage_tenant': can_manage_tenant,
         'current_workspace_id': current_workspace_id,
         'current_workspace': current_workspace,
         'available_workspaces': Workspace.objects.filter(tenant_id=current_tenant_id).order_by('name') if current_tenant_id else Workspace.objects.none(),
@@ -892,6 +900,35 @@ def dashboard_connectors(request):
         return handled
     base['section'] = 'connectors'
     return render(request, 'dashboard/connectors.html', base)
+
+
+def dashboard_tenant_settings(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+    if not base.get('current_tenant'):
+        messages.error(request, 'No tenant selected.')
+        return redirect('dashboard')
+    if not base.get('can_manage_tenant'):
+        messages.error(request, 'Only tenant owners and admins can update tenant settings.')
+        return redirect('dashboard')
+
+    tenant = base['current_tenant']
+    if request.method == 'POST':
+        form = TenantSettingsForm(request.POST, instance=tenant)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Tenant settings updated.')
+            return redirect('dashboard_tenant_settings')
+    else:
+        form = TenantSettingsForm(instance=tenant)
+
+    base['tenant_settings_form'] = form
+    base['section'] = 'tenant'
+    return render(request, 'dashboard/tenant_settings.html', base)
 
 
 def dashboard_api_keys(request):

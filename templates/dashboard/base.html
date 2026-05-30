@@ -77,7 +77,8 @@
           {% endfor %}
         </div>
       {% endif %}
-      <p><strong>Current workspace:</strong> {% if current_workspace %}{{ current_workspace.name }} ({{ current_workspace.tenant.name }}){% else %}not set{% endif %}</p>
+      <p><strong>Current tenant:</strong> {% if current_tenant %}{{ current_tenant.name }}{% else %}not set{% endif %}{% if current_membership %} <span class="meta">· Role: {{ current_membership.role }}</span>{% endif %}</p>
+      <p><strong>Current workspace:</strong> {% if current_workspace %}{{ current_workspace.name }}{% else %}not set{% endif %}</p>
       <div id="install-banner" class="install-banner">
         <strong>Install Docstore</strong>
         <div class="meta" id="install-help">Add Docstore to your home screen for a more app-like mobile experience.</div>
@@ -90,6 +91,7 @@
         <a href="/dashboard/chat/" class="{% if section == 'chat' %}active{% endif %}">Chat</a>
         <a href="/dashboard/proxi-web/" class="{% if section == 'proxi_web' %}active{% endif %}">Proxi-Web</a>
         <a href="/dashboard/connectors/" class="{% if section == 'connectors' %}active{% endif %}">Connectors</a>
+        {% if can_manage_tenant %}<a href="/dashboard/tenant/" class="{% if section == 'tenant' %}active{% endif %}">Tenant</a>{% endif %}
         <a href="/dashboard/api-keys/" class="{% if section == 'api_keys' %}active{% endif %}">API Keys</a>
         {% if is_staff_user %}
           <a href="/dashboard/staff/" class="{% if section == 'staff' %}active{% endif %}">Staff</a>
@@ -102,8 +104,9 @@
     <div class="card" style="padding: 16px 20px;">
       <div class="workspace-strip">
         <div class="workspace-current">
-          <div class="meta">Workspace</div>
-          <div><strong>{% if current_workspace %}{{ current_workspace.name }}{% else %}Not set{% endif %}</strong>{% if current_workspace %} <span class="meta">· {{ current_workspace.tenant.name }}</span>{% endif %}</div>
+          <div class="meta">Tenant</div>
+          <div><strong>{% if current_tenant %}{{ current_tenant.name }}{% else %}Not set{% endif %}</strong>{% if current_membership %} <span class="meta">· {{ current_membership.role }}</span>{% endif %}</div>
+          <div class="meta" style="margin-top: 6px;">Workspace: <strong>{% if current_workspace %}{{ current_workspace.name }}{% else %}Not set{% endif %}</strong></div>
         </div>
         <form method="post" class="workspace-form" style="margin: 0;">
           {% csrf_token %}

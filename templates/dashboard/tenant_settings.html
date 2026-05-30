@@ -1,0 +1,25 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Tenant Settings · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Tenant settings</h2>
+  <p class="meta">Update the current tenant’s basic information. Only tenant owners and admins can edit this page.</p>
+  {% if current_tenant %}
+    <div class="row" style="padding-top: 0;">
+      <div class="meta">Current tenant</div>
+      <div><strong>{{ current_tenant.name }}</strong> · <span class="meta">{{ current_tenant.slug }}</span> · <span class="meta">{{ current_tenant.status }}</span></div>
+    </div>
+  {% endif %}
+  <form method="post">
+    {% csrf_token %}
+    {% for field in tenant_settings_form %}
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% if field.help_text %}<div class="meta">{{ field.help_text }}</div>{% endif %}
+      {% for error in field.errors %}<div class="msg" style="background:#4a1d1d;border-color:#7f1d1d;color:#fee2e2;">{{ error }}</div>{% endfor %}
+    {% endfor %}
+    {% for error in tenant_settings_form.non_field_errors %}<div class="msg" style="background:#4a1d1d;border-color:#7f1d1d;color:#fee2e2;">{{ error }}</div>{% endfor %}
+    <button type="submit">Save tenant settings</button>
+  </form>
+</div>
+{% endblock %}
