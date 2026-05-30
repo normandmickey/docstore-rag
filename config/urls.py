@@ -52,6 +52,7 @@ urlpatterns = [
     path('dashboard/urls/', dashboard_urls, name='dashboard_urls'),
     path('dashboard/chat/', dashboard_chat, name='dashboard_chat'),
     path('dashboard/proxi-web/', dashboard_proxi_web, name='dashboard_proxi_web'),
+    path('dashboard/chatbots/', include('chatbots.urls')),
     path('documents/<int:document_id>/', document_detail, name='document_detail'),
     path('documents/<int:document_id>/facts/', document_facts, name='document_facts'),
     path('documents/<int:document_id>/chunks/', document_chunks, name='document_chunks'),

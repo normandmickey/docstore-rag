@@ -1,0 +1,87 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Chatbots · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Chatbots</h2>
+  <p class="meta">Tenant-owned chatbot integrations live here. Workspace context should guide grounding, while runtime hosting stays in a separate bot-runner service.</p>
+  <div class="grid">
+    <div class="stat"><strong>Integrations</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ chatbot_integrations|length }}</div></div>
+    <div class="stat"><strong>Bot definitions</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ chatbot_definitions|length }}</div></div>
+    <div class="stat"><strong>Deployments</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ chatbot_deployments|length }}</div></div>
+    <div class="stat"><strong>Recent events</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ chatbot_recent_events|length }}</div></div>
+  </div>
+  <div style="margin-top: 16px;" class="meta">This is an initial scaffold. CRUD flows, runner APIs, and Telegram/Discord runtime support are still to come.</div>
+</div>
+
+<div class="card">
+  <h2>Integrations</h2>
+  {% if chatbot_integrations %}
+    {% for integration in chatbot_integrations %}
+      <div class="row">
+        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div>
+            <div><strong>{{ integration.name }}</strong></div>
+            <div class="meta">{{ integration.get_platform_display }} · Status: {{ integration.status }}{% if integration.external_bot_id %} · Bot ID: {{ integration.external_bot_id }}{% endif %}</div>
+          </div>
+          <div class="meta">Updated {{ integration.updated_at }}</div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No chatbot integrations yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Bot definitions</h2>
+  {% if chatbot_definitions %}
+    {% for definition in chatbot_definitions %}
+      <div class="row">
+        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div>
+            <div><strong>{{ definition.name }}</strong></div>
+            <div class="meta">Integration: {{ definition.integration.name }}{% if definition.default_workspace %} · Workspace: {{ definition.default_workspace.name }}{% endif %} · Runtime: {{ definition.get_runtime_mode_display }}</div>
+          </div>
+          <div class="meta">Template: {{ definition.template_name|default:'—' }} {{ definition.template_version|default:'' }}</div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No chatbot definitions yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Recent builds & deployments</h2>
+  {% if chatbot_recent_builds or chatbot_deployments %}
+    {% for build in chatbot_recent_builds %}
+      <div class="row">
+        <div><strong>Build</strong> · {{ build.bot_definition.name }} · v{{ build.version }}</div>
+        <div class="meta">{{ build.status }} · {{ build.get_artifact_type_display }} · {{ build.created_at }}</div>
+      </div>
+    {% endfor %}
+    {% for deployment in chatbot_deployments %}
+      <div class="row">
+        <div><strong>Deployment</strong> · {{ deployment.bot_definition.name }}</div>
+        <div class="meta">{{ deployment.status|default:'unknown' }} · {{ deployment.runner_type|default:'runner' }} · {{ deployment.runner_target|default:'—' }}</div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No chatbot builds or deployments yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Recent event logs</h2>
+  {% if chatbot_recent_events %}
+    {% for event in chatbot_recent_events %}
+      <div class="row">
+        <div><strong>{{ event.event_type }}</strong> <span class="meta">· {{ event.severity }} · {{ event.created_at }}</span></div>
+        {% if event.message %}<div style="margin-top:8px; white-space:pre-wrap;">{{ event.message }}</div>{% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No chatbot event logs yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

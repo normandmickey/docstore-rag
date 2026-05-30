@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'connectors',
     'support',
     'integrations.voice',
+    'chatbots',
 ]
 
 MIDDLEWARE = [

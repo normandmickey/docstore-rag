@@ -1,5 +1,19 @@
 # TODO
 
+## Chatbots / multi-platform bot runner
+- [ ] Add `chatbots` app as a tenant-scoped control plane for Telegram, Discord, and Zoom-style bots
+- [ ] Keep bot hosting outside Django core in a separate `docstore-bot-runner` service/plugin layer
+- [ ] Add core models: `ChatbotIntegration`, `ChatbotEndpoint`, `ChatbotDefinition`, `ChatbotEndpointBinding`, `ChatbotBuild`, `ChatbotDeployment`, `ChatbotConversation`, `ChatbotMessage`, `ChatbotEventLog`
+- [ ] Add admin visibility for chatbot integrations, endpoint mappings, builds, deployments, conversations, messages, and event logs
+- [ ] Add dashboard pages for chatbot integrations, definitions, endpoint mappings, deployments, conversations, and logs
+- [ ] Add runner-facing APIs for endpoint resolution, message/event ingest, build manifest fetch, and runner heartbeat
+- [ ] Start with generated manifest/config artifacts rather than arbitrary bespoke generated code per tenant
+- [ ] Add Telegram as the first live runtime target
+- [ ] Add Discord after Telegram routing/logging is stable
+- [ ] Split Zoom Team Chat and Zoom Meeting Assistant into distinct integration types if/when Zoom ships
+- [ ] Add deployment/build status visibility in dashboard so tenants/admins can see whether a bot is configured, built, and running
+- [ ] Add logging policy controls for message retention, raw payload retention, and operational event verbosity
+
 ## Dashboard / UX
 - [ ] Make Documents page show file-uploaded documents only by default
 - [ ] Add selective purge from Trash instead of only “purge all shown”
