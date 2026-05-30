@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import support_channel_edit, support_channel_new, support_channels, support_conversation_detail, support_index, twilio_sms_inbound, twilio_sms_status, twilio_voice_inbound, twilio_voice_menu, twilio_voice_recording
+from .views import support_channel_edit, support_channel_new, support_channels, support_conversation_detail, support_index, support_voice_call_detail, support_voice_calls, twilio_sms_inbound, twilio_sms_status, twilio_voice_inbound, twilio_voice_menu, twilio_voice_recording
 
 urlpatterns = [
     path('', support_index, name='support_index'),
@@ -8,6 +8,8 @@ urlpatterns = [
     path('channels/new/', support_channel_new, name='support_channel_new'),
     path('channels/<int:channel_id>/edit/', support_channel_edit, name='support_channel_edit'),
     path('conversations/<int:conversation_id>/', support_conversation_detail, name='support_conversation_detail'),
+    path('calls/', support_voice_calls, name='support_voice_calls'),
+    path('calls/<int:call_id>/', support_voice_call_detail, name='support_voice_call_detail'),
     path('sms/inbound/', twilio_sms_inbound, name='twilio_sms_inbound'),
     path('sms/status/', twilio_sms_status, name='twilio_sms_status'),
     path('voice/inbound/', twilio_voice_inbound, name='twilio_voice_inbound'),

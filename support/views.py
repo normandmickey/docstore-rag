@@ -9,6 +9,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from control.views import _dashboard_base, _handle_workspace_actions
+from integrations.voice.models import VoiceCallRecord
 
 from .forms import SupportChannelForm, SupportConversationUpdateForm, SupportReplyForm
 from .models import SupportChannel, SupportContact, SupportConversation, SupportMessage
@@ -47,6 +48,8 @@ def support_index(request):
         'support_conversations': conversations.order_by('-last_message_at', '-updated_at', '-id')[:100],
         'support_channels_count': SupportChannel.objects.filter(tenant=tenant, active=True).count(),
         'support_contacts_count': SupportContact.objects.filter(tenant=tenant).count(),
+        'support_voice_calls_count': VoiceCallRecord.objects.filter(tenant=tenant).count(),
+        'recent_voice_calls': VoiceCallRecord.objects.select_related('workspace', 'support_channel').filter(tenant=tenant).order_by('-created_at')[:5],
     })
     return render(request, 'dashboard/support_index.html', base)
 
@@ -233,6 +236,53 @@ def support_conversation_detail(request, conversation_id):
         'support_update_form': update_form,
     })
     return render(request, 'dashboard/support_conversation.html', base)
+
+
+@login_required
+def support_voice_calls(request):
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+
+    tenant = base.get('current_tenant')
+    if tenant is None:
+        messages.error(request, 'No tenant selected.')
+        return redirect('dashboard')
+
+    calls = VoiceCallRecord.objects.select_related('workspace', 'support_channel').filter(tenant=tenant).order_by('-created_at')[:100]
+    base.update({
+        'section': 'support',
+        'support_subsection': 'calls',
+        'support_voice_calls': calls,
+    })
+    return render(request, 'dashboard/support_calls.html', base)
+
+
+@login_required
+def support_voice_call_detail(request, call_id):
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+
+    tenant = base.get('current_tenant')
+    if tenant is None:
+        messages.error(request, 'No tenant selected.')
+        return redirect('dashboard')
+
+    voice_call = get_object_or_404(
+        VoiceCallRecord.objects.select_related('workspace', 'support_channel'),
+        id=call_id,
+        tenant=tenant,
+    )
+    base.update({
+        'section': 'support',
+        'support_subsection': 'calls',
+        'support_voice_call': voice_call,
+        'support_voice_transcript': voice_call.transcript_json or [],
+    })
+    return render(request, 'dashboard/support_call_detail.html', base)
 
 
 @csrf_exempt

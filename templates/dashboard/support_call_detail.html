@@ -1,0 +1,35 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Voice Call · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Voice call</h2>
+  <p class="meta">{{ support_voice_call.from_number|default:'Unknown caller' }} → {{ support_voice_call.to_number|default:'Unknown number' }}</p>
+  <p class="meta">Call SID: {{ support_voice_call.call_sid }}</p>
+  <p class="meta">{% if support_voice_call.support_channel %}Channel: {{ support_voice_call.support_channel.name }}{% endif %}{% if support_voice_call.workspace %} · Workspace: {{ support_voice_call.workspace.name }}{% endif %}</p>
+  <p class="meta">{% if support_voice_call.started_at %}Started: {{ support_voice_call.started_at }}{% endif %}{% if support_voice_call.ended_at %} · Ended: {{ support_voice_call.ended_at }}{% endif %}</p>
+  <p class="meta">Close reason: {{ support_voice_call.close_reason|default:'—' }} · Turns: {{ support_voice_call.turn_count }}</p>
+  <div style="margin-top: 16px; display:flex; gap:10px; flex-wrap:wrap;">
+    <a href="/dashboard/support/calls/">Back to calls</a>
+    <a href="/dashboard/support/">Support inbox</a>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Transcript</h2>
+  {% if support_voice_transcript %}
+    {% for turn in support_voice_transcript %}
+      <div class="row">
+        <div><strong>{{ turn.role|default:'unknown'|title }}</strong></div>
+        <div style="margin-top:8px; white-space:pre-wrap;">{{ turn.text|default:'' }}</div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No transcript turns stored for this call.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Metadata</h2>
+  <pre>{{ support_voice_call.metadata_json }}</pre>
+</div>
+{% endblock %}

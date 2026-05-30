@@ -8,14 +8,40 @@
     <div class="stat"><strong>Open conversations</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ support_conversations|length }}</div></div>
     <div class="stat"><strong>Active channels</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ support_channels_count }}</div></div>
     <div class="stat"><strong>Known contacts</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ support_contacts_count }}</div></div>
+    <div class="stat"><strong>Voice calls</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ support_voice_calls_count }}</div></div>
   </div>
   <div style="margin-top: 16px; display:flex; gap:10px; flex-wrap:wrap;">
     <a href="/dashboard/support/?status=open">Open</a>
     <a href="/dashboard/support/?status=pending">Pending</a>
     <a href="/dashboard/support/?status=closed">Closed</a>
     <a href="/dashboard/support/?status=all">All</a>
+    <a href="/dashboard/support/calls/">Voice calls</a>
     {% if can_manage_tenant %}<a href="/dashboard/support/channels/">Manage channels</a>{% endif %}
   </div>
+</div>
+
+<div class="card">
+  <h2>Recent voice calls</h2>
+  {% if recent_voice_calls %}
+    {% for call in recent_voice_calls %}
+      <div class="row">
+        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div>
+            <div><a href="/dashboard/support/calls/{{ call.id }}/"><strong>{{ call.from_number|default:'Unknown caller' }}</strong></a></div>
+            <div class="meta">To {{ call.to_number|default:'Unknown number' }}{% if call.support_channel %} · {{ call.support_channel.name }}{% endif %}{% if call.workspace %} · Workspace: {{ call.workspace.name }}{% endif %}</div>
+            <div class="meta">{{ call.call_sid }}</div>
+          </div>
+          <div style="text-align:right;">
+            {% if call.close_reason %}<div><span class="status status-running">{{ call.close_reason }}</span></div>{% endif %}
+            <div class="meta">{% if call.started_at %}{{ call.started_at }}{% else %}{{ call.created_at }}{% endif %}</div>
+            <div class="meta">{{ call.turn_count }} turn{{ call.turn_count|pluralize }}</div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No stored voice calls yet for this tenant.</p>
+  {% endif %}
 </div>
 
 <div class="card">
