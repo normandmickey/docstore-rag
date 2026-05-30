@@ -10,7 +10,15 @@
     <div class="stat"><strong>Deployments</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ chatbot_deployments|length }}</div></div>
     <div class="stat"><strong>Recent events</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ chatbot_recent_events|length }}</div></div>
   </div>
-  <div style="margin-top: 16px;" class="meta">This is an initial scaffold. CRUD flows, runner APIs, and Telegram/Discord runtime support are still to come.</div>
+  <div style="margin-top: 16px; display:flex; gap:10px; flex-wrap:wrap;">
+    {% if can_manage_tenant %}
+      <a href="/dashboard/chatbots/integrations/new/">New integration</a>
+      <a href="/dashboard/chatbots/definitions/new/">New bot definition</a>
+      <a href="/dashboard/chatbots/endpoints/new/">New endpoint</a>
+      <a href="/dashboard/chatbots/bindings/new/">New binding</a>
+    {% endif %}
+  </div>
+  <div style="margin-top: 16px;" class="meta">Runner-facing resolve + ingest APIs are now scaffolded for Telegram/Discord-style routing. Runtime hosting is still the next layer.</div>
 </div>
 
 <div class="card">
@@ -39,7 +47,7 @@
       <div class="row">
         <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
           <div>
-            <div><strong>{{ definition.name }}</strong></div>
+            <div><a href="/dashboard/chatbots/definitions/{{ definition.id }}/"><strong>{{ definition.name }}</strong></a></div>
             <div class="meta">Integration: {{ definition.integration.name }}{% if definition.default_workspace %} · Workspace: {{ definition.default_workspace.name }}{% endif %} · Runtime: {{ definition.get_runtime_mode_display }}</div>
           </div>
           <div class="meta">Template: {{ definition.template_name|default:'—' }} {{ definition.template_version|default:'' }}</div>
@@ -48,6 +56,25 @@
     {% endfor %}
   {% else %}
     <p class="meta">No chatbot definitions yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Endpoint bindings</h2>
+  {% if chatbot_endpoint_bindings %}
+    {% for binding in chatbot_endpoint_bindings %}
+      <div class="row">
+        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div>
+            <div><strong>{{ binding.bot_definition.name }}</strong> → {{ binding.endpoint.display_name }}</div>
+            <div class="meta">{{ binding.endpoint.get_endpoint_type_display }} · {{ binding.endpoint.get_mode_display }}{% if binding.workspace_override %} · Workspace override: {{ binding.workspace_override.name }}{% endif %}</div>
+          </div>
+          <div class="meta">{{ binding.updated_at }}</div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No endpoint bindings yet.</p>
   {% endif %}
 </div>
 

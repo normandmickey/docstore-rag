@@ -1,0 +1,59 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ chatbot_definition.name }} · Chatbot · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>{{ chatbot_definition.name }}</h2>
+  <p class="meta">Integration: {{ chatbot_definition.integration.name }} · Runtime: {{ chatbot_definition.get_runtime_mode_display }}{% if chatbot_definition.default_workspace %} · Workspace: {{ chatbot_definition.default_workspace.name }}{% endif %}</p>
+  <p class="meta">Template: {{ chatbot_definition.template_name|default:'—' }} {{ chatbot_definition.template_version|default:'' }}</p>
+  {% if chatbot_definition.system_prompt %}
+    <h3>System prompt</h3>
+    <pre>{{ chatbot_definition.system_prompt }}</pre>
+  {% endif %}
+  {% if chatbot_definition.persona_prompt %}
+    <h3>Persona prompt</h3>
+    <pre>{{ chatbot_definition.persona_prompt }}</pre>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Endpoint bindings</h2>
+  {% if chatbot_bindings %}
+    {% for binding in chatbot_bindings %}
+      <div class="row">
+        <div><strong>{{ binding.endpoint.display_name }}</strong></div>
+        <div class="meta">{{ binding.endpoint.get_endpoint_type_display }} · Mode: {{ binding.endpoint.get_mode_display }}{% if binding.workspace_override %} · Workspace override: {{ binding.workspace_override.name }}{% endif %}</div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No endpoint bindings yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Recent builds</h2>
+  {% if chatbot_builds %}
+    {% for build in chatbot_builds %}
+      <div class="row">
+        <div><strong>v{{ build.version }}</strong></div>
+        <div class="meta">{{ build.status }} · {{ build.get_artifact_type_display }} · {{ build.created_at }}</div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No builds yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Deployments</h2>
+  {% if chatbot_deployments %}
+    {% for deployment in chatbot_deployments %}
+      <div class="row">
+        <div><strong>{{ deployment.runner_type|default:'runner' }}</strong></div>
+        <div class="meta">{{ deployment.status|default:'unknown' }} · {{ deployment.runner_target|default:'—' }}</div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No deployments yet.</p>
+  {% endif %}
+</div>
+{% endblock %}
