@@ -6,6 +6,7 @@ from django.urls import include, path
 from documents.api import DocumentCreateView, DocumentDeleteView, DocumentPurgeView, DocumentRestoreView, URLIngestView
 from control.views import AppLoginView, dashboard, dashboard_api_keys, dashboard_chat, dashboard_connectors, dashboard_documents, dashboard_proxi_web, dashboard_tenant_settings, dashboard_urls, document_chunks, document_detail, document_download, document_facts, document_search, logout_view, microsoft_connect_callback, microsoft_connect_start, signup, staff_dashboard
 from retrieval.api import ChatView, SearchView
+from support.api import SupportChannelLookupView
 
 
 def home(request):
@@ -71,6 +72,7 @@ urlpatterns = [
     path('api/v1/urls/ingest/', URLIngestView.as_view()),
     path('api/v1/search/', SearchView.as_view()),
     path('api/v1/chat/', ChatView.as_view()),
+    path('api/v1/support/channel-lookup/', SupportChannelLookupView.as_view()),
     path('admin/', admin.site.urls),
     path('healthz/', health),
 ]
