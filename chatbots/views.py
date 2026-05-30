@@ -52,7 +52,11 @@ def chatbot_integration_new(request):
             integration = form.save(commit=False)
             integration.tenant = tenant
             integration.save()
-            messages.success(request, 'Chatbot integration created.')
+            if not integration.webhook_url and integration.runner_key:
+                integration.webhook_url = f'https://bots.docstore.oddsmith.net/webhooks/telegram/{integration.runner_key}' if integration.platform == ChatbotIntegration.PLATFORM_TELEGRAM else ''
+                integration.webhook_status = integration.webhook_status or 'pending'
+                integration.save(update_fields=['webhook_url', 'webhook_status', 'updated_at'])
+            messages.success(request, f'Chatbot integration created. Runner key: {integration.runner_key}')
             return redirect('chatbot_index')
     else:
         form = ChatbotIntegrationForm()

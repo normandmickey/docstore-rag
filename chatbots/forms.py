@@ -17,12 +17,11 @@ class ChatbotIntegrationForm(forms.ModelForm):
             'external_bot_id',
             'webhook_url',
             'webhook_status',
-            'runner_key',
             'credentials_json',
             'metadata_json',
         ]
         widgets = {
-            'runner_key': forms.TextInput(attrs={'readonly': 'readonly'}),
+            'webhook_url': forms.URLInput(attrs={'style': 'width: 100%;'}),
             'credentials_json': forms.Textarea(attrs={'rows': 6}),
             'metadata_json': forms.Textarea(attrs={'rows': 4}),
         }
