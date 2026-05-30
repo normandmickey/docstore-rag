@@ -73,6 +73,7 @@ urlpatterns = [
     path('api/v1/search/', SearchView.as_view()),
     path('api/v1/chat/', ChatView.as_view()),
     path('api/v1/support/channel-lookup/', SupportChannelLookupView.as_view()),
+    path('api/v1/integrations/voice/', include('integrations.voice.urls')),
     path('admin/', admin.site.urls),
     path('healthz/', health),
 ]
