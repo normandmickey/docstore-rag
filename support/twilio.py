@@ -64,9 +64,22 @@ def build_voicemail_twiml(*, greeting: str, action_url: str) -> str:
     return str(response)
 
 
+def build_ivr_menu_twiml(*, action_url: str) -> str:
+    response = VoiceResponse()
+    gather = response.gather(num_digits=1, action=action_url, method='POST', timeout=6)
+    gather.say('Welcome to Employee Support.', voice='alice')
+    gather.say('Press 1 to leave a general employee support request.', voice='alice')
+    gather.say('Press 2 for benefits and policy help.', voice='alice')
+    gather.say('Press 3 to repeat this menu.', voice='alice')
+    response.say('No selection received. Goodbye.', voice='alice')
+    response.hangup()
+    return str(response)
+
+
 __all__ = [
     'TwilioRestException',
     'VoiceResponse',
+    'build_ivr_menu_twiml',
     'build_voicemail_twiml',
     'send_sms',
     'status_callback_url',

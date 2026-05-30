@@ -13,7 +13,7 @@ from control.views import _dashboard_base, _handle_workspace_actions
 from .forms import SupportChannelForm, SupportConversationUpdateForm, SupportReplyForm
 from .models import SupportChannel, SupportContact, SupportConversation, SupportMessage
 from .services import attach_voicemail_to_call, ingest_inbound_call, ingest_inbound_sms, update_message_delivery_status
-from .twilio import TwilioRestException, build_voicemail_twiml, send_sms, twilio_enabled, validate_twilio_request
+from .twilio import TwilioRestException, build_ivr_menu_twiml, build_voicemail_twiml, send_sms, twilio_enabled, validate_twilio_request
 
 logger = logging.getLogger(__name__)
 
@@ -293,7 +293,6 @@ def twilio_voice_inbound(request):
     to_number = request.POST.get('To', '')
     from_number = request.POST.get('From', '')
     call_sid = request.POST.get('CallSid', '')
-    caller_name = request.POST.get('CallerName', '')
     logger.info('Twilio voice webhook hit to=%s from=%s call_sid=%s', to_number, from_number, call_sid)
 
     if not validate_twilio_request(request):
@@ -304,6 +303,30 @@ def twilio_voice_inbound(request):
         logger.warning('Twilio voice missing To/From/CallSid call_sid=%s', call_sid)
         return HttpResponseBadRequest('Missing To/From/CallSid')
 
+    gather_url = request.build_absolute_uri().replace('/voice/inbound/', '/voice/menu/')
+    twiml = build_ivr_menu_twiml(action_url=gather_url)
+    return HttpResponse(twiml, content_type='text/xml')
+
+
+@csrf_exempt
+@require_POST
+def twilio_voice_menu(request):
+    to_number = request.POST.get('To', '')
+    from_number = request.POST.get('From', '')
+    call_sid = request.POST.get('CallSid', '')
+    caller_name = request.POST.get('CallerName', '')
+    digits = (request.POST.get('Digits', '') or '').strip()
+    logger.info('Twilio voice menu selection to=%s from=%s call_sid=%s digits=%s', to_number, from_number, call_sid, digits)
+
+    if not validate_twilio_request(request):
+        logger.warning('Twilio voice menu signature validation failed to=%s from=%s call_sid=%s url=%s', to_number, from_number, call_sid, request.build_absolute_uri())
+        return HttpResponse(status=403)
+
+    if digits == '3' or not digits:
+        gather_url = request.build_absolute_uri()
+        twiml = build_ivr_menu_twiml(action_url=gather_url)
+        return HttpResponse(twiml, content_type='text/xml')
+
     try:
         conversation, call = ingest_inbound_call(
             to_number=to_number,
@@ -311,19 +334,27 @@ def twilio_voice_inbound(request):
             call_sid=call_sid,
             caller_name=caller_name,
         )
-        logger.info('Twilio voice stored conversation_id=%s call_id=%s call_sid=%s', conversation.id, call.id, call_sid)
+        if digits == '2':
+            conversation.subject = 'Benefits and policy phone support request'
+            conversation.metadata_json = {**(conversation.metadata_json or {}), 'voice_menu_option': 'benefits_policy'}
+            conversation.save(update_fields=['subject', 'metadata_json', 'updated_at'])
+        else:
+            conversation.subject = 'General employee phone support request'
+            conversation.metadata_json = {**(conversation.metadata_json or {}), 'voice_menu_option': 'general_support'}
+            conversation.save(update_fields=['subject', 'metadata_json', 'updated_at'])
+        logger.info('Twilio voice menu stored conversation_id=%s call_id=%s call_sid=%s digits=%s', conversation.id, call.id, call_sid, digits)
     except SupportChannel.DoesNotExist:
-        logger.warning('Twilio voice no support channel found to=%s from=%s call_sid=%s', to_number, from_number, call_sid)
+        logger.warning('Twilio voice menu no support channel found to=%s from=%s call_sid=%s', to_number, from_number, call_sid)
         return HttpResponse(status=404)
     except Exception:
-        logger.exception('Twilio voice ingest failed to=%s from=%s call_sid=%s', to_number, from_number, call_sid)
+        logger.exception('Twilio voice menu ingest failed to=%s from=%s call_sid=%s digits=%s', to_number, from_number, call_sid, digits)
         return HttpResponse(status=500)
 
-    action_url = request.build_absolute_uri().replace('/voice/inbound/', '/voice/recording/')
-    twiml = build_voicemail_twiml(
-        greeting='Thanks for calling Employee Support. Please leave your name, callback number, and question after the tone.',
-        action_url=action_url,
-    )
+    recording_url = request.build_absolute_uri().replace('/voice/menu/', '/voice/recording/')
+    greeting = 'Please leave your name, callback number, and employee support question after the tone.'
+    if digits == '2':
+        greeting = 'Please leave your name, callback number, and your benefits or policy question after the tone.'
+    twiml = build_voicemail_twiml(greeting=greeting, action_url=recording_url)
     return HttpResponse(twiml, content_type='text/xml')
 
 
