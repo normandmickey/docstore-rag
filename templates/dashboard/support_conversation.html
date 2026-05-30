@@ -24,7 +24,7 @@
 
 <div class="card">
   <h2>Reply</h2>
-  <p class="meta">For now replies are saved as outbound drafts in docstore. Twilio send wiring is the next step.</p>
+  <p class="meta">If Twilio is configured, replies send as real SMS from this channel number. Otherwise they are saved as local drafts.</p>
   <form method="post">
     {% csrf_token %}
     <input type="hidden" name="action" value="reply">

@@ -1,12 +1,17 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
 
 from control.views import _dashboard_base, _handle_workspace_actions
 
 from .forms import SupportChannelForm, SupportConversationUpdateForm, SupportReplyForm
 from .models import SupportChannel, SupportContact, SupportConversation, SupportMessage
+from .services import ingest_inbound_sms, update_message_delivery_status
+from .twilio import TwilioRestException, send_sms, twilio_enabled, validate_twilio_request
 
 
 @login_required
@@ -159,20 +164,51 @@ def support_conversation_detail(request, conversation_id):
         if reply_form.is_valid():
             body = (reply_form.cleaned_data.get('body') or '').strip()
             if body:
-                SupportMessage.objects.create(
-                    conversation=conversation,
-                    direction=SupportMessage.DIR_OUTBOUND,
-                    kind=SupportMessage.KIND_SYSTEM,
-                    body=body,
-                    sent_by_user=request.user,
-                    delivery_status='draft',
-                )
-                conversation.last_message_at = timezone.now()
-                if conversation.status == SupportConversation.STATUS_CLOSED:
-                    conversation.status = SupportConversation.STATUS_OPEN
-                conversation.save(update_fields=['last_message_at', 'status', 'updated_at'])
-                messages.success(request, 'Reply draft saved locally. Twilio send wiring is the next step.')
-                return redirect('support_conversation_detail', conversation_id=conversation.id)
+                if not twilio_enabled():
+                    SupportMessage.objects.create(
+                        conversation=conversation,
+                        direction=SupportMessage.DIR_OUTBOUND,
+                        kind=SupportMessage.KIND_SYSTEM,
+                        body=body,
+                        sent_by_user=request.user,
+                        delivery_status='draft',
+                    )
+                    conversation.last_message_at = timezone.now()
+                    if conversation.status == SupportConversation.STATUS_CLOSED:
+                        conversation.status = SupportConversation.STATUS_OPEN
+                    conversation.save(update_fields=['last_message_at', 'status', 'updated_at'])
+                    messages.warning(request, 'Twilio is not configured yet, so this reply was saved as a local draft only.')
+                    return redirect('support_conversation_detail', conversation_id=conversation.id)
+
+                try:
+                    provider_message = send_sms(
+                        from_number=conversation.channel.twilio_phone_number,
+                        to_number=conversation.contact.phone_number,
+                        body=body,
+                    )
+                    SupportMessage.objects.create(
+                        conversation=conversation,
+                        direction=SupportMessage.DIR_OUTBOUND,
+                        kind=SupportMessage.KIND_SMS,
+                        body=body,
+                        sent_by_user=request.user,
+                        provider_message_sid=getattr(provider_message, 'sid', '') or '',
+                        delivery_status=getattr(provider_message, 'status', '') or 'queued',
+                        metadata_json={
+                            'twilio_from': conversation.channel.twilio_phone_number,
+                            'twilio_to': conversation.contact.phone_number,
+                        },
+                    )
+                    conversation.last_message_at = timezone.now()
+                    if conversation.status == SupportConversation.STATUS_CLOSED:
+                        conversation.status = SupportConversation.STATUS_OPEN
+                    conversation.save(update_fields=['last_message_at', 'status', 'updated_at'])
+                    messages.success(request, 'Reply sent via Twilio.')
+                    return redirect('support_conversation_detail', conversation_id=conversation.id)
+                except TwilioRestException as exc:
+                    messages.error(request, f'Twilio send failed: {exc}')
+                except Exception as exc:
+                    messages.error(request, f'Unexpected send error: {exc}')
     elif request.method == 'POST' and request.POST.get('action') == 'update_conversation':
         update_form = SupportConversationUpdateForm(request.POST, instance=conversation, tenant=tenant)
         reply_form = SupportReplyForm()
@@ -193,3 +229,46 @@ def support_conversation_detail(request, conversation_id):
         'support_update_form': update_form,
     })
     return render(request, 'dashboard/support_conversation.html', base)
+
+
+@csrf_exempt
+@require_POST
+def twilio_sms_inbound(request):
+    if not validate_twilio_request(request):
+        return HttpResponse(status=403)
+
+    to_number = request.POST.get('To', '')
+    from_number = request.POST.get('From', '')
+    body = request.POST.get('Body', '')
+    message_sid = request.POST.get('MessageSid', '')
+    profile_name = request.POST.get('ProfileName', '')
+
+    if not to_number or not from_number:
+        return HttpResponseBadRequest('Missing To/From')
+
+    try:
+        ingest_inbound_sms(
+            to_number=to_number,
+            from_number=from_number,
+            body=body,
+            provider_message_sid=message_sid,
+            profile_name=profile_name,
+        )
+    except SupportChannel.DoesNotExist:
+        return HttpResponse(status=404)
+    except Exception:
+        return HttpResponse(status=500)
+
+    return HttpResponse('<?xml version="1.0" encoding="UTF-8"?><Response></Response>', content_type='text/xml')
+
+
+@csrf_exempt
+@require_POST
+def twilio_sms_status(request):
+    if not validate_twilio_request(request):
+        return HttpResponse(status=403)
+
+    message_sid = request.POST.get('MessageSid', '')
+    message_status = request.POST.get('MessageStatus', '')
+    update_message_delivery_status(provider_message_sid=message_sid, delivery_status=message_status)
+    return HttpResponse('ok')
