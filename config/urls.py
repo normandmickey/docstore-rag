@@ -16,6 +16,14 @@ def health(_request):
     return JsonResponse({'ok': True, 'service': 'docstore-rag'})
 
 
+def privacy(request):
+    return render(request, 'privacy.html')
+
+
+def terms(request):
+    return render(request, 'terms.html')
+
+
 def offline(request):
     return render(request, 'offline.html')
 
@@ -30,6 +38,8 @@ def manifest(_request):
 
 urlpatterns = [
     path('', home),
+    path('privacy/', privacy, name='privacy'),
+    path('terms/', terms, name='terms'),
     path('offline/', offline, name='offline'),
     path('sw.js', service_worker, name='service_worker'),
     path('manifest.webmanifest', manifest, name='manifest'),
