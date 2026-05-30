@@ -27,10 +27,6 @@ def ingest_voice_call(request):
     if request.method != 'POST':
         return JsonResponse({'ok': False, 'error': 'method_not_allowed'}, status=405)
 
-    api_key = get_api_key_from_header(request)
-    if not api_key:
-        return JsonResponse({'ok': False, 'error': 'unauthorized'}, status=401)
-
     try:
         payload = json.loads(request.body.decode('utf-8'))
     except Exception:
