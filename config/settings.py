@@ -29,6 +29,7 @@ INSTALLED_APPS = [
     'retrieval',
     'audit',
     'connectors',
+    'support',
 ]
 
 MIDDLEWARE = [

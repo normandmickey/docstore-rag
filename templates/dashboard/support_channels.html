@@ -1,0 +1,36 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Support Channels · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
+    <div>
+      <h2 style="margin-bottom:6px;">Support channels</h2>
+      <p class="meta">Tenant-owned Twilio numbers and their default workspace context.</p>
+    </div>
+    <a href="/dashboard/support/channels/new/">New channel</a>
+  </div>
+</div>
+
+<div class="card">
+  {% if support_channels %}
+    {% for channel in support_channels %}
+      <div class="row">
+        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div>
+            <div><strong>{{ channel.name }}</strong></div>
+            <div class="meta">{{ channel.twilio_phone_number }} · {{ channel.get_channel_type_display }}</div>
+            <div class="meta">Workspace: {% if channel.default_workspace %}{{ channel.default_workspace.name }}{% else %}None{% endif %}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="meta">{% if channel.active %}Active{% else %}Inactive{% endif %}</div>
+            <div class="meta">AI: {% if channel.ai_enabled %}On{% else %}Off{% endif %} · Auto-reply: {% if channel.auto_reply_enabled %}On{% else %}Off{% endif %}</div>
+            <div style="margin-top:8px;"><a href="/dashboard/support/channels/{{ channel.id }}/edit/">Edit</a></div>
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No support channels configured yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

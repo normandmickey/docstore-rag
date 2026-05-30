@@ -1,0 +1,53 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Support Conversation · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Conversation</h2>
+  <p class="meta">{{ support_conversation.contact.name|default:support_conversation.contact.phone_number }} · {{ support_conversation.contact.phone_number }}</p>
+  <p class="meta">Channel: {{ support_conversation.channel.name }}{% if support_conversation.workspace_context %} · Workspace context: {{ support_conversation.workspace_context.name }}{% endif %}</p>
+</div>
+
+<div class="card">
+  <h2>Messages</h2>
+  {% if support_messages %}
+    {% for message in support_messages %}
+      <div class="row">
+        <div><strong>{% if message.direction == 'inbound' %}Inbound{% else %}Outbound{% endif %}</strong> <span class="meta">· {{ message.created_at }}</span></div>
+        <div style="margin-top:8px; white-space:pre-wrap;">{{ message.body }}</div>
+        {% if message.sent_by_user %}<div class="meta" style="margin-top:8px;">By {{ message.sent_by_user.username }}</div>{% endif %}
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No messages yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Reply</h2>
+  <p class="meta">For now replies are saved as outbound drafts in docstore. Twilio send wiring is the next step.</p>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="reply">
+    {% for field in support_reply_form %}
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% for error in field.errors %}<div class="msg" style="background:#4a1d1d;border-color:#7f1d1d;color:#fee2e2;">{{ error }}</div>{% endfor %}
+    {% endfor %}
+    <button type="submit">Save reply draft</button>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Conversation settings</h2>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="update_conversation">
+    {% for field in support_update_form %}
+      <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+      {{ field }}
+      {% for error in field.errors %}<div class="msg" style="background:#4a1d1d;border-color:#7f1d1d;color:#fee2e2;">{{ error }}</div>{% endfor %}
+    {% endfor %}
+    <button type="submit">Update conversation</button>
+  </form>
+</div>
+{% endblock %}

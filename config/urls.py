@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.template.loader import render_to_string
-from django.urls import path
+from django.urls import include, path
 from documents.api import DocumentCreateView, DocumentDeleteView, DocumentPurgeView, DocumentRestoreView, URLIngestView
 from control.views import AppLoginView, dashboard, dashboard_api_keys, dashboard_chat, dashboard_connectors, dashboard_documents, dashboard_proxi_web, dashboard_tenant_settings, dashboard_urls, document_chunks, document_detail, document_download, document_facts, document_search, logout_view, microsoft_connect_callback, microsoft_connect_start, signup, staff_dashboard
 from retrieval.api import ChatView, SearchView
@@ -49,6 +49,7 @@ urlpatterns = [
     path('dashboard/connectors/', dashboard_connectors, name='dashboard_connectors'),
     path('dashboard/tenant/', dashboard_tenant_settings, name='dashboard_tenant_settings'),
     path('dashboard/api-keys/', dashboard_api_keys, name='dashboard_api_keys'),
+    path('dashboard/support/', include('support.urls')),
     path('dashboard/staff/', staff_dashboard, name='staff_dashboard'),
     path('connect/microsoft/', microsoft_connect_start, name='microsoft_connect_start'),
     path('connect/microsoft/callback/', microsoft_connect_callback, name='microsoft_connect_callback'),

@@ -1,0 +1,44 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Support · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Support inbox</h2>
+  <p class="meta">Tenant-scoped support conversations live here. Each channel can point at a default workspace for document-grounded support context.</p>
+  <div class="grid">
+    <div class="stat"><strong>Open conversations</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ support_conversations|length }}</div></div>
+    <div class="stat"><strong>Active channels</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ support_channels_count }}</div></div>
+    <div class="stat"><strong>Known contacts</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ support_contacts_count }}</div></div>
+  </div>
+  <div style="margin-top: 16px; display:flex; gap:10px; flex-wrap:wrap;">
+    <a href="/dashboard/support/?status=open">Open</a>
+    <a href="/dashboard/support/?status=pending">Pending</a>
+    <a href="/dashboard/support/?status=closed">Closed</a>
+    <a href="/dashboard/support/?status=all">All</a>
+    {% if can_manage_tenant %}<a href="/dashboard/support/channels/">Manage channels</a>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Conversations{% if support_status_filter %} · {{ support_status_filter|title }}{% endif %}</h2>
+  {% if support_conversations %}
+    {% for convo in support_conversations %}
+      <div class="row">
+        <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+          <div>
+            <div><a href="/dashboard/support/conversations/{{ convo.id }}/"><strong>{{ convo.contact.name|default:convo.contact.phone_number }}</strong></a></div>
+            <div class="meta">{{ convo.contact.phone_number }} · {{ convo.channel.name }}{% if convo.workspace_context %} · Workspace: {{ convo.workspace_context.name }}{% endif %}</div>
+            {% if convo.subject %}<div class="meta">{{ convo.subject }}</div>{% endif %}
+          </div>
+          <div style="text-align:right;">
+            <div><span class="status status-running">{{ convo.status }}</span></div>
+            <div class="meta">{% if convo.last_message_at %}{{ convo.last_message_at }}{% else %}No messages yet{% endif %}</div>
+            {% if convo.assigned_user %}<div class="meta">Assigned: {{ convo.assigned_user.username }}</div>{% endif %}
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p class="meta">No conversations yet for this tenant/filter.</p>
+  {% endif %}
+</div>
+{% endblock %}
