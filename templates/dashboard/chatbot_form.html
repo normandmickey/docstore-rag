@@ -31,7 +31,7 @@
           name="{{ field.html_name }}"
           id="{{ field.id_for_label }}"
           rows="{{ field.field.widget.attrs.rows|default:6 }}"
-        >{{ field.value|default_if_none:'' }}</textarea>
+        >{% firstof field.initial field.value '' %}</textarea>
       {% else %}
         {{ field }}
       {% endif %}
