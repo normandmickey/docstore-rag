@@ -993,6 +993,7 @@ def dashboard_connectors(request):
             return redirect('dashboard_connectors')
         folder_id = (request.POST.get('folder_id') or 'root').strip() or 'root'
         label = (request.POST.get('label') or '').strip() or 'Google Drive'
+        recursive = (request.POST.get('recursive') or '1').strip() == '1'
         connector, _created = Connector.objects.update_or_create(
             tenant=current_tenant,
             workspace=current_workspace,
@@ -1004,6 +1005,7 @@ def dashboard_connectors(request):
                     'external_account_id': google_account.id,
                     'account_email': google_account.email,
                     'folder_id': folder_id,
+                    'recursive': recursive,
                 },
             },
         )
@@ -1036,6 +1038,69 @@ def dashboard_connectors(request):
             logger.exception('Google Drive sync command failed for connector=%s', connector.id)
             messages.error(request, f'Google Drive sync failed: {exc}')
         return redirect('dashboard_connectors')
+
+    if request.method == 'POST' and request.POST.get('action') == 'use_google_drive_folder' and current_workspace and current_tenant:
+        if not google_account:
+            messages.error(request, 'Connect a Google account first.')
+            return redirect('dashboard_connectors')
+        folder_id = (request.POST.get('folder_id') or 'root').strip() or 'root'
+        folder_name = (request.POST.get('folder_name') or '').strip() or 'Google Drive'
+        connector, _created = Connector.objects.update_or_create(
+            tenant=current_tenant,
+            workspace=current_workspace,
+            provider=Connector.PROVIDER_GOOGLE_DRIVE,
+            defaults={
+                'label': f'Google Drive · {folder_name}',
+                'status': Connector.STATUS_ACTIVE,
+                'config_json': {
+                    'external_account_id': google_account.id,
+                    'account_email': google_account.email,
+                    'folder_id': folder_id,
+                    'recursive': True,
+                },
+            },
+        )
+        messages.success(request, f'Now using Google Drive folder "{folder_name}" for this workspace connector.')
+        return redirect(f'/dashboard/connectors/?google_folder={folder_id}')
+
+    if request.method == 'POST' and request.POST.get('action') == 'sync_google_drive_folder_now' and current_workspace and current_tenant:
+        if not google_account:
+            messages.error(request, 'Connect a Google account first.')
+            return redirect('dashboard_connectors')
+        folder_id = (request.POST.get('folder_id') or 'root').strip() or 'root'
+        folder_name = (request.POST.get('folder_name') or '').strip() or 'Google Drive'
+        connector, _created = Connector.objects.update_or_create(
+            tenant=current_tenant,
+            workspace=current_workspace,
+            provider=Connector.PROVIDER_GOOGLE_DRIVE,
+            defaults={
+                'label': f'Google Drive · {folder_name}',
+                'status': Connector.STATUS_ACTIVE,
+                'config_json': {
+                    'external_account_id': google_account.id,
+                    'account_email': google_account.email,
+                    'folder_id': folder_id,
+                    'recursive': True,
+                },
+            },
+        )
+        try:
+            result = subprocess.run(
+                ['.venv/bin/python', 'manage.py', 'sync_google_drive_connector', str(connector.id)],
+                cwd=str(settings.BASE_DIR),
+                capture_output=True,
+                text=True,
+                timeout=300,
+                check=False,
+            )
+            if result.returncode == 0:
+                messages.success(request, result.stdout.strip() or 'Google Drive sync completed.')
+            else:
+                messages.error(request, result.stderr.strip() or result.stdout.strip() or 'Google Drive sync failed.')
+        except Exception as exc:
+            logger.exception('Google Drive folder sync command failed for connector=%s', connector.id)
+            messages.error(request, f'Google Drive sync failed: {exc}')
+        return redirect(f'/dashboard/connectors/?google_folder={folder_id}')
 
     if request.method == 'POST' and request.POST.get('action') == 'google_drive_import' and current_workspace and current_tenant:
         if not google_account:

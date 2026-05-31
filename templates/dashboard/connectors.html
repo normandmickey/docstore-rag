@@ -32,7 +32,7 @@
   {% if google_account %}
     <hr style="border:0; border-top:1px solid #243055; margin: 20px 0;">
     <h3 style="margin-top:0;">Google Drive folder browser</h3>
-    <p class="meta">Browse folders, pick one for this workspace connector, or fall back to manual folder id entry. Use <code>root</code> for My Drive root.</p>
+    <p class="meta">Browse folders, set one as the workspace connector target, or sync the current folder tree right away.</p>
     <div class="row">
       <strong>Current folder:</strong> {{ google_drive_folder_current_name }}<br>
       <span class="meta">Folder id: {{ google_drive_folder_current_id }}</span>
@@ -42,6 +42,22 @@
           <a href="/dashboard/connectors/?google_folder={{ google_drive_folder_parent_id }}">Go up one level</a>
         {% endif %}
       </div>
+      <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
+        <form method="post" style="margin:0;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="use_google_drive_folder">
+          <input type="hidden" name="folder_id" value="{{ google_drive_folder_current_id }}">
+          <input type="hidden" name="folder_name" value="{{ google_drive_folder_current_name }}">
+          <button type="submit">Use this folder for connector</button>
+        </form>
+        <form method="post" style="margin:0;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="sync_google_drive_folder_now">
+          <input type="hidden" name="folder_id" value="{{ google_drive_folder_current_id }}">
+          <input type="hidden" name="folder_name" value="{{ google_drive_folder_current_name }}">
+          <button type="submit">Sync this folder now</button>
+        </form>
+      </div>
     </div>
 
     {% if google_drive_folders %}
@@ -49,7 +65,23 @@
         <div class="row">
           <strong>{{ folder.name }}</strong><br>
           <span class="meta">Folder · {{ folder.id }}</span><br>
-          <a href="/dashboard/connectors/?google_folder={{ folder.id }}">Open folder</a>
+          <div style="margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap;">
+            <a href="/dashboard/connectors/?google_folder={{ folder.id }}">Open folder</a>
+            <form method="post" style="margin:0;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="use_google_drive_folder">
+              <input type="hidden" name="folder_id" value="{{ folder.id }}">
+              <input type="hidden" name="folder_name" value="{{ folder.name }}">
+              <button type="submit">Use this folder</button>
+            </form>
+            <form method="post" style="margin:0;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="sync_google_drive_folder_now">
+              <input type="hidden" name="folder_id" value="{{ folder.id }}">
+              <input type="hidden" name="folder_name" value="{{ folder.name }}">
+              <button type="submit">Sync this folder now</button>
+            </form>
+          </div>
         </div>
       {% endfor %}
     {% else %}
@@ -65,17 +97,21 @@
       <input id="google_connector_label" type="text" name="label" value="{% if google_drive_connector %}{{ google_drive_connector.label }}{% else %}Google Drive{% endif %}">
       <label for="google_folder_id">Folder id</label>
       <input id="google_folder_id" type="text" name="folder_id" value="{% if google_drive_connector and google_drive_connector.config_json.folder_id %}{{ google_drive_connector.config_json.folder_id }}{% else %}{{ google_drive_folder_current_id|default:'root' }}{% endif %}" placeholder="root or a Google Drive folder id">
+      <label style="display:flex; align-items:center; gap:8px; margin: 10px 0 16px;">
+        <input type="checkbox" name="recursive" value="1" {% if not google_drive_connector or google_drive_connector.config_json.recursive != False %}checked{% endif %} style="width:auto; margin:0;">
+        <span>Include subfolders recursively</span>
+      </label>
       <button type="submit">Save Google Drive connector</button>
     </form>
 
     {% if google_drive_connector %}
       <div class="row">
         <strong>{{ google_drive_connector.label }}</strong><br>
-        <span class="meta">Folder id: {{ google_drive_connector.config_json.folder_id|default:'root' }}{% if google_drive_connector.last_synced_at %} · Last synced {{ google_drive_connector.last_synced_at }}{% endif %}</span>
+        <span class="meta">Folder id: {{ google_drive_connector.config_json.folder_id|default:'root' }} · Recursive: {% if google_drive_connector.config_json.recursive == False %}No{% else %}Yes{% endif %}{% if google_drive_connector.last_synced_at %} · Last synced {{ google_drive_connector.last_synced_at }}{% endif %}</span>
         <form method="post" style="margin-top: 12px;">
           {% csrf_token %}
           <input type="hidden" name="action" value="sync_google_drive_connector">
-          <button type="submit">Sync now</button>
+          <button type="submit">Sync saved connector now</button>
         </form>
       </div>
     {% endif %}
@@ -111,7 +147,7 @@
 <div class="card">
   <h2>Planned connector types</h2>
   <div class="row"><strong>SharePoint</strong><br><span class="meta">OAuth scaffold exists; picker and sync UI still to come.</span></div>
-  <div class="row"><strong>Google Drive</strong><br><span class="meta">OAuth, browse/import, and basic folder sync are in place; richer picker and incremental sync come next.</span></div>
+  <div class="row"><strong>Google Drive</strong><br><span class="meta">OAuth, folder browser, one-off import, and recursive folder sync are now in place; incremental sync and richer history come next.</span></div>
   <div class="row"><strong>Web / URLs</strong><br><span class="meta">Already handled on the URLs page as direct imports.</span></div>
 </div>
 {% endblock %}
