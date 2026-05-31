@@ -35,10 +35,10 @@ class ChatbotEventIngestSerializer(serializers.Serializer):
 
 class ChatbotMessageIngestSerializer(serializers.Serializer):
     tenant_id = serializers.IntegerField(required=False)
-    workspace_id = serializers.IntegerField(required=False)
+    workspace_id = serializers.IntegerField(required=False, allow_null=True)
     integration_id = serializers.IntegerField()
-    endpoint_id = serializers.IntegerField(required=False)
-    bot_definition_id = serializers.IntegerField(required=False)
+    endpoint_id = serializers.IntegerField(required=False, allow_null=True)
+    bot_definition_id = serializers.IntegerField(required=False, allow_null=True)
     platform = serializers.ChoiceField(choices=ChatbotIntegration.PLATFORM_CHOICES)
     external_conversation_id = serializers.CharField(required=False, allow_blank=True)
     external_thread_id = serializers.CharField(required=False, allow_blank=True)
