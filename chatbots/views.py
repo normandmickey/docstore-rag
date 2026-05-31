@@ -282,8 +282,9 @@ def chatbot_zoom_connect_callback(request):
 
     integration_id = integration_id or state_integration_id
     if not code or not integration_id or (expected_nonce and returned_nonce and expected_nonce != returned_nonce):
+        query_snapshot = {key: request.GET.get(key) for key in request.GET.keys()}
         logger.warning(
-            'Zoom OAuth callback invalid state/missing code integration_id=%s session_integration_id=%s state_integration_id=%s expected_nonce=%s returned_nonce=%s code_present=%s raw_state=%s',
+            'Zoom OAuth callback invalid state/missing code integration_id=%s session_integration_id=%s state_integration_id=%s expected_nonce=%s returned_nonce=%s code_present=%s raw_state=%s query=%s',
             integration_id,
             request.session.get('zoom_oauth_integration_id'),
             state_integration_id,
@@ -291,8 +292,9 @@ def chatbot_zoom_connect_callback(request):
             returned_nonce,
             bool(code),
             returned_state,
+            query_snapshot,
         )
-        messages.error(request, 'Zoom connection failed: invalid OAuth state or missing code.')
+        messages.error(request, f'Zoom connection failed: invalid OAuth state or missing code. Returned params: {query_snapshot}')
         return redirect('chatbot_index')
 
     integration = ChatbotIntegration.objects.filter(id=integration_id, platform=ChatbotIntegration.PLATFORM_ZOOM_CHAT).first()
