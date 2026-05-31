@@ -281,6 +281,17 @@ def chatbot_zoom_connect_callback(request):
         state_payload = {}
 
     integration_id = integration_id or state_integration_id
+
+    if not integration_id and request.user.is_authenticated:
+        tenant_id = request.session.get('current_tenant_id')
+        if tenant_id:
+            zoom_integrations = ChatbotIntegration.objects.filter(
+                tenant_id=tenant_id,
+                platform=ChatbotIntegration.PLATFORM_ZOOM_CHAT,
+            ).order_by('id')
+            if zoom_integrations.count() == 1:
+                integration_id = zoom_integrations.first().id
+
     state_invalid = bool(returned_state) and bool(expected_nonce) and bool(returned_nonce) and expected_nonce != returned_nonce
     if not code or not integration_id or state_invalid:
         query_snapshot = {key: request.GET.get(key) for key in request.GET.keys()}
