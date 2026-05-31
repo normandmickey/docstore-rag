@@ -62,6 +62,7 @@ urlpatterns = [
     path('dashboard/tenant/', dashboard_tenant_settings, name='dashboard_tenant_settings'),
     path('dashboard/api-keys/', dashboard_api_keys, name='dashboard_api_keys'),
     path('dashboard/support/', include('support.urls')),
+    path('dashboard/reports/', include('reports.urls')),
     path('twilio/webhooks/', include('support.urls')),
     path('dashboard/staff/', staff_dashboard, name='staff_dashboard'),
     path('connect/microsoft/', microsoft_connect_start, name='microsoft_connect_start'),

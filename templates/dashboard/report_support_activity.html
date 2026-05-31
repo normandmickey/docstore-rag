@@ -1,0 +1,54 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Support Activity Report · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Support Activity Report</h2>
+  <p class="meta">Ad hoc support reporting for the current tenant, with HTML summary and XLSX export.</p>
+  <form method="get" style="display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items:end;">
+    <div>
+      <label for="start">Start date</label>
+      <input id="start" type="text" name="start" value="{{ report_start }}" placeholder="YYYY-MM-DD">
+    </div>
+    <div>
+      <label for="end">End date</label>
+      <input id="end" type="text" name="end" value="{{ report_end }}" placeholder="YYYY-MM-DD">
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button type="submit">Run report</button>
+      <a href="?start={{ report_start }}&end={{ report_end }}&format=xlsx">Download XLSX</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Summary</h2>
+  <div class="grid">
+    <div class="stat"><div class="meta">Conversations created</div><div style="font-size:1.5rem; font-weight:700;">{{ report_summary.conversations_created }}</div></div>
+    <div class="stat"><div class="meta">Inbound messages</div><div style="font-size:1.5rem; font-weight:700;">{{ report_summary.messages_inbound }}</div></div>
+    <div class="stat"><div class="meta">Outbound messages</div><div style="font-size:1.5rem; font-weight:700;">{{ report_summary.messages_outbound }}</div></div>
+    <div class="stat"><div class="meta">Voice calls</div><div style="font-size:1.5rem; font-weight:700;">{{ report_summary.voice_calls }}</div></div>
+    <div class="stat"><div class="meta">Currently open</div><div style="font-size:1.5rem; font-weight:700;">{{ report_summary.currently_open }}</div></div>
+    <div class="stat"><div class="meta">Currently pending</div><div style="font-size:1.5rem; font-weight:700;">{{ report_summary.currently_pending }}</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Daily breakdown</h2>
+  {% for row in report_rows %}
+    <div class="row">
+      <strong>{{ row.date }}</strong><br>
+      <span class="meta">
+        Conversations: {{ row.conversations_created }} ·
+        Open: {{ row.open_count }} ·
+        Pending: {{ row.pending_count }} ·
+        Closed: {{ row.closed_count }} ·
+        Inbound: {{ row.messages_inbound }} ·
+        Outbound: {{ row.messages_outbound }} ·
+        Calls: {{ row.voice_calls }}
+      </span>
+    </div>
+  {% empty %}
+    <p class="meta">No support activity found for this date range.</p>
+  {% endfor %}
+</div>
+{% endblock %}

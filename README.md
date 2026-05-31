@@ -380,6 +380,17 @@ Behavior:
 - chatbot + voice runtimes are separate services and should not be folded into Django
 - document-scoped search pages remain a first-class debugging tool during tuning
 
+## Reporting
+Docstore now has an initial `reports` app scaffold with a first support activity report:
+- route: `/dashboard/reports/support/`
+- filters: start date / end date
+- exports: XLSX
+
+The current pattern is intentionally simple:
+- native Django views for report pages
+- `openpyxl` for spreadsheet export
+- room to add PDF exports later
+
 ## Related docs
 - `DEPLOY.md`
 - `docs/chatbots-architecture.md`

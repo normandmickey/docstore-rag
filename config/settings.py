@@ -34,6 +34,7 @@ INSTALLED_APPS = [
     'support',
     'integrations.voice',
     'chatbots',
+    'reports',
 ]
 
 MIDDLEWARE = [
