@@ -30,6 +30,7 @@
             <div class="doc-meta-group meta">
               <div>Status: {{ row.document.status }}</div>
               <div>Collection: {{ row.document.collection|default:'—' }}</div>
+              <div>Workspaces: {% for workspace in row.assigned_workspaces %}{{ workspace.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</div>
               <div>Uploaded: {{ row.document.created_at }}</div>
               <div>Versions: {{ row.version_count }}{% if row.latest_version %} · Latest v{{ row.latest_version.version_number }}{% endif %}{% if row.chunk_count %} · Chunks: {{ row.chunk_count }}{% endif %}</div>
               {% if row.latest_job %}<div><span class="status status-{{ row.latest_job.status }}">Job {{ row.latest_job.status }}</span> Stage: {{ row.latest_job.stage }}</div>{% endif %}

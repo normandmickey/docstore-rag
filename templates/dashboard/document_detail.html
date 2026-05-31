@@ -7,7 +7,8 @@
   <div class="meta">
     <div>Status: {{ detail_document.status }}</div>
     <div>Collection: {{ detail_document.collection|default:'—' }}</div>
-    <div>Workspace: {{ detail_document.workspace.name }}</div>
+    <div>Primary workspace: {{ detail_document.workspace.name }}</div>
+    <div>Assigned workspaces: {% for assignment in detail_workspace_assignments %}{{ assignment.workspace.name }}{% if assignment.is_primary %} (primary){% endif %}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</div>
     <div>Uploaded: {{ detail_document.created_at }}</div>
     <div>Chunks: {{ detail_chunk_count }} · Facts: {{ detail_fact_count }}</div>
     {% if detail_latest_version %}<div>Latest version: v{{ detail_latest_version.version_number }}</div>{% endif %}
@@ -32,6 +33,22 @@
     <div class="stat"><strong>Chunks</strong><div class="meta">{{ detail_chunk_count }} chunks</div></div>
     <div class="stat"><strong>Document search</strong><div class="meta">Vector + metadata + lexical search scoped to this document</div></div>
   </div>
+</div>
+
+<div class="card">
+  <h2>Workspace assignments</h2>
+  <p class="meta">Assign this document to other workspaces without duplicating the file, versions, chunks, or embeddings.</p>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="assign_document_workspace">
+    <label>Assign to workspace</label>
+    <select name="workspace_id">
+      {% for workspace in detail_available_workspaces %}
+        <option value="{{ workspace.id }}">{{ workspace.name }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit">Assign workspace</button>
+  </form>
 </div>
 
 <div class="card">

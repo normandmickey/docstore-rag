@@ -5,7 +5,7 @@ from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from pgvector.django import CosineDistance
 
 from audit.models import RetrievalLog
-from documents.models import Chunk, Document, ExtractedFact
+from documents.models import Chunk, Document, DocumentWorkspaceAssignment, ExtractedFact
 from providers import answer_with_context, embed_texts, rewrite_question
 from control.pii import redact_pii
 
@@ -44,10 +44,10 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
     query_vector = embed_texts([standalone_query])[0]
     qs = Chunk.objects.filter(
         tenant=tenant,
-        workspace=workspace,
         embedding__isnull=False,
         document__status=Document.STATUS_READY,
-    ).select_related('document')
+        document__workspace_assignments__workspace=workspace,
+    ).select_related('document').distinct()
     if document_id:
         qs = qs.filter(document_id=document_id)
 
@@ -139,12 +139,13 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
         local_expansion = list(
             Chunk.objects.filter(
                 tenant=tenant,
-                workspace=workspace,
                 document_id=best_candidate.document_id,
                 document__status=Document.STATUS_READY,
+                document__workspace_assignments__workspace=workspace,
                 chunk_index__in=neighbor_indexes,
             )
             .select_related('document')
+            .distinct()
             .order_by('chunk_index')
         )
         for chunk in local_expansion:
@@ -226,9 +227,9 @@ def retrieve_facts(*, tenant, workspace, query, top_k=8, document_id=None):
     query_tokens = tokenize_query(query)
     facts = ExtractedFact.objects.filter(
         tenant=tenant,
-        workspace=workspace,
         document__status=Document.STATUS_READY,
-    ).select_related('document', 'chunk')
+        document__workspace_assignments__workspace=workspace,
+    ).select_related('document', 'chunk').distinct()
     if document_id:
         facts = facts.filter(document_id=document_id)
 

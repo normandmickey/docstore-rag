@@ -67,6 +67,23 @@ class Document(models.Model):
         return f'{self.filename} [{self.workspace}]'
 
 
+class DocumentWorkspaceAssignment(models.Model):
+    document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='workspace_assignments')
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='document_assignments')
+    is_primary = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['document_id', 'workspace__name']
+        unique_together = [('document', 'workspace')]
+        indexes = [
+            models.Index(fields=['workspace', 'document']),
+        ]
+
+    def __str__(self):
+        return f'{self.document.filename} -> {self.workspace.name}'
+
+
 class DocumentVersion(models.Model):
     document = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='versions')
     version_number = models.PositiveIntegerField(default=1)

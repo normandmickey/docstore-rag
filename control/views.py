@@ -19,7 +19,7 @@ from django.utils.text import slugify
 
 from connectors.google_drive import GoogleDriveClient
 from connectors.models import Connector, ExternalDocumentBinding
-from documents.models import Chunk, Document, ExtractedFact
+from documents.models import Chunk, Document, DocumentWorkspaceAssignment, ExtractedFact
 from documents.upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
 from ingestion.models import IngestionJob
 from ingestion.tasks import ingest_document_task
@@ -145,15 +145,15 @@ def _dashboard_base(request):
         if current_workspace:
             documents = Document.objects.filter(
                 tenant_id=current_tenant_id,
-                workspace_id=current_workspace_id,
+                workspace_assignments__workspace_id=current_workspace_id,
             ).exclude(
                 status__in=[Document.STATUS_FAILED, Document.STATUS_DELETED],
-            ).prefetch_related('ingestion_jobs', 'chunks', 'versions').order_by('-created_at')[:25]
+            ).prefetch_related('ingestion_jobs', 'chunks', 'versions', 'workspace_assignments__workspace').distinct().order_by('-created_at')[:25]
             deleted_documents = Document.objects.filter(
                 tenant_id=current_tenant_id,
-                workspace_id=current_workspace_id,
+                workspace_assignments__workspace_id=current_workspace_id,
                 status=Document.STATUS_DELETED,
-            ).prefetch_related('ingestion_jobs', 'chunks', 'versions').order_by('-updated_at')[:25]
+            ).prefetch_related('ingestion_jobs', 'chunks', 'versions', 'workspace_assignments__workspace').distinct().order_by('-updated_at')[:25]
 
     def build_document_rows(items):
         rows = []
@@ -173,6 +173,7 @@ def _dashboard_base(request):
                 'chunk_count': chunk_count,
                 'preview': preview,
                 'source_url': document.source_url,
+                'assigned_workspaces': [assignment.workspace for assignment in document.workspace_assignments.all()],
             })
         return rows
 
@@ -248,8 +249,8 @@ def _handle_workspace_actions(request, base):
         documents_to_delete = list(Document.objects.filter(
             id__in=document_ids,
             tenant=current_workspace.tenant,
-            workspace=current_workspace,
-        ).exclude(status=Document.STATUS_DELETED))
+            workspace_assignments__workspace=current_workspace,
+        ).exclude(status=Document.STATUS_DELETED).distinct())
         if not documents_to_delete:
             messages.error(request, 'No matching documents found.')
             return redirect(request.path)
@@ -263,9 +264,9 @@ def _handle_workspace_actions(request, base):
         documents_to_restore = list(Document.objects.filter(
             id__in=document_ids,
             tenant=current_workspace.tenant,
-            workspace=current_workspace,
+            workspace_assignments__workspace=current_workspace,
             status=Document.STATUS_DELETED,
-        ))
+        ).distinct())
         if not documents_to_restore:
             messages.error(request, 'No deleted documents selected for restore.')
             return redirect(request.path)
@@ -283,9 +284,9 @@ def _handle_workspace_actions(request, base):
         documents_to_purge = list(Document.objects.filter(
             id__in=document_ids,
             tenant=current_workspace.tenant,
-            workspace=current_workspace,
+            workspace_assignments__workspace=current_workspace,
             status=Document.STATUS_DELETED,
-        ))
+        ).distinct())
         if not documents_to_purge:
             messages.error(request, 'No deleted documents selected for purge.')
             return redirect(request.path)
@@ -487,7 +488,7 @@ def _document_detail_base(request, document_id):
     if handled:
         return handled, None, None
 
-    document = get_object_or_404(Document.objects.select_related('tenant', 'workspace'), id=document_id)
+    document = get_object_or_404(Document.objects.select_related('tenant', 'workspace').prefetch_related('workspace_assignments__workspace'), id=document_id)
     membership = TenantMembership.objects.filter(user=request.user, tenant=document.tenant).exists()
     if not membership and not request.user.is_staff:
         raise Http404('Document not found.')
@@ -501,6 +502,8 @@ def _document_detail_base(request, document_id):
         'detail_latest_job': latest_job,
         'detail_fact_count': ExtractedFact.objects.filter(document=document).count(),
         'detail_chunk_count': Chunk.objects.filter(document=document).count(),
+        'detail_workspace_assignments': document.workspace_assignments.all(),
+        'detail_available_workspaces': Workspace.objects.filter(tenant=document.tenant).order_by('name'),
     })
     return None, base, document
 
@@ -512,6 +515,23 @@ def document_detail(request, document_id):
     handled, base, document = _document_detail_base(request, document_id)
     if handled:
         return handled
+
+    if request.method == 'POST' and request.POST.get('action') == 'assign_document_workspace':
+        workspace_id = (request.POST.get('workspace_id') or '').strip()
+        workspace = Workspace.objects.filter(id=workspace_id, tenant=document.tenant).first() if workspace_id.isdigit() else None
+        if not workspace:
+            messages.error(request, 'Select a valid workspace to assign.')
+            return redirect(request.path)
+        assignment, created = DocumentWorkspaceAssignment.objects.get_or_create(
+            document=document,
+            workspace=workspace,
+            defaults={'is_primary': workspace.id == document.workspace_id},
+        )
+        if created:
+            messages.success(request, f'Assigned document to workspace "{workspace.name}".')
+        else:
+            messages.info(request, f'Document is already assigned to workspace "{workspace.name}".')
+        return redirect(request.path)
 
     if request.method == 'POST' and request.POST.get('action') == 'reingest_document':
         extractor = (request.POST.get('extractor') or IngestionJob.EXTRACTOR_STANDARD).strip()
