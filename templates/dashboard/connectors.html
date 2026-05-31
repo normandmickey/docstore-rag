@@ -19,22 +19,48 @@
 </div>
 <div class="card">
   <h2>Google Drive connections</h2>
-  <p class="meta">Connect your own Google account so this workspace can later browse/import Google Drive files.</p>
+  <p class="meta">Connect your own Google account so this workspace can browse and import Google Drive files.</p>
   <p><a href="/connect/google/">Connect Google account</a></p>
-  {% with google_accounts=external_accounts %}
-    {% for account in google_accounts %}
-      {% if account.provider == 'google' %}
-        <div class="row"><strong>{{ account.display_name|default:account.email|default:'Google account' }}</strong><br><span class="meta">{{ account.provider }} · {{ account.email }}{% if account.workspace %} · Workspace: {{ account.workspace.name }}{% endif %}</span></div>
-      {% endif %}
-    {% empty %}
-      <p>No external Google accounts connected yet.</p>
-    {% endfor %}
-  {% endwith %}
+  {% for account in external_accounts %}
+    {% if account.provider == 'google' %}
+      <div class="row"><strong>{{ account.display_name|default:account.email|default:'Google account' }}</strong><br><span class="meta">{{ account.provider }} · {{ account.email }}{% if account.workspace %} · Workspace: {{ account.workspace.name }}{% endif %}</span></div>
+    {% endif %}
+  {% empty %}
+    <p>No external Google accounts connected yet.</p>
+  {% endfor %}
+
+  {% if google_account %}
+    <hr style="border:0; border-top:1px solid #243055; margin: 20px 0;">
+    <h3 style="margin-top:0;">Browse recent Drive files</h3>
+    <form method="get" action="/dashboard/connectors/">
+      <label for="google_q">Search Drive by name</label>
+      <input id="google_q" type="text" name="google_q" value="{{ google_drive_query }}" placeholder="e.g. handbook, PTO, pricing">
+      <button type="submit">Search Drive</button>
+    </form>
+
+    {% if google_drive_files %}
+      {% for item in google_drive_files %}
+        <div class="row">
+          <strong>{{ item.name }}</strong><br>
+          <span class="meta">{{ item.mimeType }}{% if item.modifiedTime %} · Updated {{ item.modifiedTime }}{% endif %}</span>
+          {% if item.webViewLink %}<br><a href="{{ item.webViewLink }}" target="_blank" rel="noopener">Open in Google Drive</a>{% endif %}
+          <form method="post" style="margin-top: 12px;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="google_drive_import">
+            <input type="hidden" name="file_id" value="{{ item.id }}">
+            <button type="submit">Import into current workspace</button>
+          </form>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="meta">No recent Drive files found yet for this account/query.</p>
+    {% endif %}
+  {% endif %}
 </div>
 <div class="card">
   <h2>Planned connector types</h2>
   <div class="row"><strong>SharePoint</strong><br><span class="meta">OAuth scaffold exists; picker and sync UI still to come.</span></div>
-  <div class="row"><strong>Google Drive</strong><br><span class="meta">OAuth/account linking is being added first; picker/import/sync UI comes next.</span></div>
+  <div class="row"><strong>Google Drive</strong><br><span class="meta">OAuth and first import flow are being added first; richer folder picker and incremental sync come next.</span></div>
   <div class="row"><strong>Web / URLs</strong><br><span class="meta">Already handled on the URLs page as direct imports.</span></div>
 </div>
 {% endblock %}

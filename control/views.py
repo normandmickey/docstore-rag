@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.contrib.auth import login, logout
 from django.contrib.auth.views import LoginView
 from django.contrib.auth import get_user_model
+from django.core.files.base import ContentFile
 from django.core.paginator import Paginator
 from django.db.models import Count
 from django.http import FileResponse, Http404
@@ -15,7 +16,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.text import slugify
 
-from connectors.models import Connector
+from connectors.google_drive import GoogleDriveClient
+from connectors.models import Connector, ExternalDocumentBinding
 from documents.models import Chunk, Document, ExtractedFact
 from documents.upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
 from ingestion.models import IngestionJob
@@ -961,6 +963,99 @@ def dashboard_connectors(request):
     handled = _handle_workspace_actions(request, base)
     if handled:
         return handled
+
+    current_workspace = base['current_workspace']
+    current_tenant = base['current_tenant']
+    google_account = ExternalAccount.objects.filter(
+        user=request.user,
+        provider=ExternalAccount.PROVIDER_GOOGLE,
+    ).order_by('-updated_at').first()
+    base['google_account'] = google_account
+    base['google_drive_files'] = []
+    base['google_drive_query'] = ''
+
+    if request.method == 'POST' and request.POST.get('action') == 'google_drive_import' and current_workspace and current_tenant:
+        if not google_account:
+            messages.error(request, 'Connect a Google account first.')
+            return redirect('dashboard_connectors')
+
+        file_id = (request.POST.get('file_id') or '').strip()
+        if not file_id:
+            messages.error(request, 'Pick a Google Drive file to import.')
+            return redirect('dashboard_connectors')
+
+        try:
+            client = GoogleDriveClient(google_account.access_token)
+            remote = client.get_file(file_id)
+            raw_bytes, import_mime, import_filename = client.download_file_bytes(
+                file_id=file_id,
+                mime_type=remote.get('mimeType', ''),
+                filename=remote.get('name', '') or 'google-drive-file',
+            )
+            upload = ContentFile(raw_bytes, name=import_filename or remote.get('name') or 'google-drive-file')
+            connector, _ = Connector.objects.get_or_create(
+                tenant=current_tenant,
+                workspace=current_workspace,
+                provider=Connector.PROVIDER_GOOGLE_DRIVE,
+                label='Google Drive',
+                defaults={
+                    'status': Connector.STATUS_ACTIVE,
+                    'config_json': {
+                        'external_account_id': google_account.id,
+                        'account_email': google_account.email,
+                    },
+                },
+            )
+            result = create_or_reuse_document(
+                tenant=current_tenant,
+                workspace=current_workspace,
+                uploaded_file=upload,
+                filename=import_filename or remote.get('name') or 'google-drive-file',
+                mime_type=import_mime or remote.get('mimeType', ''),
+                size_bytes=len(raw_bytes),
+                collection='google-drive',
+                uploaded_by=request.user,
+                source_type=Document.SOURCE_CONNECTOR,
+                source_url=remote.get('webViewLink', ''),
+            )
+            ExternalDocumentBinding.objects.update_or_create(
+                connector=connector,
+                external_id=remote.get('id', file_id),
+                defaults={
+                    'external_path': 'google-drive',
+                    'etag': remote.get('md5Checksum', ''),
+                    'document': result['document'],
+                    'metadata_json': {
+                        'name': remote.get('name', ''),
+                        'mime_type': remote.get('mimeType', ''),
+                        'modified_time': remote.get('modifiedTime', ''),
+                        'web_url': remote.get('webViewLink', ''),
+                    },
+                },
+            )
+            messages.success(request, f'Imported Google Drive file: {remote.get("name") or import_filename}.')
+            return redirect('dashboard_connectors')
+        except Exception as exc:
+            logger.exception('Google Drive import failed for user=%s workspace=%s file_id=%s', request.user.id, current_workspace.id, file_id)
+            messages.error(request, f'Google Drive import failed: {exc}')
+            return redirect('dashboard_connectors')
+
+    if google_account:
+        query = (request.GET.get('google_q') or '').strip()
+        base['google_drive_query'] = query
+        try:
+            client = GoogleDriveClient(google_account.access_token)
+            q = None
+            if query:
+                escaped = query.replace("'", "\\'")
+                q = f"name contains '{escaped}' and trashed = false"
+            else:
+                q = 'trashed = false'
+            base['google_drive_files'] = client.list_files(q=q, page_size=20)
+        except Exception as exc:
+            logger.exception('Google Drive list failed for user=%s', request.user.id)
+            messages.error(request, f'Google Drive browse failed: {exc}')
+
     base['section'] = 'connectors'
     return render(request, 'dashboard/connectors.html', base)
 
