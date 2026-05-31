@@ -1,6 +1,10 @@
 import requests
 
 
+class GoogleDriveAPIError(Exception):
+    pass
+
+
 GOOGLE_DOC_EXPORTS = {
     'application/vnd.google-apps.document': ('application/vnd.openxmlformats-officedocument.wordprocessingml.document', '.docx'),
     'application/vnd.google-apps.spreadsheet': ('text/csv', '.csv'),
@@ -18,6 +22,29 @@ class GoogleDriveClient:
     def _headers(self):
         return {'Authorization': f'Bearer {self.access_token}'}
 
+    def _raise_for_status(self, response):
+        try:
+            response.raise_for_status()
+        except requests.HTTPError as exc:
+            details = ''
+            try:
+                payload = response.json() or {}
+                error = payload.get('error') or {}
+                if isinstance(error, dict):
+                    message = error.get('message') or ''
+                    status = error.get('status') or ''
+                    code = error.get('code')
+                    details = f'HTTP {code or response.status_code}'
+                    if status:
+                        details += f' {status}'
+                    if message:
+                        details += f': {message}'
+                else:
+                    details = str(error)
+            except Exception:
+                details = response.text[:500]
+            raise GoogleDriveAPIError(details or str(exc)) from exc
+
     def list_files(self, q=None, page_size=25):
         params = {
             'pageSize': page_size,
@@ -34,7 +61,7 @@ class GoogleDriveClient:
             params=params,
             timeout=30,
         )
-        response.raise_for_status()
+        self._raise_for_status(response)
         return response.json().get('files', [])
 
     def get_file(self, file_id):
@@ -47,7 +74,7 @@ class GoogleDriveClient:
             },
             timeout=30,
         )
-        response.raise_for_status()
+        self._raise_for_status(response)
         return response.json()
 
     def list_folder_files(self, folder_id='root', page_size=100):
@@ -67,7 +94,7 @@ class GoogleDriveClient:
                 params={'mimeType': export_mime},
                 timeout=120,
             )
-            response.raise_for_status()
+            self._raise_for_status(response)
             if filename and not filename.lower().endswith(ext):
                 filename = f'{filename}{ext}'
             return response.content, export_mime, filename
@@ -78,5 +105,5 @@ class GoogleDriveClient:
             params={'alt': 'media', 'supportsAllDrives': 'true'},
             timeout=120,
         )
-        response.raise_for_status()
+        self._raise_for_status(response)
         return response.content, mime_type or response.headers.get('Content-Type', ''), filename
