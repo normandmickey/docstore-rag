@@ -7,6 +7,43 @@ from control.api_guard import resolve_request_context
 from .service import answer_question, retrieve_chunks
 
 
+def _preferred_source_url(row):
+    document = row.document
+    if document.source_url:
+        return document.source_url
+
+    chunk_meta = getattr(row, 'metadata_json', {}) or {}
+    for key in ('webViewLink', 'web_url', 'source_url', 'url'):
+        value = chunk_meta.get(key)
+        if value:
+            return value
+
+    try:
+        latest_version = document.versions.first()
+        version_meta = (latest_version.extraction_metadata_json or {}) if latest_version else {}
+    except Exception:
+        version_meta = {}
+    for key in ('webViewLink', 'web_url', 'source_url', 'url'):
+        value = version_meta.get(key)
+        if value:
+            return value
+
+    return f'/documents/{document.id}/download/'
+
+
+def _serialize_source(row):
+    return {
+        'chunk_id': row.id,
+        'document_id': row.document_id,
+        'document': row.document.filename,
+        'chunk_index': row.chunk_index,
+        'text': row.text,
+        'distance': float(getattr(row, 'distance', 0.0)),
+        'source_url': _preferred_source_url(row),
+        'source_url_kind': 'external' if _preferred_source_url(row).startswith('http') else 'docstore',
+    }
+
+
 class SearchSerializer(serializers.Serializer):
     tenant_id = serializers.IntegerField(required=False)
     workspace_id = serializers.IntegerField(required=False)
@@ -45,17 +82,7 @@ class SearchView(APIView):
         )
 
         return Response({
-            'results': [
-                {
-                    'chunk_id': row.id,
-                    'document_id': row.document_id,
-                    'document': row.document.filename,
-                    'chunk_index': row.chunk_index,
-                    'text': row.text,
-                    'distance': float(getattr(row, 'distance', 0.0)),
-                }
-                for row in results
-            ]
+            'results': [_serialize_source(row) for row in results]
         })
 
 
@@ -82,15 +109,5 @@ class ChatView(APIView):
 
         return Response({
             'answer': answer,
-            'sources': [
-                {
-                    'chunk_id': row.id,
-                    'document_id': row.document_id,
-                    'document': row.document.filename,
-                    'chunk_index': row.chunk_index,
-                    'text': row.text,
-                    'distance': float(getattr(row, 'distance', 0.0)),
-                }
-                for row in results
-            ]
+            'sources': [_serialize_source(row) for row in results]
         })
