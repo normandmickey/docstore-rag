@@ -72,6 +72,43 @@ def chatbot_integration_new(request):
 
 
 @login_required
+def chatbot_integration_edit(request, integration_id):
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+
+    tenant = base.get('current_tenant')
+    if tenant is None:
+        messages.error(request, 'No tenant selected.')
+        return redirect('dashboard')
+    if not base.get('can_manage_tenant'):
+        messages.error(request, 'Only tenant owners and admins can manage chatbot integrations.')
+        return redirect('chatbot_index')
+
+    integration = get_object_or_404(ChatbotIntegration, id=integration_id, tenant=tenant)
+    if request.method == 'POST':
+        form = ChatbotIntegrationForm(request.POST, instance=integration)
+        if form.is_valid():
+            updated = form.save(commit=False)
+            updated.tenant = tenant
+            updated.save()
+            messages.success(request, 'Chatbot integration updated.')
+            return redirect('chatbot_index')
+    else:
+        form = ChatbotIntegrationForm(instance=integration)
+
+    base.update({
+        'section': 'chatbots',
+        'chatbot_subsection': 'integration_edit',
+        'chatbot_form': form,
+        'chatbot_form_title': f'Edit chatbot integration: {integration.name}',
+        'chatbot_form_submit': 'Save integration',
+    })
+    return render(request, 'dashboard/chatbot_form.html', base)
+
+
+@login_required
 def chatbot_definition_new(request):
     base = _dashboard_base(request)
     handled = _handle_workspace_actions(request, base)

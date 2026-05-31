@@ -28,7 +28,7 @@
       <div class="row">
         <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap;">
           <div>
-            <div><strong>{{ integration.name }}</strong></div>
+            <div><a href="/dashboard/chatbots/integrations/{{ integration.id }}/edit/"><strong>{{ integration.name }}</strong></a></div>
             <div class="meta">{{ integration.get_platform_display }} · Status: {{ integration.status }}{% if integration.external_bot_id %} · Bot ID: {{ integration.external_bot_id }}{% endif %}</div>
             <div class="meta">Runner key: <code>{{ integration.runner_key }}</code></div>
           </div>
