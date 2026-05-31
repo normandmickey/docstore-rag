@@ -26,7 +26,14 @@ from providers import answer_with_general_context
 from .forms import SignUpForm, TenantSettingsForm
 from .models import APIKey, ExternalAccount, InviteToken, ProxiWebMessage, ProxiWebThread, Tenant, TenantMembership, Workspace
 from .api_auth import hash_api_key
-from .oauth import exchange_code_for_tokens, fetch_graph_me, microsoft_authorize_url
+from .oauth import (
+    exchange_code_for_tokens,
+    exchange_google_code_for_tokens,
+    fetch_google_userinfo,
+    fetch_graph_me,
+    google_authorize_url,
+    microsoft_authorize_url,
+)
 from .pii import redact_pii
 
 logger = logging.getLogger(__name__)
@@ -357,6 +364,62 @@ def microsoft_connect_callback(request):
     except Exception as exc:
         logger.exception('Microsoft OAuth callback failed for user=%s', request.user.id)
         messages.error(request, f'Microsoft connection failed: {exc}')
+    return redirect('dashboard_connectors')
+
+
+def google_connect_start(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    state = secrets.token_urlsafe(24)
+    request.session['google_oauth_state'] = state
+    return redirect(google_authorize_url(state))
+
+
+def google_connect_callback(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    expected_state = request.session.get('google_oauth_state')
+    returned_state = request.GET.get('state')
+    code = request.GET.get('code')
+    error = request.GET.get('error')
+
+    if error:
+        messages.error(request, f'Google connection failed: {error}')
+        return redirect('dashboard_connectors')
+    if not code or not expected_state or expected_state != returned_state:
+        messages.error(request, 'Google connection failed: invalid OAuth state or missing code.')
+        return redirect('dashboard_connectors')
+
+    try:
+        tokens = exchange_google_code_for_tokens(code)
+        profile = fetch_google_userinfo(tokens['access_token'])
+        if not request.session.get('current_tenant_id') or not request.session.get('current_workspace_id'):
+            tenant, workspace = _bootstrap_user_workspace(request.user, request.session)
+        else:
+            tenant = Tenant.objects.get(id=request.session['current_tenant_id'])
+            workspace = Workspace.objects.get(id=request.session['current_workspace_id'], tenant=tenant)
+
+        account, _created = ExternalAccount.objects.update_or_create(
+            user=request.user,
+            provider=ExternalAccount.PROVIDER_GOOGLE,
+            external_user_id=profile.get('sub', ''),
+            defaults={
+                'tenant': tenant,
+                'workspace': workspace,
+                'email': profile.get('email', ''),
+                'display_name': profile.get('name', ''),
+                'access_token': tokens.get('access_token', ''),
+                'refresh_token': tokens.get('refresh_token', ''),
+                'expires_at': tokens.get('expires_at'),
+                'scopes_json': settings.GOOGLE_SCOPES,
+                'metadata_json': profile,
+            },
+        )
+        messages.success(request, f'Connected Google account for {account.email or account.display_name or "your account"}.')
+    except Exception as exc:
+        logger.exception('Google OAuth callback failed for user=%s', request.user.id)
+        messages.error(request, f'Google connection failed: {exc}')
     return redirect('dashboard_connectors')
 
 

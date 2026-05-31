@@ -5,8 +5,10 @@ from control.models import Tenant, Workspace
 
 class Connector(models.Model):
     PROVIDER_SHAREPOINT = 'sharepoint'
+    PROVIDER_GOOGLE_DRIVE = 'google_drive'
     PROVIDER_CHOICES = [
         (PROVIDER_SHAREPOINT, 'SharePoint'),
+        (PROVIDER_GOOGLE_DRIVE, 'Google Drive'),
     ]
 
     STATUS_ACTIVE = 'active'

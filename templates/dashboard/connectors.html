@@ -3,21 +3,38 @@
 {% block content %}
 <div class="card">
   <h2>Connectors</h2>
-  <p class="meta">This page is for external knowledge sources. Microsoft / SharePoint is scaffolded first and will be the main connector flow here.</p>
+  <p class="meta">This page is for external knowledge sources. Microsoft / SharePoint and Google Drive are the first account-link flows here.</p>
 </div>
 <div class="card">
   <h2>Microsoft / SharePoint connections</h2>
   <p class="meta">Connect your own Microsoft account so this workspace can later sync SharePoint content.</p>
   <p><a href="/connect/microsoft/">Connect Microsoft account</a></p>
   {% for account in external_accounts %}
-    <div class="row"><strong>{{ account.display_name|default:account.email|default:'Microsoft account' }}</strong><br><span class="meta">{{ account.provider }} · {{ account.email }}{% if account.workspace %} · Workspace: {{ account.workspace.name }}{% endif %}</span></div>
+    {% if account.provider == 'microsoft' %}
+      <div class="row"><strong>{{ account.display_name|default:account.email|default:'Microsoft account' }}</strong><br><span class="meta">{{ account.provider }} · {{ account.email }}{% if account.workspace %} · Workspace: {{ account.workspace.name }}{% endif %}</span></div>
+    {% endif %}
   {% empty %}
     <p>No external Microsoft accounts connected yet.</p>
   {% endfor %}
 </div>
 <div class="card">
+  <h2>Google Drive connections</h2>
+  <p class="meta">Connect your own Google account so this workspace can later browse/import Google Drive files.</p>
+  <p><a href="/connect/google/">Connect Google account</a></p>
+  {% with google_accounts=external_accounts %}
+    {% for account in google_accounts %}
+      {% if account.provider == 'google' %}
+        <div class="row"><strong>{{ account.display_name|default:account.email|default:'Google account' }}</strong><br><span class="meta">{{ account.provider }} · {{ account.email }}{% if account.workspace %} · Workspace: {{ account.workspace.name }}{% endif %}</span></div>
+      {% endif %}
+    {% empty %}
+      <p>No external Google accounts connected yet.</p>
+    {% endfor %}
+  {% endwith %}
+</div>
+<div class="card">
   <h2>Planned connector types</h2>
   <div class="row"><strong>SharePoint</strong><br><span class="meta">OAuth scaffold exists; picker and sync UI still to come.</span></div>
+  <div class="row"><strong>Google Drive</strong><br><span class="meta">OAuth/account linking is being added first; picker/import/sync UI comes next.</span></div>
   <div class="row"><strong>Web / URLs</strong><br><span class="meta">Already handled on the URLs page as direct imports.</span></div>
 </div>
 {% endblock %}

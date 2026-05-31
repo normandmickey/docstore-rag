@@ -4,7 +4,7 @@ from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.urls import include, path
 from documents.api import DocumentCreateView, DocumentDeleteView, DocumentPurgeView, DocumentRestoreView, URLIngestView
-from control.views import AppLoginView, dashboard, dashboard_api_keys, dashboard_chat, dashboard_connectors, dashboard_documents, dashboard_proxi_web, dashboard_tenant_settings, dashboard_urls, document_chunks, document_detail, document_download, document_facts, document_search, logout_view, microsoft_connect_callback, microsoft_connect_start, signup, staff_dashboard
+from control.views import AppLoginView, dashboard, dashboard_api_keys, dashboard_chat, dashboard_connectors, dashboard_documents, dashboard_proxi_web, dashboard_tenant_settings, dashboard_urls, document_chunks, document_detail, document_download, document_facts, document_search, google_connect_callback, google_connect_start, logout_view, microsoft_connect_callback, microsoft_connect_start, signup, staff_dashboard
 from retrieval.api import ChatView, SearchView
 from support.api import SupportChannelLookupView
 
@@ -66,6 +66,8 @@ urlpatterns = [
     path('dashboard/staff/', staff_dashboard, name='staff_dashboard'),
     path('connect/microsoft/', microsoft_connect_start, name='microsoft_connect_start'),
     path('connect/microsoft/callback/', microsoft_connect_callback, name='microsoft_connect_callback'),
+    path('connect/google/', google_connect_start, name='google_connect_start'),
+    path('connect/google/callback/', google_connect_callback, name='google_connect_callback'),
     path('api/v1/documents/', DocumentCreateView.as_view()),
     path('api/v1/documents/delete/', DocumentDeleteView.as_view()),
     path('api/v1/documents/restore/', DocumentRestoreView.as_view()),

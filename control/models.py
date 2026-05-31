@@ -87,8 +87,10 @@ class APIKey(models.Model):
 
 class ExternalAccount(models.Model):
     PROVIDER_MICROSOFT = 'microsoft'
+    PROVIDER_GOOGLE = 'google'
     PROVIDER_CHOICES = [
         (PROVIDER_MICROSOFT, 'Microsoft'),
+        (PROVIDER_GOOGLE, 'Google'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='external_accounts')

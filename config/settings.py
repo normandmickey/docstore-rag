@@ -133,6 +133,11 @@ MS_GRAPH_CLIENT_SECRET = os.getenv('MS_GRAPH_CLIENT_SECRET', '')
 MS_GRAPH_REDIRECT_URI = os.getenv('MS_GRAPH_REDIRECT_URI', '')
 MS_GRAPH_SCOPES = [scope.strip() for scope in os.getenv('MS_GRAPH_SCOPES', 'openid profile email offline_access Files.Read Sites.Read.All User.Read').split() if scope.strip()]
 
+GOOGLE_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
+GOOGLE_REDIRECT_URI = os.getenv('GOOGLE_REDIRECT_URI', '')
+GOOGLE_SCOPES = [scope.strip() for scope in os.getenv('GOOGLE_SCOPES', 'openid email profile https://www.googleapis.com/auth/drive.readonly').split() if scope.strip()]
+
 S3_ENDPOINT_URL = os.getenv('S3_ENDPOINT_URL', '')
 S3_ACCESS_KEY = os.getenv('S3_ACCESS_KEY', '')
 S3_SECRET_KEY = os.getenv('S3_SECRET_KEY', '')
