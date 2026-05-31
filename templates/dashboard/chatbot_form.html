@@ -26,7 +26,15 @@
     {% csrf_token %}
     {% for field in chatbot_form %}
       <label for="{{ field.id_for_label }}">{{ field.label }}</label>
-      {{ field }}
+      {% if field.name == 'persona_prompt' or field.name == 'system_prompt' or field.name == 'allowed_tools_json' or field.name == 'response_policy_json' or field.name == 'handoff_policy_json' or field.name == 'logging_policy_json' or field.name == 'metadata_json' %}
+        <textarea
+          name="{{ field.html_name }}"
+          id="{{ field.id_for_label }}"
+          rows="{{ field.field.widget.attrs.rows|default:6 }}"
+        >{{ field.value|default_if_none:'' }}</textarea>
+      {% else %}
+        {{ field }}
+      {% endif %}
       {% if field.help_text %}<div class="meta" style="margin-top:-10px; margin-bottom:12px;">{{ field.help_text }}</div>{% endif %}
       {% for error in field.errors %}<div class="msg" style="background:#4a1d1d;border-color:#7f1d1d;color:#fee2e2;">{{ error }}</div>{% endfor %}
     {% endfor %}
