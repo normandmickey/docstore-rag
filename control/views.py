@@ -36,12 +36,29 @@ from .oauth import (
     fetch_graph_me,
     google_authorize_url,
     microsoft_authorize_url,
+    refresh_google_tokens,
 )
 from .pii import redact_pii
 from .email_flows import send_invite_email
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+
+def _get_valid_google_access_token(account):
+    if not account:
+        return ''
+    if account.expires_at and account.expires_at > timezone.now() + timezone.timedelta(minutes=5) and account.access_token:
+        return account.access_token
+    if not account.refresh_token:
+        return account.access_token
+    tokens = refresh_google_tokens(account.refresh_token)
+    account.access_token = tokens.get('access_token', account.access_token)
+    if tokens.get('refresh_token'):
+        account.refresh_token = tokens.get('refresh_token')
+    account.expires_at = tokens.get('expires_at')
+    account.save(update_fields=['access_token', 'refresh_token', 'expires_at', 'updated_at'])
+    return account.access_token
 
 
 class AppLoginView(LoginView):
@@ -1114,7 +1131,7 @@ def dashboard_connectors(request):
             return redirect('dashboard_connectors')
 
         try:
-            client = GoogleDriveClient(google_account.access_token)
+            client = GoogleDriveClient(_get_valid_google_access_token(google_account))
             remote = client.get_file(file_id)
             raw_bytes, import_mime, import_filename = client.download_file_bytes(
                 file_id=file_id,
@@ -1175,7 +1192,7 @@ def dashboard_connectors(request):
         base['google_drive_query'] = query
         base['google_drive_folder_current_id'] = folder_current_id
         try:
-            client = GoogleDriveClient(google_account.access_token)
+            client = GoogleDriveClient(_get_valid_google_access_token(google_account))
             q = None
             if query:
                 escaped = query.replace("'", "\\'")

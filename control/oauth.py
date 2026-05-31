@@ -92,6 +92,24 @@ def exchange_google_code_for_tokens(code):
     return payload
 
 
+def refresh_google_tokens(refresh_token):
+    response = requests.post(
+        GOOGLE_TOKEN_URL,
+        data={
+            'client_id': settings.GOOGLE_CLIENT_ID,
+            'client_secret': settings.GOOGLE_CLIENT_SECRET,
+            'refresh_token': refresh_token,
+            'grant_type': 'refresh_token',
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    expires_in = payload.get('expires_in', 3600)
+    payload['expires_at'] = timezone.now() + timezone.timedelta(seconds=expires_in)
+    return payload
+
+
 def fetch_google_userinfo(access_token):
     response = requests.get(
         GOOGLE_USERINFO_URL,

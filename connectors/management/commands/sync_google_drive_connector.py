@@ -7,11 +7,28 @@ from django.utils import timezone
 from connectors.google_drive import GoogleDriveClient, SUPPORTED_GOOGLE_DRIVE_EXPORT_MIME_TYPES
 from connectors.models import Connector, ConnectorSyncRun, ExternalDocumentBinding
 from control.models import ExternalAccount
+from control.oauth import refresh_google_tokens
 from documents.models import Document
 from documents.upload_service import create_or_reuse_document
 
 
 SUPPORTED_FILE_EXTENSIONS = {'.pdf', '.docx', '.txt', '.md', '.html', '.htm', '.csv'}
+
+
+def get_valid_google_access_token(account):
+    if not account:
+        return ''
+    if account.expires_at and account.expires_at > timezone.now() + timezone.timedelta(minutes=5) and account.access_token:
+        return account.access_token
+    if not account.refresh_token:
+        return account.access_token
+    tokens = refresh_google_tokens(account.refresh_token)
+    account.access_token = tokens.get('access_token', account.access_token)
+    if tokens.get('refresh_token'):
+        account.refresh_token = tokens.get('refresh_token')
+    account.expires_at = tokens.get('expires_at')
+    account.save(update_fields=['access_token', 'refresh_token', 'expires_at'])
+    return account.access_token
 
 
 class Command(BaseCommand):
@@ -42,7 +59,7 @@ class Command(BaseCommand):
             raise CommandError('Linked Google external account not found or missing access token.')
 
         sync_run = ConnectorSyncRun.objects.create(connector=connector, status=ConnectorSyncRun.STATUS_RUNNING)
-        client = GoogleDriveClient(account.access_token)
+        client = GoogleDriveClient(get_valid_google_access_token(account))
         created = 0
         versioned = 0
         skipped = 0
