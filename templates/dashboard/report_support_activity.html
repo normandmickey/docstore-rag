@@ -13,9 +13,27 @@
       <label for="end">End date</label>
       <input id="end" type="text" name="end" value="{{ report_end }}" placeholder="YYYY-MM-DD">
     </div>
+    <div>
+      <label for="channel">Channel</label>
+      <select id="channel" name="channel">
+        <option value="">All channels</option>
+        {% for channel in report_channels %}
+          <option value="{{ channel.id }}" {% if report_channel_id == channel.id|stringformat:'s' %}selected{% endif %}>{{ channel.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="assigned_user">Assigned user</label>
+      <select id="assigned_user" name="assigned_user">
+        <option value="">All assigned users</option>
+        {% for membership in report_assigned_users %}
+          <option value="{{ membership.user.id }}" {% if report_assigned_user_id == membership.user.id|stringformat:'s' %}selected{% endif %}>{{ membership.user.username }}</option>
+        {% endfor %}
+      </select>
+    </div>
     <div style="display:flex; gap:10px; flex-wrap:wrap;">
       <button type="submit">Run report</button>
-      <a href="?start={{ report_start }}&end={{ report_end }}&format=xlsx">Download XLSX</a>
+      <a href="?start={{ report_start }}&end={{ report_end }}&channel={{ report_channel_id }}&assigned_user={{ report_assigned_user_id }}&format=xlsx">Download XLSX</a>
     </div>
   </form>
 </div>

@@ -10,7 +10,7 @@ from django.utils import timezone
 from openpyxl import Workbook
 
 from control.views import _dashboard_base, _handle_workspace_actions
-from support.models import SupportConversation, SupportMessage
+from support.models import SupportChannel, SupportConversation, SupportMessage
 from integrations.voice.models import VoiceCallRecord
 
 
@@ -46,9 +46,23 @@ def support_activity_report(request):
     start_dt = timezone.make_aware(timezone.datetime.combine(start_date, timezone.datetime.min.time()))
     end_dt = timezone.make_aware(timezone.datetime.combine(end_date, timezone.datetime.max.time()))
 
+    channel_id_raw = (request.GET.get('channel') or '').strip()
+    assigned_user_id_raw = (request.GET.get('assigned_user') or '').strip()
+    channel_id = int(channel_id_raw) if channel_id_raw.isdigit() else None
+    assigned_user_id = int(assigned_user_id_raw) if assigned_user_id_raw.isdigit() else None
+
     conversations = SupportConversation.objects.filter(tenant=tenant, created_at__gte=start_dt, created_at__lte=end_dt)
     messages_qs = SupportMessage.objects.filter(conversation__tenant=tenant, created_at__gte=start_dt, created_at__lte=end_dt)
     calls_qs = VoiceCallRecord.objects.filter(tenant=tenant, created_at__gte=start_dt, created_at__lte=end_dt)
+
+    if channel_id:
+        conversations = conversations.filter(channel_id=channel_id)
+        messages_qs = messages_qs.filter(conversation__channel_id=channel_id)
+        calls_qs = calls_qs.filter(support_channel_id=channel_id)
+    if assigned_user_id:
+        conversations = conversations.filter(assigned_user_id=assigned_user_id)
+        messages_qs = messages_qs.filter(conversation__assigned_user_id=assigned_user_id)
+        calls_qs = calls_qs.filter(related_conversation__assigned_user_id=assigned_user_id)
 
     rows = []
     cursor = start_date
@@ -122,6 +136,10 @@ def support_activity_report(request):
         'report_name': 'support_activity',
         'report_start': start_date.isoformat(),
         'report_end': end_date.isoformat(),
+        'report_channel_id': channel_id_raw,
+        'report_assigned_user_id': assigned_user_id_raw,
+        'report_channels': SupportChannel.objects.filter(tenant=tenant).order_by('name'),
+        'report_assigned_users': tenant.memberships.select_related('user').order_by('user__username'),
         'report_rows': rows,
         'report_summary': summary,
     })
