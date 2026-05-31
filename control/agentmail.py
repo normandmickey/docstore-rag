@@ -47,8 +47,10 @@ class AgentMailClient:
             payload['html'] = html
 
         candidate_urls = [
+            f'{self.base_url}{self.api_prefix}/inboxes/{self.inbox_id}/messages/send',
+            f'{self.base_url}/v0/inboxes/{self.inbox_id}/messages/send',
+            f'https://api.agentmail.to/v0/inboxes/{self.inbox_id}/messages/send',
             f'{self.base_url}{self.api_prefix}/inboxes/{self.inbox_id}/messages',
-            f'{self.base_url}/v0/inboxes/{self.inbox_id}/messages',
             f'https://api.agentmail.to/v0/inboxes/{self.inbox_id}/messages',
         ]
 
