@@ -354,6 +354,32 @@ def chatbot_zoom_connect_callback(request):
 
 
 @login_required
+@login_required
+def chatbot_event_detail(request, event_id):
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+
+    tenant = base.get('current_tenant')
+    if tenant is None:
+        messages.error(request, 'No tenant selected.')
+        return redirect('dashboard')
+
+    event = get_object_or_404(
+        ChatbotEventLog.objects.select_related('integration', 'endpoint', 'bot_definition'),
+        id=event_id,
+        tenant=tenant,
+    )
+    base.update({
+        'section': 'chatbots',
+        'chatbot_subsection': 'event_detail',
+        'chatbot_event': event,
+    })
+    return render(request, 'dashboard/chatbot_event_detail.html', base)
+
+
+@login_required
 def chatbot_definition_detail(request, definition_id):
     base = _dashboard_base(request)
     handled = _handle_workspace_actions(request, base)

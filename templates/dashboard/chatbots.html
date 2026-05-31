@@ -104,7 +104,7 @@
   {% if chatbot_recent_events %}
     {% for event in chatbot_recent_events %}
       <div class="row">
-        <div><strong>{{ event.event_type }}</strong> <span class="meta">· {{ event.severity }} · {{ event.created_at }}</span></div>
+        <div><a href="/dashboard/chatbots/events/{{ event.id }}/"><strong>{{ event.event_type }}</strong></a> <span class="meta">· {{ event.severity }} · {{ event.created_at }}</span></div>
         {% if event.message %}<div style="margin-top:8px; white-space:pre-wrap;">{{ event.message }}</div>{% endif %}
       </div>
     {% endfor %}

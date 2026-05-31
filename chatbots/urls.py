@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import chatbot_binding_new, chatbot_definition_detail, chatbot_definition_new, chatbot_endpoint_new, chatbot_index, chatbot_integration_edit, chatbot_integration_new, chatbot_zoom_connect_callback, chatbot_zoom_connect_start
+from .views import chatbot_binding_new, chatbot_definition_detail, chatbot_definition_new, chatbot_endpoint_new, chatbot_event_detail, chatbot_index, chatbot_integration_edit, chatbot_integration_new, chatbot_zoom_connect_callback, chatbot_zoom_connect_start
 
 urlpatterns = [
     path('', chatbot_index, name='chatbot_index'),
@@ -9,6 +9,7 @@ urlpatterns = [
     path('integrations/<int:integration_id>/zoom/connect/', chatbot_zoom_connect_start, name='chatbot_zoom_connect_start'),
     path('integrations/zoom/callback/', chatbot_zoom_connect_callback, name='chatbot_zoom_connect_callback'),
     path('definitions/new/', chatbot_definition_new, name='chatbot_definition_new'),
+    path('events/<int:event_id>/', chatbot_event_detail, name='chatbot_event_detail'),
     path('definitions/<int:definition_id>/', chatbot_definition_detail, name='chatbot_definition_detail'),
     path('endpoints/new/', chatbot_endpoint_new, name='chatbot_endpoint_new'),
     path('bindings/new/', chatbot_binding_new, name='chatbot_binding_new'),

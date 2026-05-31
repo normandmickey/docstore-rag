@@ -1,0 +1,22 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}{{ chatbot_event.event_type }} · Chatbot Event · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>{{ chatbot_event.event_type }}</h2>
+  <p class="meta">Severity: {{ chatbot_event.severity }} · {{ chatbot_event.created_at }}</p>
+  <p class="meta">
+    {% if chatbot_event.integration %}Integration: {{ chatbot_event.integration.name }}{% endif %}
+    {% if chatbot_event.endpoint %} · Endpoint: {{ chatbot_event.endpoint.display_name }}{% endif %}
+    {% if chatbot_event.bot_definition %} · Bot: {{ chatbot_event.bot_definition.name }}{% endif %}
+  </p>
+  {% if chatbot_event.message %}
+    <h3>Message</h3>
+    <pre>{{ chatbot_event.message }}</pre>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Payload JSON</h2>
+  <pre>{{ chatbot_event.payload_json|pprint }}</pre>
+</div>
+{% endblock %}
