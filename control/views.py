@@ -1,5 +1,6 @@
 import logging
 import secrets
+import subprocess
 
 import requests
 
@@ -973,6 +974,64 @@ def dashboard_connectors(request):
     base['google_account'] = google_account
     base['google_drive_files'] = []
     base['google_drive_query'] = ''
+    base['google_drive_connector'] = None
+
+    if current_workspace and current_tenant:
+        base['google_drive_connector'] = Connector.objects.filter(
+            tenant=current_tenant,
+            workspace=current_workspace,
+            provider=Connector.PROVIDER_GOOGLE_DRIVE,
+        ).order_by('-updated_at').first()
+
+    if request.method == 'POST' and request.POST.get('action') == 'save_google_drive_connector' and current_workspace and current_tenant:
+        if not google_account:
+            messages.error(request, 'Connect a Google account first.')
+            return redirect('dashboard_connectors')
+        folder_id = (request.POST.get('folder_id') or 'root').strip() or 'root'
+        label = (request.POST.get('label') or '').strip() or 'Google Drive'
+        connector, _created = Connector.objects.update_or_create(
+            tenant=current_tenant,
+            workspace=current_workspace,
+            provider=Connector.PROVIDER_GOOGLE_DRIVE,
+            defaults={
+                'label': label,
+                'status': Connector.STATUS_ACTIVE,
+                'config_json': {
+                    'external_account_id': google_account.id,
+                    'account_email': google_account.email,
+                    'folder_id': folder_id,
+                },
+            },
+        )
+        messages.success(request, f'Saved Google Drive connector for folder id: {folder_id}.')
+        return redirect('dashboard_connectors')
+
+    if request.method == 'POST' and request.POST.get('action') == 'sync_google_drive_connector' and current_workspace and current_tenant:
+        connector = Connector.objects.filter(
+            tenant=current_tenant,
+            workspace=current_workspace,
+            provider=Connector.PROVIDER_GOOGLE_DRIVE,
+        ).order_by('-updated_at').first()
+        if not connector:
+            messages.error(request, 'Save a Google Drive connector first.')
+            return redirect('dashboard_connectors')
+        try:
+            result = subprocess.run(
+                ['.venv/bin/python', 'manage.py', 'sync_google_drive_connector', str(connector.id)],
+                cwd=str(settings.BASE_DIR),
+                capture_output=True,
+                text=True,
+                timeout=300,
+                check=False,
+            )
+            if result.returncode == 0:
+                messages.success(request, result.stdout.strip() or 'Google Drive sync completed.')
+            else:
+                messages.error(request, result.stderr.strip() or result.stdout.strip() or 'Google Drive sync failed.')
+        except Exception as exc:
+            logger.exception('Google Drive sync command failed for connector=%s', connector.id)
+            messages.error(request, f'Google Drive sync failed: {exc}')
+        return redirect('dashboard_connectors')
 
     if request.method == 'POST' and request.POST.get('action') == 'google_drive_import' and current_workspace and current_tenant:
         if not google_account:

@@ -7,6 +7,8 @@ GOOGLE_DOC_EXPORTS = {
     'application/vnd.google-apps.presentation': ('application/pdf', '.pdf'),
 }
 
+SUPPORTED_GOOGLE_DRIVE_EXPORT_MIME_TYPES = set(GOOGLE_DOC_EXPORTS.keys())
+
 
 class GoogleDriveClient:
     def __init__(self, access_token):
@@ -47,6 +49,10 @@ class GoogleDriveClient:
         )
         response.raise_for_status()
         return response.json()
+
+    def list_folder_files(self, folder_id='root', page_size=100):
+        q = f"'{folder_id}' in parents and trashed = false"
+        return self.list_files(q=q, page_size=page_size)
 
     def download_file_bytes(self, file_id, mime_type=None, filename=''):
         if mime_type in GOOGLE_DOC_EXPORTS:
