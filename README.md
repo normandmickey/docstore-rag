@@ -1,13 +1,11 @@
 # Docstore RAG
 
-A multi-tenant document storage, retrieval, and chat service for document-grounded workflows, built with Django for admin visibility and operational control.
+A multi-tenant document storage, retrieval, chat, and control-plane service for document-grounded workflows, built with Django for admin visibility and operational control.
 
 ## Live
-
-- `https://docstore.oddsmith.net`
+- App: `https://docstore.oddsmith.net`
 
 ## Current Status
-
 Docstore is now well past the initial scaffold stage. The live product currently includes:
 
 - Django auth + tenant/workspace onboarding
@@ -23,6 +21,9 @@ Docstore is now well past the initial scaffold stage. The live product currently
 - invite-only signup
 - SharePoint OAuth foundation
 - MinIO-backed production file storage
+- tenant-scoped support flows (SMS/voice scaffolding)
+- optional voice transcript ingest endpoint
+- chatbot control plane for Telegram/Discord-style integrations
 
 ## What Works Now
 
@@ -74,9 +75,50 @@ Docstore is now well past the initial scaffold stage. The live product currently
   - question text
   - raw chunk text
 
+### Support + voice integration
+- tenant-scoped support settings and channel scaffolding
+- Twilio SMS/voice webhook support in Django
+- optional `VoiceCallRecord` storage via:
+  - `POST /api/v1/integrations/voice/calls/ingest/`
+- admin visibility for `VoiceCallRecord`
+- dashboard visibility for support voice calls:
+  - `/dashboard/support/calls/`
+- legacy voicemail-style support threads hidden from main support inbox
+
+### Chatbot control plane
+Docstore now includes a tenant-scoped chatbot control plane for external bot runtimes.
+
+Current pieces live in Django:
+- `ChatbotIntegration`
+- `ChatbotEndpoint`
+- `ChatbotDefinition`
+- `ChatbotEndpointBinding`
+- `ChatbotBuild`
+- `ChatbotDeployment`
+- `ChatbotConversation`
+- `ChatbotMessage`
+- `ChatbotEventLog`
+
+Dashboard pages now include:
+- `/dashboard/chatbots/`
+- create/edit integration forms
+- create definition form
+- create endpoint form
+- create binding form
+- definition detail page
+
+Runner-facing APIs now include:
+- `POST /api/v1/chatbots/resolve/`
+- `POST /api/v1/chatbots/messages/ingest/`
+- `POST /api/v1/chatbots/events/ingest/`
+
+Current live bot runtimes using this control plane:
+- Telegram via `docstore-bot-runner`
+- Discord via `docstore-bot-runner`
+
 ## Architecture
 
-## Core concepts
+### Core concepts
 - **Tenant**: top-level org/account boundary
 - **Workspace**: logical knowledge base within a tenant
 - **Collection**: optional namespace/tag inside a workspace
@@ -88,20 +130,41 @@ Docstore is now well past the initial scaffold stage. The live product currently
 - **ExternalAccount**: user-owned OAuth-linked provider account (currently Microsoft scaffold)
 - **Connector**: external sync configuration
 
-## App layout
+### App layout
 - `control` — auth flow, tenants, workspaces, API keys, external accounts, dashboard pages
 - `documents` — documents, versions, chunks, facts, upload handling, duplicate/version logic
 - `ingestion` — parsing, chunking, question generation, embeddings, Celery jobs
 - `retrieval` — chunk retrieval, answer assembly, dashboard chat/search
 - `audit` — retrieval logging
 - `connectors` — SharePoint connector models, Graph helper, sync runs, bindings
+- `support` — tenant-scoped support channels, conversations, Twilio flows
+- `integrations.voice` — optional voice transcript ingest model/view/admin
+- `chatbots` — chatbot integrations, definitions, logs, dashboard control-plane pages
+
+### Bot/runtime boundary
+Docstore is the **control plane**, not the long-running bot runtime.
+
+Docstore owns:
+- tenant/workspace config
+- chatbot integrations + definitions
+- resolve/logging APIs
+- retrieval/chat APIs
+- dashboard/admin visibility
+
+External runtimes own:
+- platform-specific webhooks/gateway connections
+- message/session handling
+- retries and transport behavior
+- execution-plane behavior
+
+Current runtime repos/services:
+- `docstore-bot-runner` — Telegram + Discord
+- `docstore-voice-agent` — realtime Twilio voice agent
 
 ## Retrieval design (current)
-
 Docstore no longer relies on a single raw chunk embedding alone.
 
 Each chunk can now carry multiple retrieval signals:
-
 - `text` + `embedding`
 - `metadata_text` + `metadata_embedding`
 - `question_text` + `question_embedding`
@@ -118,31 +181,7 @@ Each chunk can now carry multiple retrieval signals:
 5. do local same-document chunk expansion around the strongest hit
 6. answer only from the selected context
 
-### Why this exists
-This grew out of handbook/policy retrieval problems where:
-- raw embeddings alone were too fuzzy
-- metadata helped but was still document-centric
-- question-style retrieval text better matched how humans actually ask
-
-## Facts layer (current)
-
-Docstore also builds a lightweight extracted-facts layer during ingestion.
-
-Current fact types:
-- `heading`
-- `list_item`
-- `policy`
-
-This layer is useful for:
-- debugging extraction quality
-- surfacing structured snippets in the dashboard
-- providing an additional retrieval/context path
-
-It is not yet intended as a complete ontology or knowledge graph.
-
 ## Provider split (current)
-
-Docstore now uses different providers for different tasks.
 
 ### OpenAI
 Used for:
@@ -160,24 +199,6 @@ Used for:
 Current configured chat/question model family:
 - `openai/gpt-oss-20b`
 
-This split keeps embeddings stable while using a cheaper/faster generative path for retrieval-language generation and answers.
-
-## Experimental / shelved work
-
-### Docling
-Docling is installed separately on the VPS and extractor selection support exists in code.
-
-What we learned:
-- Docling can be installed and invoked
-- Docling improves structure in some cases
-- Docling did not solve glyph corruption cleanly for the target handbook
-- Docling runtime on the current VPS was too slow for regular use
-
-Conclusion:
-- keep Docling as an experimental alternate extractor backend
-- do **not** use it as the normal production path on this VPS for now
-- likely revisit on a GPU machine or faster host later
-
 ## Important Routes
 
 ### Web
@@ -193,6 +214,9 @@ Conclusion:
 - `/dashboard/proxi-web/`
 - `/dashboard/api-keys/`
 - `/dashboard/staff/`
+- `/dashboard/support/`
+- `/dashboard/support/calls/`
+- `/dashboard/chatbots/`
 - `/documents/<id>/`
 - `/documents/<id>/facts/`
 - `/documents/<id>/chunks/`
@@ -210,30 +234,11 @@ Conclusion:
 - `POST /api/v1/urls/ingest/`
 - `POST /api/v1/search/`
 - `POST /api/v1/chat/`
-
-## Key Models
-
-### control
-- `Tenant`
-- `Workspace`
-- `TenantMembership`
-- `APIKey`
-- `ExternalAccount`
-- `InviteToken`
-
-### documents
-- `Document`
-- `DocumentVersion`
-- `Chunk`
-- `ExtractedFact`
-
-### ingestion
-- `IngestionJob`
-
-### connectors
-- `Connector`
-- `ConnectorSyncRun`
-- `ExternalDocumentBinding`
+- `POST /api/v1/support/channel-lookup/`
+- `POST /api/v1/integrations/voice/calls/ingest/`
+- `POST /api/v1/chatbots/resolve/`
+- `POST /api/v1/chatbots/messages/ingest/`
+- `POST /api/v1/chatbots/events/ingest/`
 
 ## Environment Notes
 
@@ -253,17 +258,10 @@ QUESTION_GEN_MODEL=openai/gpt-oss-20b
 ```
 
 ### LLM question-generation guardrails
-Current enrichment guardrails:
-
 ```env
 QUESTION_GEN_MIN_CHARS=300
 QUESTION_GEN_MAX_CHUNKS=40
 ```
-
-Meaning:
-- only chunks above a minimum size are eligible
-- only a capped number of chunks per ingestion run use the LLM question-generation path
-- noisy chunks still fall back to heuristic question generation
 
 ### Storage
 Production currently uses MinIO-backed object storage.
@@ -271,18 +269,19 @@ User-facing download URLs are streamed through Django so raw internal MinIO URLs
 
 ### Celery
 Docstore uses its own queue:
-
 ```env
 CELERY_BROKER_URL=redis://localhost:6379/0
 CELERY_RESULT_BACKEND=redis://localhost:6379/1
 ```
-
 Worker should consume the `docstore` queue.
 
-### Microsoft / SharePoint OAuth scaffold
-Still foundation-level, not fully productized.
-Expected env:
+### Voice integration toggle
+Optional voice transcript ingest uses:
+```env
+VOICE_INTEGRATION_ENABLED=true
+```
 
+### Microsoft / SharePoint OAuth scaffold
 ```env
 MS_GRAPH_CLIENT_ID=...
 MS_GRAPH_CLIENT_SECRET=...
@@ -292,7 +291,6 @@ MS_GRAPH_SCOPES=openid profile email offline_access Files.Read Sites.Read.All Us
 ```
 
 ## API keys
-
 Dashboard users can create and revoke API keys from:
 - `/dashboard/api-keys/`
 
@@ -301,22 +299,24 @@ Behavior:
 - only prefix + hash stored
 - revoke disables without deleting the DB record
 - workspace-scoped and tenant-wide keys supported
-- custom API-key guard handles tenant/workspace inference where possible
+- chatbot/voice runtimes rely on these API keys for resolve/log/chat ingest flows
 
 ## Operational Notes
-- production deploy path uses Pi → VPS rsync
+- current production deploy path is git-based Pi → VPS deploy helper
 - `.env` is intentionally excluded from deploy sync
 - generated vectors live in Postgres, not SQLite
 - current production-safe extraction path is the standard extractor
-- retrieval quality still depends heavily on extraction quality for PDFs with glyph/encoding problems
-- document-scoped search pages are now a first-class debugging tool and should be used heavily during tuning
+- chatbot + voice runtimes are separate services and should not be folded into Django
+- document-scoped search pages remain a first-class debugging tool during tuning
 
 ## Related docs
-- see `docs/workflows/retrieval-and-ingestion.md` for the current workflow and tuning notes
+- `DEPLOY.md`
+- `docs/chatbots-architecture.md`
 
 ## Good Next Steps
 - keep improving chunk-question quality and cost discipline
-- improve exact-list ranking for near-miss chunks (e.g. “floating holidays” vs “paid holidays”)
-- improve PDF cleanup / extraction quality further
+- improve exact-list ranking for near-miss chunks
 - continue SharePoint productization
 - add more retrieval evaluation fixtures / benchmark questions
+- continue chatbot UX polish and richer endpoint binding flows
+- continue voice-agent quality and transcript sync refinement
