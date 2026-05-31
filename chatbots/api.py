@@ -205,11 +205,18 @@ class ChatbotMessageIngestView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        tenant, workspace, _api_key = resolve_request_context(
-            request,
-            tenant_id=data.get('tenant_id'),
-            workspace_id=data.get('workspace_id'),
-        )
+        if data.get('workspace_id') is not None:
+            tenant, workspace, _api_key = resolve_request_context(
+                request,
+                tenant_id=data.get('tenant_id'),
+                workspace_id=data.get('workspace_id'),
+            )
+        else:
+            api_key = get_api_key_from_header(request)
+            if api_key is None:
+                return Response({'detail': 'Authentication required.'}, status=401)
+            tenant = api_key.tenant
+            workspace = None
 
         integration = ChatbotIntegration.objects.get(id=data['integration_id'], tenant=tenant)
         endpoint = ChatbotEndpoint.objects.filter(id=data.get('endpoint_id'), tenant=tenant).first() if data.get('endpoint_id') else None
