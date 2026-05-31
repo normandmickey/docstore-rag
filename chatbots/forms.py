@@ -117,7 +117,26 @@ class ChatbotDefinitionForm(forms.ModelForm):
         else:
             self.fields['integration'].queryset = ChatbotIntegration.objects.none()
             self.fields['default_workspace'].queryset = Workspace.objects.none()
+        json_field_names = [
+            'allowed_tools_json',
+            'response_policy_json',
+            'handoff_policy_json',
+            'logging_policy_json',
+            'metadata_json',
+        ]
+        for field_name in json_field_names:
+            if field_name in self.fields:
+                self.fields[field_name].initial = json.dumps(getattr(self.instance, field_name, {}) or {}, indent=2, sort_keys=True)
         if self.instance and self.instance.pk:
+            self.fields['integration'].initial = self.instance.integration_id
+            self.fields['default_workspace'].initial = self.instance.default_workspace_id
+            self.fields['persona_prompt'].initial = self.instance.persona_prompt
+            self.fields['system_prompt'].initial = self.instance.system_prompt
+            self.fields['runtime_mode'].initial = self.instance.runtime_mode
+            self.fields['template_name'].initial = self.instance.template_name
+            self.fields['template_version'].initial = self.instance.template_version
+            self.fields['name'].initial = self.instance.name
+            self.fields['active'].initial = self.instance.active
             self.fields['prefill_from_integration'].initial = False
 
     def clean_integration(self):
