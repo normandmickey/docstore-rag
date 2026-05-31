@@ -1,0 +1,72 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Interactions Report · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Interactions Report</h2>
+  <p class="meta">Cross-channel activity stream for support, voice, and chatbots.</p>
+  <form method="get" style="display:grid; gap:16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); align-items:end;">
+    <div>
+      <label for="start">Start date</label>
+      <input id="start" type="text" name="start" value="{{ report_start }}" placeholder="YYYY-MM-DD">
+    </div>
+    <div>
+      <label for="end">End date</label>
+      <input id="end" type="text" name="end" value="{{ report_end }}" placeholder="YYYY-MM-DD">
+    </div>
+    <div>
+      <label for="source">Source</label>
+      <select id="source" name="source">
+        {% for value, label in report_source_choices %}
+          <option value="{{ value }}" {% if report_source == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div>
+      <label for="workspace">Workspace</label>
+      <select id="workspace" name="workspace">
+        <option value="">All workspaces</option>
+        {% for workspace in report_workspaces %}
+          <option value="{{ workspace.id }}" {% if report_workspace_id == workspace.id|stringformat:'s' %}selected{% endif %}>{{ workspace.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+      <button type="submit">Run report</button>
+      <a href="?start={{ report_start }}&end={{ report_end }}&source={{ report_source }}&workspace={{ report_workspace_id }}&format=xlsx">Download XLSX</a>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <h2>Summary</h2>
+  <div class="grid">
+    <div class="stat"><div class="meta">Rows</div><div style="font-size:1.5rem; font-weight:700;">{{ report_summary.total_rows }}</div></div>
+    <div class="stat"><div class="meta">Support</div><div style="font-size:1.5rem; font-weight:700;">{{ report_summary.support_rows }}</div></div>
+    <div class="stat"><div class="meta">Voice</div><div style="font-size:1.5rem; font-weight:700;">{{ report_summary.voice_rows }}</div></div>
+    <div class="stat"><div class="meta">Chatbots</div><div style="font-size:1.5rem; font-weight:700;">{{ report_summary.chatbot_rows }}</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Activity stream</h2>
+  {% for row in report_rows %}
+    <div class="row">
+      <strong>{{ row.timestamp|date:'Y-m-d H:i' }}</strong> · <span class="status status-succeeded" style="background:#1a2446; color:#dbeafe;">{{ row.source }}</span><br>
+      <span class="meta">
+        End user: {{ row.end_user|default:'—' }}
+        {% if row.contact_detail %} · {{ row.contact_detail }}{% endif %}
+      </span><br>
+      <span class="meta">
+        Channel: {{ row.channel|default:'—' }} ·
+        Workspace: {{ row.workspace|default:'—' }} ·
+        Assigned: {{ row.assigned_user|default:'—' }} ·
+        Status: {{ row.status|default:'—' }} ·
+        Ref: {{ row.reference }}
+      </span>
+      {% if row.preview %}<br><div style="margin-top:6px;">{{ row.preview }}</div>{% endif %}
+    </div>
+  {% empty %}
+    <p class="meta">No interactions found for this filter set.</p>
+  {% endfor %}
+</div>
+{% endblock %}

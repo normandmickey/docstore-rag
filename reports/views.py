@@ -12,6 +12,7 @@ from openpyxl import Workbook
 from control.views import _dashboard_base, _handle_workspace_actions
 from support.models import SupportChannel, SupportConversation, SupportMessage
 from integrations.voice.models import VoiceCallRecord
+from chatbots.models import ChatbotConversation, ChatbotIntegration
 
 
 def _infer_support_source(conversation):
@@ -209,3 +210,181 @@ def support_activity_report(request):
         'report_detail_rows': detail_rows,
     })
     return render(request, 'dashboard/report_support_activity.html', base)
+
+
+@login_required
+def interactions_report(request):
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+
+    tenant = base.get('current_tenant')
+    if tenant is None:
+        messages.error(request, 'No tenant selected.')
+        return redirect('dashboard')
+
+    today = timezone.localdate()
+    start_default = today - timedelta(days=29)
+    start_raw = (request.GET.get('start') or '').strip()
+    end_raw = (request.GET.get('end') or '').strip()
+    source_filter = (request.GET.get('source') or '').strip().lower()
+    workspace_id_raw = (request.GET.get('workspace') or '').strip()
+    workspace_id = int(workspace_id_raw) if workspace_id_raw.isdigit() else None
+
+    try:
+        start_date = timezone.datetime.fromisoformat(start_raw).date() if start_raw else start_default
+    except ValueError:
+        start_date = start_default
+    try:
+        end_date = timezone.datetime.fromisoformat(end_raw).date() if end_raw else today
+    except ValueError:
+        end_date = today
+
+    if end_date < start_date:
+        start_date, end_date = end_date, start_date
+
+    start_dt = timezone.make_aware(timezone.datetime.combine(start_date, timezone.datetime.min.time()))
+    end_dt = timezone.make_aware(timezone.datetime.combine(end_date, timezone.datetime.max.time()))
+
+    rows = []
+
+    support_qs = SupportConversation.objects.select_related('channel', 'contact', 'assigned_user', 'workspace_context').filter(
+        tenant=tenant,
+        created_at__gte=start_dt,
+        created_at__lte=end_dt,
+    )
+    if workspace_id:
+        support_qs = support_qs.filter(workspace_context_id=workspace_id)
+    for conversation in support_qs[:250]:
+        source = _infer_support_source(conversation)
+        if source_filter and source_filter != source:
+            continue
+        contact_meta = conversation.contact.metadata_json or {}
+        rows.append({
+            'timestamp': conversation.created_at,
+            'source': source,
+            'end_user': conversation.contact.name or conversation.contact.phone_number or '',
+            'contact_detail': (contact_meta.get('email') or '').strip() or conversation.contact.phone_number or '',
+            'channel': conversation.channel.name if conversation.channel_id else '',
+            'workspace': conversation.workspace_context.name if conversation.workspace_context_id else '',
+            'assigned_user': conversation.assigned_user.username if conversation.assigned_user_id else '',
+            'status': conversation.status,
+            'preview': conversation.subject or '',
+            'reference': f'support-{conversation.id}',
+        })
+
+    voice_qs = VoiceCallRecord.objects.select_related('workspace', 'support_channel').filter(
+        tenant=tenant,
+        created_at__gte=start_dt,
+        created_at__lte=end_dt,
+    )
+    if workspace_id:
+        voice_qs = voice_qs.filter(workspace_id=workspace_id)
+    for call in voice_qs[:250]:
+        source = 'voice'
+        if source_filter and source_filter != source:
+            continue
+        rows.append({
+            'timestamp': call.created_at,
+            'source': source,
+            'end_user': call.from_number or '',
+            'contact_detail': call.to_number or '',
+            'channel': call.support_channel.name if call.support_channel_id else '',
+            'workspace': call.workspace.name if call.workspace_id else '',
+            'assigned_user': '',
+            'status': call.close_reason or '',
+            'preview': f'Call {call.call_sid}',
+            'reference': f'voice-{call.id}',
+        })
+
+    chatbot_qs = ChatbotConversation.objects.select_related('integration', 'endpoint', 'workspace').filter(
+        tenant=tenant,
+        created_at__gte=start_dt,
+        created_at__lte=end_dt,
+    )
+    if workspace_id:
+        chatbot_qs = chatbot_qs.filter(workspace_id=workspace_id)
+    for convo in chatbot_qs[:250]:
+        source = f'chatbot_{convo.platform}'
+        if source_filter and source_filter != source:
+            continue
+        meta = convo.metadata_json or {}
+        external_user = meta.get('external_user_name') or meta.get('external_user_id') or convo.external_conversation_id or ''
+        channel_label = ''
+        if convo.integration_id:
+            channel_label = f'{convo.integration.name} ({convo.platform})'
+        elif convo.platform:
+            channel_label = convo.platform
+        rows.append({
+            'timestamp': convo.created_at,
+            'source': source,
+            'end_user': external_user,
+            'contact_detail': convo.external_thread_id or convo.external_conversation_id or '',
+            'channel': channel_label,
+            'workspace': convo.workspace.name if convo.workspace_id else '',
+            'assigned_user': '',
+            'status': convo.status,
+            'preview': convo.title or '',
+            'reference': f'chatbot-{convo.id}',
+        })
+
+    rows.sort(key=lambda item: item['timestamp'], reverse=True)
+    rows = rows[:500]
+
+    summary = {
+        'total_rows': len(rows),
+        'support_rows': sum(1 for row in rows if row['source'] in {'support', 'sms', 'sms/voice', 'voice'} and row['reference'].startswith('support-')),
+        'voice_rows': sum(1 for row in rows if row['reference'].startswith('voice-')),
+        'chatbot_rows': sum(1 for row in rows if row['reference'].startswith('chatbot-')),
+    }
+
+    if (request.GET.get('format') or '').strip().lower() == 'xlsx':
+        wb = Workbook()
+        ws = wb.active
+        ws.title = 'Interactions'
+        ws.append(['Timestamp', 'Source', 'End User', 'Contact Detail', 'Channel', 'Workspace', 'Assigned User', 'Status', 'Preview', 'Reference'])
+        for row in rows:
+            ws.append([
+                timezone.localtime(row['timestamp']).strftime('%Y-%m-%d %H:%M') if row['timestamp'] else '',
+                row['source'],
+                row['end_user'],
+                row['contact_detail'],
+                row['channel'],
+                row['workspace'],
+                row['assigned_user'],
+                row['status'],
+                row['preview'],
+                row['reference'],
+            ])
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response['Content-Disposition'] = f'attachment; filename="interactions-{start_date.isoformat()}-to-{end_date.isoformat()}.xlsx"'
+        return response
+
+    base.update({
+        'section': 'reports',
+        'report_name': 'interactions',
+        'report_start': start_date.isoformat(),
+        'report_end': end_date.isoformat(),
+        'report_source': source_filter,
+        'report_workspace_id': workspace_id_raw,
+        'report_source_choices': [
+            ('', 'All sources'),
+            ('support', 'Support'),
+            ('sms', 'SMS'),
+            ('sms/voice', 'SMS/Voice'),
+            ('voice', 'Voice'),
+            (f'chatbot_{ChatbotIntegration.PLATFORM_TELEGRAM}', 'Chatbot · Telegram'),
+            (f'chatbot_{ChatbotIntegration.PLATFORM_DISCORD}', 'Chatbot · Discord'),
+        ],
+        'report_workspaces': tenant.workspaces.order_by('name'),
+        'report_rows': rows,
+        'report_summary': summary,
+    })
+    return render(request, 'dashboard/report_interactions.html', base)
