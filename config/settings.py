@@ -168,6 +168,7 @@ LOGOUT_REDIRECT_URL = '/login/'
 ACCOUNT_EMAIL_VERIFICATION = 'none'
 ACCOUNT_LOGIN_METHODS = {'username', 'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']
+ACCOUNT_ADAPTER = 'control.account_adapter.DocstoreAccountAdapter'
 ALLOW_PUBLIC_SIGNUPS = os.getenv('ALLOW_PUBLIC_SIGNUPS', '1') == '1'
 
 

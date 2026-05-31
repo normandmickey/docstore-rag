@@ -356,6 +356,7 @@ This is intended as the safe first step before wiring AgentMail into user-facing
 
 Current live app wiring now includes:
 - invite emails when staff create an invite with an email address
+- password reset emails routed through the custom allauth account adapter
 - support acknowledgement emails for newly created inbound support conversations when the support contact has an email stored in metadata
 
 These mail hooks are intentionally non-fatal: if AgentMail send fails, the underlying invite/support flow still succeeds.
