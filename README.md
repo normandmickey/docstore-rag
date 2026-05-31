@@ -354,6 +354,12 @@ Current code support includes:
 
 This is intended as the safe first step before wiring AgentMail into user-facing invite/support workflows.
 
+Current live app wiring now includes:
+- invite emails when staff create an invite with an email address
+- support acknowledgement emails for newly created inbound support conversations when the support contact has an email stored in metadata
+
+These mail hooks are intentionally non-fatal: if AgentMail send fails, the underlying invite/support flow still succeeds.
+
 ## API keys
 Dashboard users can create and revoke API keys from:
 - `/dashboard/api-keys/`

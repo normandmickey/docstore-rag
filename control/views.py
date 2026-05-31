@@ -38,6 +38,7 @@ from .oauth import (
     microsoft_authorize_url,
 )
 from .pii import redact_pii
+from .email_flows import send_invite_email
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -1314,7 +1315,23 @@ def staff_dashboard(request):
             active=True,
         )
         signup_url = request.build_absolute_uri(f'/signup/?invite={invite.token}')
-        messages.success(request, f'Invite created for {email or "link-only access"}. Share this URL: {signup_url}')
+        if email:
+            try:
+                send_invite_email(
+                    to_email=email,
+                    signup_url=signup_url,
+                    tenant_name=getattr(tenant, 'name', ''),
+                    workspace_name=getattr(workspace, 'name', ''),
+                    role=invite.role,
+                    note=note,
+                    invited_by=getattr(request.user, 'username', '') or getattr(request.user, 'email', ''),
+                )
+                messages.success(request, f'Invite created and emailed to {email}. Invite link: {signup_url}')
+            except Exception as exc:
+                logger.exception('Invite email send failed for invite_id=%s email=%s', invite.id, email)
+                messages.warning(request, f'Invite created for {email}, but email send failed: {exc}. Share this URL manually: {signup_url}')
+        else:
+            messages.success(request, f'Invite created for link-only access. Share this URL: {signup_url}')
         return redirect('staff_dashboard')
 
     if request.method == 'POST' and request.POST.get('action') == 'disable_invite':

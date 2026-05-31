@@ -1,7 +1,13 @@
+import logging
+
 from django.db import transaction
 from django.utils import timezone
 
+from control.email_flows import send_support_ack_email
+
 from .models import SupportCall, SupportChannel, SupportContact, SupportConversation, SupportMessage
+
+logger = logging.getLogger(__name__)
 
 
 def normalize_phone_number(phone_number: str) -> str:
@@ -41,6 +47,7 @@ def ingest_inbound_sms(*, to_number: str, from_number: str, body: str, provider_
         status__in=[SupportConversation.STATUS_OPEN, SupportConversation.STATUS_PENDING],
     ).order_by('-last_message_at', '-updated_at', '-id').first()
 
+    conversation_created = False
     if conversation is None:
         conversation = SupportConversation.objects.create(
             tenant=channel.tenant,
@@ -51,6 +58,7 @@ def ingest_inbound_sms(*, to_number: str, from_number: str, body: str, provider_
             subject=(body[:120] if body else ''),
             last_message_at=timezone.now(),
         )
+        conversation_created = True
 
     message = SupportMessage.objects.create(
         conversation=conversation,
@@ -70,6 +78,18 @@ def ingest_inbound_sms(*, to_number: str, from_number: str, body: str, provider_
     if not conversation.workspace_context_id and channel.default_workspace_id:
         conversation.workspace_context = channel.default_workspace
     conversation.save(update_fields=['last_message_at', 'status', 'workspace_context', 'updated_at'])
+
+    contact_email = ((contact.metadata_json or {}).get('email') or '').strip()
+    if conversation_created and contact_email:
+        try:
+            send_support_ack_email(
+                to_email=contact_email,
+                tenant_name=getattr(channel.tenant, 'name', ''),
+                subject_hint=conversation.subject or body[:120],
+                conversation_id=conversation.id,
+            )
+        except Exception:
+            logger.exception('Support acknowledgement email failed for conversation_id=%s email=%s', conversation.id, contact_email)
     return conversation, message
 
 
