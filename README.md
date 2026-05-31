@@ -290,6 +290,48 @@ MS_GRAPH_TENANT_ID=common
 MS_GRAPH_SCOPES=openid profile email offline_access Files.Read Sites.Read.All User.Read
 ```
 
+### Google Drive OAuth setup
+The Google Drive connector now supports:
+- Google account linking
+- recent-file browse/search
+- one-off file import
+- folder-backed connector setup
+- basic sync-now flow
+- lightweight folder browser UI
+
+To enable it in production:
+
+1. In Google Cloud, enable the **Google Drive API**.
+2. Configure the OAuth consent screen.
+   - If the app is still in testing, add your Google account as a test user.
+3. Create an **OAuth client ID** of type **Web application**.
+4. Add this authorized redirect URI exactly:
+   - `https://docstore.oddsmith.net/connect/google/callback/`
+5. Put these values in the Docstore `.env` on the VPS checkout:
+
+```env
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+GOOGLE_REDIRECT_URI=https://docstore.oddsmith.net/connect/google/callback/
+GOOGLE_SCOPES=openid email profile https://www.googleapis.com/auth/drive.readonly
+```
+
+Current env location on the VPS:
+- `/home/norm/sites/docstore_checkout/.env`
+
+After updating `.env`, rerun the deploy/reload path:
+
+```bash
+/home/norm/bin/deploy-docstore
+```
+
+Then test from:
+- `/dashboard/connectors/`
+
+Common Google OAuth gotchas:
+- `redirect_uri_mismatch` means the Google OAuth client redirect URI does not exactly match the configured callback URL.
+- If the app is still in testing, accounts not added as test users may be blocked.
+
 ## API keys
 Dashboard users can create and revoke API keys from:
 - `/dashboard/api-keys/`
