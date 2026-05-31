@@ -1,8 +1,47 @@
+import json
+
 from django import forms
 
 from control.models import Workspace
 
 from .models import ChatbotDefinition, ChatbotEndpoint, ChatbotEndpointBinding, ChatbotIntegration
+
+
+PLATFORM_DEFINITION_PRESETS = {
+    ChatbotIntegration.PLATFORM_TELEGRAM: {
+        'template_name': 'telegram-assistant',
+        'template_version': 'v1',
+        'persona_prompt': 'You are a concise document assistant for Telegram. Be helpful, direct, and mobile-friendly.',
+        'system_prompt': 'Answer using the current workspace documents. Keep replies short and easy to read on mobile. Prefer a direct answer first, then a short supporting detail if needed.',
+        'allowed_tools_json': {'web_search': False},
+        'response_policy_json': {'style': 'concise', 'markdown': 'light', 'channel_behavior': 'dm-first'},
+        'handoff_policy_json': {'allow_human_handoff': True},
+        'logging_policy_json': {'store_raw_events': True},
+        'metadata_json': {'prefill_source': 'telegram'},
+    },
+    ChatbotIntegration.PLATFORM_DISCORD: {
+        'template_name': 'discord-assistant',
+        'template_version': 'v1',
+        'persona_prompt': 'You are a concise document assistant for Discord. Be helpful, natural, and not overly formal.',
+        'system_prompt': 'Answer from the current workspace documents. In DMs, reply directly. In servers, assume mention-first behavior and keep responses channel-friendly.',
+        'allowed_tools_json': {'web_search': False},
+        'response_policy_json': {'style': 'concise', 'markdown': 'light', 'channel_behavior': 'dm-reply-mention-server'},
+        'handoff_policy_json': {'allow_human_handoff': True},
+        'logging_policy_json': {'store_raw_events': True},
+        'metadata_json': {'prefill_source': 'discord'},
+    },
+    ChatbotIntegration.PLATFORM_ZOOM_CHAT: {
+        'template_name': 'zoom-chat-assistant',
+        'template_version': 'v1',
+        'persona_prompt': 'You are a concise support and document assistant for Zoom Team Chat. Sound helpful and natural.',
+        'system_prompt': 'Answer using the current workspace documents. Keep responses short, clear, and professional. Avoid heavy markdown and lead with the direct answer.',
+        'allowed_tools_json': {'web_search': False},
+        'response_policy_json': {'style': 'concise', 'markdown': 'minimal', 'channel_behavior': 'team-chat'},
+        'handoff_policy_json': {'allow_human_handoff': True},
+        'logging_policy_json': {'store_raw_events': True},
+        'metadata_json': {'prefill_source': 'zoom_chat'},
+    },
+}
 
 
 class ChatbotIntegrationForm(forms.ModelForm):
@@ -34,6 +73,12 @@ class ChatbotIntegrationForm(forms.ModelForm):
 
 
 class ChatbotDefinitionForm(forms.ModelForm):
+    prefill_from_integration = forms.BooleanField(
+        required=False,
+        initial=True,
+        help_text='For new definitions, prefill prompts and policy fields from the selected integration platform when those fields are blank.',
+    )
+
     class Meta:
         model = ChatbotDefinition
         fields = [
@@ -63,6 +108,7 @@ class ChatbotDefinitionForm(forms.ModelForm):
         }
 
     def __init__(self, *args, tenant=None, **kwargs):
+        self.prefill_enabled = kwargs.pop('prefill_enabled', True)
         super().__init__(*args, **kwargs)
         self.tenant = tenant
         if tenant is not None:
@@ -71,6 +117,8 @@ class ChatbotDefinitionForm(forms.ModelForm):
         else:
             self.fields['integration'].queryset = ChatbotIntegration.objects.none()
             self.fields['default_workspace'].queryset = Workspace.objects.none()
+        if self.instance and self.instance.pk:
+            self.fields['prefill_from_integration'].initial = False
 
     def clean_integration(self):
         integration = self.cleaned_data.get('integration')
@@ -83,6 +131,25 @@ class ChatbotDefinitionForm(forms.ModelForm):
         if workspace and self.tenant and workspace.tenant_id != self.tenant.id:
             raise forms.ValidationError('Selected workspace does not belong to the current tenant.')
         return workspace
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        should_prefill = self.cleaned_data.get('prefill_from_integration') and self.prefill_enabled
+        integration = self.cleaned_data.get('integration') or getattr(instance, 'integration', None)
+        preset = PLATFORM_DEFINITION_PRESETS.get(getattr(integration, 'platform', None)) if integration else None
+        if should_prefill and preset:
+            for field_name, preset_value in preset.items():
+                current_value = getattr(instance, field_name)
+                if current_value not in (None, '', {}):
+                    continue
+                if isinstance(preset_value, dict):
+                    setattr(instance, field_name, json.loads(json.dumps(preset_value)))
+                else:
+                    setattr(instance, field_name, preset_value)
+        if commit:
+            instance.save()
+            self.save_m2m()
+        return instance
 
 
 class ChatbotEndpointForm(forms.ModelForm):

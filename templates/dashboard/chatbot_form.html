@@ -3,7 +3,13 @@
 {% block content %}
 <div class="card">
   <h2>{{ chatbot_form_title }}</h2>
-  <p class="meta">This is the first control-plane form layer for chatbot integrations, definitions, endpoints, and bindings.</p>
+  <p class="meta">This is the control-plane form layer for chatbot integrations, definitions, endpoints, and bindings.</p>
+  {% if chatbot_prefill_help %}
+    <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe;">
+      <strong>Platform prefills</strong><br>
+      If you choose an integration first, this form can prefill prompts, templates, and policy JSON with service-specific defaults for Telegram, Discord, or Zoom Chat.
+    </div>
+  {% endif %}
   {% if chatbot_zoom_help %}
     <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe;">
       <strong>Zoom Chat setup notes</strong><br>

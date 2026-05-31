@@ -10,7 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from control.oauth import exchange_zoom_code_for_tokens, zoom_authorize_url
 from control.views import _dashboard_base, _handle_workspace_actions
 
-from .forms import ChatbotDefinitionForm, ChatbotEndpointBindingForm, ChatbotEndpointForm, ChatbotIntegrationForm
+from .forms import ChatbotDefinitionForm, ChatbotEndpointBindingForm, ChatbotEndpointForm, ChatbotIntegrationForm, PLATFORM_DEFINITION_PRESETS
 from .models import ChatbotBuild, ChatbotDefinition, ChatbotDeployment, ChatbotEndpoint, ChatbotEndpointBinding, ChatbotEventLog, ChatbotIntegration
 
 logger = logging.getLogger(__name__)
@@ -149,7 +149,14 @@ def chatbot_definition_new(request):
             messages.success(request, 'Chatbot definition created.')
             return redirect('chatbot_index')
     else:
-        form = ChatbotDefinitionForm(tenant=tenant)
+        initial = {}
+        integration_id = request.GET.get('integration')
+        integration = ChatbotIntegration.objects.filter(id=integration_id, tenant=tenant).first() if integration_id else None
+        if integration:
+            initial['integration'] = integration
+            preset = PLATFORM_DEFINITION_PRESETS.get(integration.platform) or {}
+            initial.update(preset)
+        form = ChatbotDefinitionForm(tenant=tenant, initial=initial)
 
     base.update({
         'section': 'chatbots',
@@ -157,6 +164,45 @@ def chatbot_definition_new(request):
         'chatbot_form': form,
         'chatbot_form_title': 'New chatbot definition',
         'chatbot_form_submit': 'Create definition',
+        'chatbot_prefill_help': True,
+    })
+    return render(request, 'dashboard/chatbot_form.html', base)
+
+
+@login_required
+def chatbot_definition_edit(request, definition_id):
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+
+    tenant = base.get('current_tenant')
+    if tenant is None:
+        messages.error(request, 'No tenant selected.')
+        return redirect('dashboard')
+    if not base.get('can_manage_tenant'):
+        messages.error(request, 'Only tenant owners and admins can manage chatbot definitions.')
+        return redirect('chatbot_index')
+
+    definition = get_object_or_404(ChatbotDefinition, id=definition_id, tenant=tenant)
+    if request.method == 'POST':
+        form = ChatbotDefinitionForm(request.POST, tenant=tenant, instance=definition, prefill_enabled=False)
+        if form.is_valid():
+            updated = form.save(commit=False)
+            updated.tenant = tenant
+            updated.save()
+            messages.success(request, 'Chatbot definition updated.')
+            return redirect('chatbot_definition_detail', definition_id=definition.id)
+    else:
+        form = ChatbotDefinitionForm(tenant=tenant, instance=definition, prefill_enabled=False)
+
+    base.update({
+        'section': 'chatbots',
+        'chatbot_subsection': 'definition_edit',
+        'chatbot_form': form,
+        'chatbot_form_title': f'Edit chatbot definition: {definition.name}',
+        'chatbot_form_submit': 'Save definition',
+        'chatbot_prefill_help': True,
     })
     return render(request, 'dashboard/chatbot_form.html', base)
 
