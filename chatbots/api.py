@@ -6,6 +6,7 @@ from rest_framework.views import APIView
 
 from control.api_auth import get_api_key_from_header
 from control.api_guard import resolve_request_context
+from control.oauth import refresh_zoom_tokens
 
 from .models import ChatbotConversation, ChatbotDefinition, ChatbotEndpoint, ChatbotEventLog, ChatbotIntegration, ChatbotMessage
 
@@ -86,6 +87,35 @@ class ChatbotResolveView(APIView):
         integration = integrations.first()
         if integration is None:
             return Response({'detail': 'Integration not found.'}, status=404)
+
+        if integration.platform == ChatbotIntegration.PLATFORM_ZOOM_CHAT:
+            credentials = integration.credentials_json or {}
+            expires_at_raw = credentials.get('expires_at')
+            refresh_token = credentials.get('refresh_token') or ''
+            needs_refresh = False
+            if refresh_token:
+                if not expires_at_raw:
+                    needs_refresh = True
+                else:
+                    try:
+                        expires_at = timezone.datetime.fromisoformat(expires_at_raw)
+                        if timezone.is_naive(expires_at):
+                            expires_at = timezone.make_aware(expires_at, timezone.get_current_timezone())
+                        needs_refresh = expires_at <= timezone.now() + timezone.timedelta(minutes=5)
+                    except Exception:
+                        needs_refresh = True
+            if needs_refresh:
+                try:
+                    refreshed = refresh_zoom_tokens(refresh_token)
+                    credentials.update({
+                        'access_token': refreshed.get('access_token', credentials.get('access_token', '')),
+                        'refresh_token': refreshed.get('refresh_token', refresh_token),
+                        'expires_at': refreshed.get('expires_at').isoformat() if refreshed.get('expires_at') else credentials.get('expires_at', ''),
+                    })
+                    integration.credentials_json = credentials
+                    integration.save(update_fields=['credentials_json', 'updated_at'])
+                except Exception:
+                    pass
 
         endpoint = None
         external_id = (data.get('external_id') or '').strip()

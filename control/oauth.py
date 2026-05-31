@@ -128,3 +128,20 @@ def exchange_zoom_code_for_tokens(code):
     expires_in = payload.get('expires_in', 3600)
     payload['expires_at'] = timezone.now() + timezone.timedelta(seconds=expires_in)
     return payload
+
+
+def refresh_zoom_tokens(refresh_token):
+    response = requests.post(
+        ZOOM_TOKEN_URL,
+        params={
+            'grant_type': 'refresh_token',
+            'refresh_token': refresh_token,
+        },
+        auth=(settings.ZOOM_CLIENT_ID, settings.ZOOM_CLIENT_SECRET),
+        timeout=30,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    expires_in = payload.get('expires_in', 3600)
+    payload['expires_at'] = timezone.now() + timezone.timedelta(seconds=expires_in)
+    return payload
