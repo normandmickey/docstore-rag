@@ -53,7 +53,12 @@ def chatbot_integration_new(request):
             integration.tenant = tenant
             integration.save()
             if not integration.webhook_url and integration.runner_key:
-                integration.webhook_url = f'https://bots.docstore.oddsmith.net/webhooks/telegram/{integration.runner_key}' if integration.platform == ChatbotIntegration.PLATFORM_TELEGRAM else ''
+                if integration.platform == ChatbotIntegration.PLATFORM_TELEGRAM:
+                    integration.webhook_url = f'https://bots.docstore.oddsmith.net/webhooks/telegram/{integration.runner_key}'
+                elif integration.platform == ChatbotIntegration.PLATFORM_ZOOM_CHAT:
+                    integration.webhook_url = f'https://bots.docstore.oddsmith.net/webhooks/zoom-chat/{integration.runner_key}'
+                else:
+                    integration.webhook_url = ''
                 integration.webhook_status = integration.webhook_status or 'pending'
                 integration.save(update_fields=['webhook_url', 'webhook_status', 'updated_at'])
             messages.success(request, f'Chatbot integration created. Runner key: {integration.runner_key}')
@@ -67,6 +72,8 @@ def chatbot_integration_new(request):
         'chatbot_form': form,
         'chatbot_form_title': 'New chatbot integration',
         'chatbot_form_submit': 'Create integration',
+        'chatbot_zoom_help': True,
+        'chatbot_runner_key_preview': '(generated after save)',
     })
     return render(request, 'dashboard/chatbot_form.html', base)
 
@@ -104,6 +111,8 @@ def chatbot_integration_edit(request, integration_id):
         'chatbot_form': form,
         'chatbot_form_title': f'Edit chatbot integration: {integration.name}',
         'chatbot_form_submit': 'Save integration',
+        'chatbot_zoom_help': True,
+        'chatbot_runner_key_preview': integration.runner_key or '(missing)',
     })
     return render(request, 'dashboard/chatbot_form.html', base)
 

@@ -25,6 +25,12 @@ class ChatbotIntegrationForm(forms.ModelForm):
             'credentials_json': forms.Textarea(attrs={'rows': 6}),
             'metadata_json': forms.Textarea(attrs={'rows': 4}),
         }
+        help_texts = {
+            'external_app_id': 'For Zoom Chat, store the Zoom app/client id here so webhook events can resolve the correct integration.',
+            'external_bot_id': 'Optional platform bot identity. Used today for Discord; reserved for future Zoom send-side identity if needed.',
+            'credentials_json': 'Telegram stores bot_token here. Zoom Chat can store app/install metadata here later, but outbound send is not wired yet.',
+            'metadata_json': 'Optional setup notes or platform-specific metadata. For Zoom Chat, this is a good place to store team/admin notes during bring-up.',
+        }
 
 
 class ChatbotDefinitionForm(forms.ModelForm):

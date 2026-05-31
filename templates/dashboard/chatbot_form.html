@@ -4,6 +4,18 @@
 <div class="card">
   <h2>{{ chatbot_form_title }}</h2>
   <p class="meta">This is the first control-plane form layer for chatbot integrations, definitions, endpoints, and bindings.</p>
+  {% if chatbot_zoom_help %}
+    <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe;">
+      <strong>Zoom Chat setup notes</strong><br>
+      Use platform <strong>Zoom Chat</strong> for Team Chat style integrations. Current scaffold supports webhook receive/verification, resolve, message/event logging, and draft reply generation in the shared runner.<br><br>
+      For v1 setup:
+      <ul style="margin:8px 0 0 18px;">
+        <li>Use <strong>external_app_id</strong> for your Zoom app/client id.</li>
+        <li>The webhook URL should be <code>https://bots.docstore.oddsmith.net/webhooks/zoom-chat/{{ chatbot_runner_key_preview }}</code>.</li>
+        <li>Outbound send back to Zoom Chat is still pending, so this is currently an inbound/logging/control-plane scaffold.</li>
+      </ul>
+    </div>
+  {% endif %}
   <form method="post">
     {% csrf_token %}
     {% for field in chatbot_form %}
