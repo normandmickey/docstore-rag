@@ -22,10 +22,10 @@ class ChatbotResolveSerializer(serializers.Serializer):
 
 class ChatbotEventIngestSerializer(serializers.Serializer):
     tenant_id = serializers.IntegerField(required=False)
-    workspace_id = serializers.IntegerField(required=False)
-    integration_id = serializers.IntegerField(required=False)
-    endpoint_id = serializers.IntegerField(required=False)
-    bot_definition_id = serializers.IntegerField(required=False)
+    workspace_id = serializers.IntegerField(required=False, allow_null=True)
+    integration_id = serializers.IntegerField(required=False, allow_null=True)
+    endpoint_id = serializers.IntegerField(required=False, allow_null=True)
+    bot_definition_id = serializers.IntegerField(required=False, allow_null=True)
     severity = serializers.ChoiceField(choices=ChatbotEventLog.SEVERITY_CHOICES, required=False, default=ChatbotEventLog.SEVERITY_INFO)
     event_type = serializers.CharField()
     message = serializers.CharField(required=False, allow_blank=True)
@@ -173,11 +173,17 @@ class ChatbotEventIngestView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        tenant, _workspace, _api_key = resolve_request_context(
-            request,
-            tenant_id=data.get('tenant_id'),
-            workspace_id=data.get('workspace_id'),
-        )
+        if data.get('workspace_id') is not None:
+            tenant, _workspace, _api_key = resolve_request_context(
+                request,
+                tenant_id=data.get('tenant_id'),
+                workspace_id=data.get('workspace_id'),
+            )
+        else:
+            api_key = get_api_key_from_header(request)
+            if api_key is None:
+                return Response({'detail': 'Authentication required.'}, status=401)
+            tenant = api_key.tenant
 
         integration = ChatbotIntegration.objects.filter(id=data.get('integration_id'), tenant=tenant).first() if data.get('integration_id') else None
         endpoint = ChatbotEndpoint.objects.filter(id=data.get('endpoint_id'), tenant=tenant).first() if data.get('endpoint_id') else None
