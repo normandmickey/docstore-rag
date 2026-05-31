@@ -1,3 +1,4 @@
+import json
 import secrets
 
 import requests
@@ -243,8 +244,10 @@ def chatbot_zoom_connect_start(request, integration_id):
         return redirect('chatbot_index')
 
     integration = get_object_or_404(ChatbotIntegration, id=integration_id, tenant=tenant, platform=ChatbotIntegration.PLATFORM_ZOOM_CHAT)
-    state = secrets.token_urlsafe(24)
-    request.session['zoom_oauth_state'] = state
+    nonce = secrets.token_urlsafe(24)
+    state_payload = {'nonce': nonce, 'integration_id': integration.id}
+    state = json.dumps(state_payload)
+    request.session['zoom_oauth_nonce'] = nonce
     request.session['zoom_oauth_integration_id'] = integration.id
     return redirect(zoom_authorize_url(state))
 
@@ -254,7 +257,7 @@ def chatbot_zoom_connect_callback(request):
     if not request.user.is_authenticated:
         return redirect('login')
 
-    expected_state = request.session.get('zoom_oauth_state')
+    expected_nonce = request.session.get('zoom_oauth_nonce')
     integration_id = request.session.get('zoom_oauth_integration_id')
     returned_state = request.GET.get('state')
     code = request.GET.get('code')
@@ -263,7 +266,18 @@ def chatbot_zoom_connect_callback(request):
     if error:
         messages.error(request, f'Zoom connection failed: {error}')
         return redirect('chatbot_index')
-    if not code or not expected_state or expected_state != returned_state or not integration_id:
+
+    state_integration_id = None
+    returned_nonce = None
+    try:
+        state_payload = json.loads(returned_state or '{}')
+        returned_nonce = state_payload.get('nonce')
+        state_integration_id = state_payload.get('integration_id')
+    except Exception:
+        state_payload = {}
+
+    integration_id = integration_id or state_integration_id
+    if not code or not integration_id or (expected_nonce and returned_nonce and expected_nonce != returned_nonce):
         messages.error(request, 'Zoom connection failed: invalid OAuth state or missing code.')
         return redirect('chatbot_index')
 
