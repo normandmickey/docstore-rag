@@ -298,6 +298,7 @@ The Google Drive connector now supports:
 - folder-backed connector setup
 - basic sync-now flow
 - lightweight folder browser UI
+- recursive folder sync for connector-backed imports
 
 To enable it in production:
 
@@ -331,6 +332,27 @@ Then test from:
 Common Google OAuth gotchas:
 - `redirect_uri_mismatch` means the Google OAuth client redirect URI does not exactly match the configured callback URL.
 - If the app is still in testing, accounts not added as test users may be blocked.
+
+### AgentMail setup
+Docstore can now use an AgentMail inbox for project email.
+
+Current minimal env support:
+
+```env
+AGENTMAIL_API_KEY=...
+AGENTMAIL_INBOX_ID=docstore@agentmail.to
+AGENTMAIL_BASE_URL=https://api.agentmail.to/v0
+```
+
+Current code support includes:
+- a lightweight AgentMail client wrapper at `control/agentmail.py`
+- a test send command:
+
+```bash
+.venv/bin/python manage.py send_agentmail_test you@example.com
+```
+
+This is intended as the safe first step before wiring AgentMail into user-facing invite/support workflows.
 
 ## API keys
 Dashboard users can create and revoke API keys from:

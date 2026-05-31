@@ -138,6 +138,10 @@ GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
 GOOGLE_REDIRECT_URI = os.getenv('GOOGLE_REDIRECT_URI', '')
 GOOGLE_SCOPES = [scope.strip() for scope in os.getenv('GOOGLE_SCOPES', 'openid email profile https://www.googleapis.com/auth/drive.readonly').split() if scope.strip()]
 
+AGENTMAIL_API_KEY = os.getenv('AGENTMAIL_API_KEY', '')
+AGENTMAIL_INBOX_ID = os.getenv('AGENTMAIL_INBOX_ID', '')
+AGENTMAIL_BASE_URL = os.getenv('AGENTMAIL_BASE_URL', 'https://api.agentmail.to/v0')
+
 S3_ENDPOINT_URL = os.getenv('S3_ENDPOINT_URL', '')
 S3_ACCESS_KEY = os.getenv('S3_ACCESS_KEY', '')
 S3_SECRET_KEY = os.getenv('S3_SECRET_KEY', '')
