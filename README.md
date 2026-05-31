@@ -333,6 +333,25 @@ Common Google OAuth gotchas:
 - `redirect_uri_mismatch` means the Google OAuth client redirect URI does not exactly match the configured callback URL.
 - If the app is still in testing, accounts not added as test users may be blocked.
 
+### Zoom Chat OAuth setup
+For Zoom Chat outbound replies, Docstore now has a minimal OAuth/install callback flow that can store install-derived credentials back into a Zoom Chat chatbot integration.
+
+Required env:
+
+```env
+ZOOM_CLIENT_ID=...
+ZOOM_CLIENT_SECRET=...
+ZOOM_REDIRECT_URI=https://docstore.oddsmith.net/dashboard/chatbots/integrations/zoom/callback/
+```
+
+Current behavior:
+- create a `Zoom Chat` chatbot integration in the dashboard
+- store Zoom app/client id in `external_app_id`
+- use the dashboard connect flow to authorize/install the Zoom app
+- callback stores `access_token` and, when available, `bot_jid` in `credentials_json`
+
+This is the missing bridge between Zoom webhook validation and actual outbound Zoom Chat reply delivery.
+
 ### AgentMail setup
 Docstore can now use an AgentMail inbox for project email.
 

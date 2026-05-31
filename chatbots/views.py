@@ -1,7 +1,11 @@
+import secrets
+
+import requests
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
+from control.oauth import exchange_zoom_code_for_tokens, zoom_authorize_url
 from control.views import _dashboard_base, _handle_workspace_actions
 
 from .forms import ChatbotDefinitionForm, ChatbotEndpointBindingForm, ChatbotEndpointForm, ChatbotIntegrationForm
@@ -221,6 +225,80 @@ def chatbot_binding_new(request):
         'chatbot_form_submit': 'Create binding',
     })
     return render(request, 'dashboard/chatbot_form.html', base)
+
+
+@login_required
+def chatbot_zoom_connect_start(request, integration_id):
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+
+    tenant = base.get('current_tenant')
+    if tenant is None:
+        messages.error(request, 'No tenant selected.')
+        return redirect('dashboard')
+    if not base.get('can_manage_tenant'):
+        messages.error(request, 'Only tenant owners and admins can connect Zoom Chat integrations.')
+        return redirect('chatbot_index')
+
+    integration = get_object_or_404(ChatbotIntegration, id=integration_id, tenant=tenant, platform=ChatbotIntegration.PLATFORM_ZOOM_CHAT)
+    state = secrets.token_urlsafe(24)
+    request.session['zoom_oauth_state'] = state
+    request.session['zoom_oauth_integration_id'] = integration.id
+    return redirect(zoom_authorize_url(state))
+
+
+@login_required
+def chatbot_zoom_connect_callback(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    expected_state = request.session.get('zoom_oauth_state')
+    integration_id = request.session.get('zoom_oauth_integration_id')
+    returned_state = request.GET.get('state')
+    code = request.GET.get('code')
+    error = request.GET.get('error')
+
+    if error:
+        messages.error(request, f'Zoom connection failed: {error}')
+        return redirect('chatbot_index')
+    if not code or not expected_state or expected_state != returned_state or not integration_id:
+        messages.error(request, 'Zoom connection failed: invalid OAuth state or missing code.')
+        return redirect('chatbot_index')
+
+    integration = ChatbotIntegration.objects.filter(id=integration_id, platform=ChatbotIntegration.PLATFORM_ZOOM_CHAT).first()
+    if integration is None:
+        messages.error(request, 'Zoom connection failed: integration not found.')
+        return redirect('chatbot_index')
+
+    try:
+        tokens = exchange_zoom_code_for_tokens(code)
+        access_token = tokens.get('access_token', '')
+        robot_response = requests.get(
+            'https://api.zoom.us/v2/im/chat/users/me',
+            headers={'Authorization': f'Bearer {access_token}'},
+            timeout=30,
+        )
+        robot_payload = {}
+        if robot_response.ok:
+            robot_payload = robot_response.json() or {}
+
+        credentials = integration.credentials_json or {}
+        credentials.update({
+            'access_token': access_token,
+            'refresh_token': tokens.get('refresh_token', ''),
+            'expires_at': tokens.get('expires_at').isoformat() if tokens.get('expires_at') else '',
+        })
+        if robot_payload.get('jid'):
+            credentials['bot_jid'] = robot_payload.get('jid')
+        integration.credentials_json = credentials
+        integration.webhook_status = 'connected'
+        integration.save(update_fields=['credentials_json', 'webhook_status', 'updated_at'])
+        messages.success(request, 'Zoom Chat integration connected. Access token stored.')
+    except Exception as exc:
+        messages.error(request, f'Zoom connection failed: {exc}')
+    return redirect('chatbot_index')
 
 
 @login_required
