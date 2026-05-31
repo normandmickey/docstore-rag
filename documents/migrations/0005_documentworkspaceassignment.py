@@ -30,10 +30,13 @@ class Migration(migrations.Migration):
         migrations.RunSQL(
             sql=(
                 "INSERT INTO documents_documentworkspaceassignment (document_id, workspace_id, is_primary, created_at) "
-                "SELECT id, workspace_id, TRUE, NOW() "
-                "FROM documents_document "
-                "WHERE workspace_id IS NOT NULL "
-                "ON CONFLICT (document_id, workspace_id) DO NOTHING;"
+                "SELECT d.id, d.workspace_id, TRUE, NOW() "
+                "FROM documents_document d "
+                "WHERE d.workspace_id IS NOT NULL "
+                "AND NOT EXISTS ("
+                "  SELECT 1 FROM documents_documentworkspaceassignment a "
+                "  WHERE a.document_id = d.id AND a.workspace_id = d.workspace_id"
+                ");"
             ),
             reverse_sql=migrations.RunSQL.noop,
         ),
