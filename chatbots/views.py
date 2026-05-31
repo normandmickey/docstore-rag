@@ -194,7 +194,27 @@ def chatbot_definition_edit(request, definition_id):
             messages.success(request, 'Chatbot definition updated.')
             return redirect('chatbot_definition_detail', definition_id=definition.id)
     else:
-        form = ChatbotDefinitionForm(tenant=tenant, instance=definition, prefill_enabled=False)
+        form = ChatbotDefinitionForm(
+            tenant=tenant,
+            instance=definition,
+            prefill_enabled=False,
+            initial={
+                'integration': definition.integration_id,
+                'name': definition.name,
+                'default_workspace': definition.default_workspace_id,
+                'persona_prompt': definition.persona_prompt,
+                'system_prompt': definition.system_prompt,
+                'runtime_mode': definition.runtime_mode,
+                'template_name': definition.template_name,
+                'template_version': definition.template_version,
+                'allowed_tools_json': json.dumps(definition.allowed_tools_json or {}, indent=2, sort_keys=True),
+                'response_policy_json': json.dumps(definition.response_policy_json or {}, indent=2, sort_keys=True),
+                'handoff_policy_json': json.dumps(definition.handoff_policy_json or {}, indent=2, sort_keys=True),
+                'logging_policy_json': json.dumps(definition.logging_policy_json or {}, indent=2, sort_keys=True),
+                'metadata_json': json.dumps(definition.metadata_json or {}, indent=2, sort_keys=True),
+                'active': definition.active,
+            },
+        )
 
     base.update({
         'section': 'chatbots',
