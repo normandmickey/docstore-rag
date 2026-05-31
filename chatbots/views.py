@@ -1,4 +1,5 @@
 import json
+import logging
 import secrets
 
 import requests
@@ -11,6 +12,8 @@ from control.views import _dashboard_base, _handle_workspace_actions
 
 from .forms import ChatbotDefinitionForm, ChatbotEndpointBindingForm, ChatbotEndpointForm, ChatbotIntegrationForm
 from .models import ChatbotBuild, ChatbotDefinition, ChatbotDeployment, ChatbotEndpoint, ChatbotEndpointBinding, ChatbotEventLog, ChatbotIntegration
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -264,6 +267,7 @@ def chatbot_zoom_connect_callback(request):
     error = request.GET.get('error')
 
     if error:
+        logger.warning('Zoom OAuth callback returned error=%s state=%s code_present=%s', error, returned_state, bool(code))
         messages.error(request, f'Zoom connection failed: {error}')
         return redirect('chatbot_index')
 
@@ -278,6 +282,16 @@ def chatbot_zoom_connect_callback(request):
 
     integration_id = integration_id or state_integration_id
     if not code or not integration_id or (expected_nonce and returned_nonce and expected_nonce != returned_nonce):
+        logger.warning(
+            'Zoom OAuth callback invalid state/missing code integration_id=%s session_integration_id=%s state_integration_id=%s expected_nonce=%s returned_nonce=%s code_present=%s raw_state=%s',
+            integration_id,
+            request.session.get('zoom_oauth_integration_id'),
+            state_integration_id,
+            expected_nonce,
+            returned_nonce,
+            bool(code),
+            returned_state,
+        )
         messages.error(request, 'Zoom connection failed: invalid OAuth state or missing code.')
         return redirect('chatbot_index')
 
@@ -289,6 +303,7 @@ def chatbot_zoom_connect_callback(request):
     try:
         tokens = exchange_zoom_code_for_tokens(code)
         access_token = tokens.get('access_token', '')
+        logger.info('Zoom OAuth token exchange succeeded integration_id=%s token_keys=%s', integration.id, sorted(tokens.keys()))
         robot_response = requests.get(
             'https://api.zoom.us/v2/im/chat/users/me',
             headers={'Authorization': f'Bearer {access_token}'},
@@ -297,6 +312,8 @@ def chatbot_zoom_connect_callback(request):
         robot_payload = {}
         if robot_response.ok:
             robot_payload = robot_response.json() or {}
+        else:
+            logger.warning('Zoom bot profile lookup failed integration_id=%s status=%s body=%s', integration.id, robot_response.status_code, robot_response.text[:1000])
 
         credentials = integration.credentials_json or {}
         credentials.update({
@@ -310,7 +327,14 @@ def chatbot_zoom_connect_callback(request):
         integration.webhook_status = 'connected'
         integration.save(update_fields=['credentials_json', 'webhook_status', 'updated_at'])
         messages.success(request, 'Zoom Chat integration connected. Access token stored.')
+    except requests.HTTPError as exc:
+        body = ''
+        if exc.response is not None:
+            body = exc.response.text[:1000]
+        logger.exception('Zoom OAuth token exchange failed integration_id=%s body=%s', integration.id, body)
+        messages.error(request, f'Zoom connection failed during token exchange: {body or exc}')
     except Exception as exc:
+        logger.exception('Zoom OAuth callback failed integration_id=%s', integration.id)
         messages.error(request, f'Zoom connection failed: {exc}')
     return redirect('chatbot_index')
 
