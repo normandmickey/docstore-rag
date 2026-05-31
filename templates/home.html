@@ -5,89 +5,97 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1020">
   <link rel="manifest" href="/manifest.webmanifest">
-  <title>Docstore · Documents, chat, support, voice, and bots</title>
+  <title>Docstore · A private knowledge layer for documents, support, voice, and bots</title>
   <style>
     :root {
       --bg: #0b1020;
+      --bg-2: #0f172a;
       --card: #121a33;
-      --card-2: #0f172a;
+      --card-2: #10182d;
       --border: #243055;
+      --border-soft: #334155;
       --text: #eef2ff;
       --muted: #cbd5e1;
       --soft: #94a3b8;
       --blue: #2563eb;
       --blue-soft: #93c5fd;
-      --green: #16a34a;
+      --green-soft: #86efac;
     }
     * { box-sizing: border-box; }
     body {
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       margin: 0;
-      background: linear-gradient(180deg, #0b1020 0%, #0f172a 100%);
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
       color: var(--text);
     }
     a { color: var(--blue-soft); text-decoration: none; }
-    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 80px; }
+    .wrap { max-width: 1180px; margin: 0 auto; padding: 28px 20px 84px; }
     .nav {
       display: flex; justify-content: space-between; align-items: center; gap: 16px;
-      padding: 12px 0 28px;
+      padding-bottom: 26px;
     }
-    .brand { font-weight: 700; font-size: 1.15rem; color: white; }
+    .brand { font-weight: 800; font-size: 1.15rem; color: white; }
     .nav-links { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
     .button, .button-secondary {
-      display: inline-block; padding: 12px 16px; border-radius: 10px; font-weight: 600;
+      display: inline-block; padding: 12px 16px; border-radius: 10px; font-weight: 700;
     }
     .button { background: var(--blue); color: white; }
-    .button-secondary { border: 1px solid var(--border); color: var(--text); background: rgba(255,255,255,0.02); }
+    .button-secondary { background: rgba(255,255,255,0.02); border: 1px solid var(--border); color: var(--text); }
     .hero {
       display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 24px; align-items: stretch;
-      margin-bottom: 28px;
+      margin-bottom: 26px;
     }
     .card {
-      background: rgba(18,26,51,0.95); border: 1px solid var(--border); border-radius: 18px; padding: 28px;
-      box-shadow: 0 10px 40px rgba(0,0,0,0.18);
+      background: rgba(18,26,51,0.96);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 28px;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.2);
     }
     .pill {
-      display: inline-block; padding: 8px 12px; border-radius: 999px; background: rgba(37,99,235,0.18);
-      color: #bfdbfe; font-size: 0.92rem; font-weight: 700; letter-spacing: 0.02em;
+      display: inline-block; padding: 8px 12px; border-radius: 999px;
+      background: rgba(37,99,235,0.18); color: #bfdbfe; font-size: 0.92rem; font-weight: 700;
     }
-    h1 { font-size: clamp(2.2rem, 4.5vw, 4rem); line-height: 1.05; margin: 18px 0 16px; }
-    h2 { font-size: 1.7rem; margin: 0 0 14px; }
-    h3 { font-size: 1.1rem; margin: 0 0 10px; }
-    p { color: var(--muted); line-height: 1.65; }
+    .kicker {
+      color: var(--green-soft); font-size: 0.9rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em;
+    }
+    h1 { font-size: clamp(2.35rem, 4.8vw, 4.2rem); line-height: 1.03; margin: 18px 0 16px; }
+    h2 { font-size: 1.8rem; margin: 0 0 14px; }
+    h3 { font-size: 1.08rem; margin: 0 0 10px; }
+    p { color: var(--muted); line-height: 1.68; }
     .hero-copy p { font-size: 1.08rem; max-width: 760px; }
     .cta-row { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 22px; }
     .status-box {
-      margin-top: 18px; padding: 16px; border-radius: 14px; background: var(--card-2); border: 1px solid #334155;
+      margin-top: 18px; padding: 16px; border-radius: 14px; background: var(--card-2); border: 1px solid var(--border-soft);
     }
     .status-box strong { color: white; }
-    .mini-grid, .feature-grid, .use-grid {
-      display: grid; gap: 16px;
-    }
-    .mini-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 16px; }
-    .feature-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 18px; }
-    .use-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 18px; }
-    .stat, .feature, .usecase {
-      background: var(--card-2); border: 1px solid #334155; border-radius: 16px; padding: 18px;
-    }
-    .stat strong, .feature strong, .usecase strong { display: block; color: white; margin-bottom: 8px; }
     .section { margin-top: 22px; }
-    .section-intro { max-width: 840px; }
+    .section-intro { max-width: 860px; }
+    .grid-2, .grid-3 {
+      display: grid; gap: 16px; margin-top: 18px;
+    }
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .feature, .pillar, .usecase, .stack-item, .mini-card {
+      background: var(--card-2);
+      border: 1px solid var(--border-soft);
+      border-radius: 16px;
+      padding: 18px;
+    }
+    .feature strong, .pillar strong, .usecase strong, .stack-item strong, .mini-card strong {
+      display: block; color: white; margin-bottom: 8px;
+    }
     ul.clean { margin: 10px 0 0; padding-left: 18px; color: var(--muted); }
     ul.clean li { margin-bottom: 8px; }
-    .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
-    .step-num {
-      width: 34px; height: 34px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
-      background: rgba(37,99,235,0.18); color: #bfdbfe; font-weight: 800; margin-bottom: 12px;
+    .quote {
+      font-size: 1.2rem; color: #dbeafe; line-height: 1.6; margin: 0;
     }
-    .footer-note { margin-top: 28px; color: var(--soft); font-size: 0.95rem; }
+    .footer-note { margin-top: 26px; color: var(--soft); font-size: 0.95rem; }
     .install-banner {
-      margin-top: 18px; padding: 14px; border-radius: 12px; background: var(--card-2); border: 1px solid #334155; display: none;
+      margin-top: 18px; padding: 14px; border-radius: 12px; background: var(--card-2); border: 1px solid var(--border-soft); display: none;
     }
-    .kicker { color: #86efac; font-weight: 700; font-size: 0.92rem; letter-spacing: 0.03em; text-transform: uppercase; }
     @media (max-width: 920px) {
-      .hero, .feature-grid, .use-grid, .steps { grid-template-columns: 1fr; }
-      .mini-grid { grid-template-columns: 1fr; }
+      .hero, .grid-2, .grid-3 { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -111,16 +119,21 @@
 
     <div class="hero">
       <div class="card hero-copy">
-        <div class="pill">Invite-only · Multi-tenant · Live</div>
-        <h1>Your documents, turned into chat, support, voice, and bots.</h1>
+        <div class="pill">Private knowledge layer · Invite-only · Live</div>
+        <h1>Turn scattered documents into something your team can actually use.</h1>
         <p>
-          Docstore is a multi-tenant document workspace that lets teams upload files, ingest URLs, connect cloud sources,
-          search semantically, chat with grounded answers, and power support inboxes, phone agents, and chatbots from the same knowledge base.
+          Most teams have files everywhere and answers nowhere: PDFs in Drive, policies in docs, support knowledge buried in threads,
+          and too much context trapped in people’s heads. Docstore exists to turn that mess into one private, grounded knowledge layer
+          for documents, chat, support, voice, and bots.
+        </p>
+        <p>
+          Upload files. Ingest URLs. Connect cloud folders. Search semantically. Ask grounded questions. Power Zoom, Telegram, Discord,
+          voice agents, and support workflows from the same source of truth.
         </p>
         <div class="cta-row">
           {% if request.user.is_authenticated %}
             <a class="button" href="/dashboard/">Open dashboard</a>
-            <a class="button-secondary" href="/dashboard/connectors/">View connectors</a>
+            <a class="button-secondary" href="/dashboard/connectors/">Explore connectors</a>
           {% else %}
             <a class="button" href="/login/">Log in</a>
             <a class="button-secondary" href="/signup/">Request access</a>
@@ -129,10 +142,10 @@
         <div class="status-box">
           {% if request.user.is_authenticated %}
             <strong>Signed in as {{ request.user.username }}</strong><br>
-            You can upload documents, connect sources, manage workspaces, and use chat, support, and chatbot features from the dashboard.
+            Your dashboard gives you access to documents, chat, connectors, support, reports, and chatbot tooling.
           {% else %}
-            <strong>Built for private workspaces and shared team use.</strong><br>
-            Docstore is designed for invite-based access, tenant/workspace separation, and private storage rather than open public indexing.
+            <strong>Built for private workspaces, not public toy demos.</strong><br>
+            Docstore is designed for invite-based teams, tenant-aware separation, private storage, and grounded answers tied to real source material.
           {% endif %}
         </div>
         <div id="install-banner" class="install-banner">
@@ -143,185 +156,203 @@
       </div>
 
       <div class="card">
-        <div class="kicker">Why teams use it</div>
-        <div class="mini-grid">
-          <div class="stat">
-            <strong>Document ingestion</strong>
-            Upload files, ingest URLs, import from Google Drive, and keep folder-based connectors synced.
+        <div class="kicker">Product point of view</div>
+        <p class="quote">
+          “Docstore is not just a place to upload files. It is a private knowledge product you can operate across chat, support, voice, and automation.”
+        </p>
+        <div class="grid-2">
+          <div class="mini-card">
+            <strong>Not another file dump</strong>
+            Documents are searchable, grounded, scoped, and reusable across delivery channels.
           </div>
-          <div class="stat">
-            <strong>Grounded chat</strong>
-            Ask questions against the current workspace with semantic retrieval and extracted facts.
+          <div class="mini-card">
+            <strong>Not a hallucination engine</strong>
+            Answers are meant to be rooted in the current workspace, not free-floating guesses.
           </div>
-          <div class="stat">
-            <strong>Support channels</strong>
-            Centralize support threads, voice calls, and bot interactions in one tenant-aware control plane.
+          <div class="mini-card">
+            <strong>Built for operations</strong>
+            Support inboxes, voice calls, connectors, and reporting live alongside retrieval and chat.
           </div>
-          <div class="stat">
-            <strong>Automation-ready</strong>
-            Use API keys, chatbot integrations, reporting, and scheduled sync to build workflows on top.
+          <div class="mini-card">
+            <strong>One source of truth</strong>
+            The same workspace can power humans, bots, and phone agents without duplicating knowledge.
           </div>
         </div>
       </div>
     </div>
 
     <div class="card section">
-      <h2>What Docstore is</h2>
+      <h2>Why Docstore exists</h2>
       <p class="section-intro">
-        Docstore is a private knowledge platform for teams that want more than file storage. It combines document management,
-        retrieval, grounded AI chat, tenant-aware support tools, and channel integrations so the same workspace can power
-        internal search, customer support, phone agents, and chatbots without duplicating knowledge across tools.
+        AI around documents usually breaks in one of two ways: either it stays trapped as a demo chat widget bolted onto uploads,
+        or it gets spread across too many disconnected tools to trust. Docstore takes a different approach. The idea is simple:
+        build one private system where documents can be ingested, organized, retrieved, synced, questioned, and delivered into the channels where people actually work.
       </p>
-      <div class="steps">
-        <div class="feature">
-          <div class="step-num">1</div>
-          <strong>Connect or upload</strong>
-          Bring in PDFs, DOCX, CSV, text, HTML, URLs, and connected sources like Google Drive.
+      <div class="grid-3">
+        <div class="pillar">
+          <strong>A private knowledge layer</strong>
+          Put uploads, URLs, synced folders, and extracted knowledge into one tenant-aware system instead of scattering them across separate tools.
         </div>
-        <div class="feature">
-          <div class="step-num">2</div>
-          <strong>Organize by tenant and workspace</strong>
-          Keep knowledge scoped to the right team, customer, department, or use case.
+        <div class="pillar">
+          <strong>Grounded answers, not loose summaries</strong>
+          Retrieval is scoped to the current workspace so the system stays useful for actual policy, support, and operations questions.
         </div>
-        <div class="feature">
-          <div class="step-num">3</div>
-          <strong>Search, chat, sync, and automate</strong>
-          Use the same document base for chat, support inboxes, voice agents, and bots.
+        <div class="pillar">
+          <strong>One backend, multiple delivery channels</strong>
+          Use the same knowledge base for dashboard chat, support workflows, Zoom Chat, Telegram, Discord, and voice.
         </div>
       </div>
     </div>
 
     <div class="card section">
-      <h2>Feature overview</h2>
-      <div class="feature-grid">
+      <h2>What you can do with it</h2>
+      <div class="grid-3">
         <div class="feature">
-          <strong>Document ingestion</strong>
+          <strong>Ingest and organize documents</strong>
           <ul class="clean">
-            <li>File uploads and URL ingest</li>
-            <li>Duplicate and version handling</li>
-            <li>Soft delete and trash lifecycle</li>
-            <li>Private MinIO-backed storage</li>
+            <li>Upload files and ingest URLs</li>
+            <li>Handle duplicates and versions</li>
+            <li>Use soft delete and trash instead of destructive workflows</li>
+            <li>Keep assets private with MinIO-backed storage</li>
           </ul>
         </div>
         <div class="feature">
-          <strong>Search and grounded chat</strong>
+          <strong>Search and chat with grounded context</strong>
           <ul class="clean">
             <li>Semantic retrieval with pgvector</li>
-            <li>Workspace-scoped Q&amp;A</li>
+            <li>Workspace-scoped question answering</li>
             <li>Extracted facts and hybrid retrieval</li>
-            <li>Separate Proxi-Web web-aware chat mode</li>
+            <li>Separate Proxi-Web mode for web-aware conversations</li>
           </ul>
         </div>
         <div class="feature">
-          <strong>Connectors</strong>
+          <strong>Connect external sources</strong>
           <ul class="clean">
-            <li>Google Drive account linking and browse/import</li>
-            <li>Folder-backed connectors</li>
+            <li>Google Drive browse, import, and folder connectors</li>
             <li>Recursive sync and scheduled sync</li>
-            <li>SharePoint scaffold for future expansion</li>
+            <li>SharePoint direction already scaffolded</li>
+            <li>Built to extend toward more source types</li>
           </ul>
         </div>
         <div class="feature">
-          <strong>Tenant and workspace control</strong>
+          <strong>Run support workflows from the same workspace</strong>
           <ul class="clean">
-            <li>Invite-only signup</li>
-            <li>Tenant and workspace separation</li>
-            <li>Owner/admin/member roles</li>
-            <li>User-managed API keys</li>
+            <li>Tenant-scoped support inbox</li>
+            <li>Voice call visibility and transcript capture</li>
+            <li>Cross-channel reporting and export</li>
+            <li>AgentMail-backed outbound and system email</li>
           </ul>
         </div>
         <div class="feature">
-          <strong>Support and communications</strong>
-          <ul class="clean">
-            <li>Support inbox and voice call visibility</li>
-            <li>Voice transcript storage and sync</li>
-            <li>Cross-channel interaction reporting</li>
-            <li>AgentMail-backed outbound/system email</li>
-          </ul>
-        </div>
-        <div class="feature">
-          <strong>Chatbots and execution</strong>
+          <strong>Power bots and assistants</strong>
           <ul class="clean">
             <li>Tenant-owned chatbot definitions</li>
-            <li>Telegram, Discord, and Zoom Chat support</li>
-            <li>Separate bot runner architecture</li>
-            <li>Conversation history for more natural replies</li>
+            <li>Zoom Chat, Telegram, and Discord support</li>
+            <li>Conversation history for more natural follow-ups</li>
+            <li>Separate runner architecture for channel execution</li>
+          </ul>
+        </div>
+        <div class="feature">
+          <strong>Operate it like a product</strong>
+          <ul class="clean">
+            <li>Invite-only signup and tenant roles</li>
+            <li>Workspace separation and API keys</li>
+            <li>Admin visibility with Django</li>
+            <li>Native reporting instead of opaque black boxes</li>
           </ul>
         </div>
       </div>
     </div>
 
     <div class="card section">
-      <h2>What’s live today</h2>
-      <div class="feature-grid">
-        <div class="feature">
-          <strong>Upload, ingest, and retrieval</strong>
-          Upload documents, ingest URLs, manage versions, and ask grounded questions against your current workspace.
-        </div>
-        <div class="feature">
-          <strong>Google Drive connector</strong>
-          Connect a Google account, browse Drive, import files, set folder connectors, and run scheduled syncs.
-        </div>
-        <div class="feature">
-          <strong>Support inbox and voice logging</strong>
-          View support activity, voice calls, and cross-channel interactions from the dashboard and admin.
-        </div>
-        <div class="feature">
-          <strong>Chatbot control plane</strong>
-          Create integrations, bot definitions, endpoint bindings, and review chatbot events in one place.
-        </div>
-        <div class="feature">
-          <strong>Live Zoom, Telegram, and Discord bots</strong>
-          Use connected workspaces to answer questions in supported chat channels with grounded responses.
-        </div>
-        <div class="feature">
-          <strong>Reporting and exports</strong>
-          Review support activity and interaction reports with built-in XLSX export.
-        </div>
-      </div>
-    </div>
-
-    <div class="card section">
-      <h2>Use cases</h2>
-      <div class="use-grid">
+      <h2>Use cases that fit naturally</h2>
+      <div class="grid-3">
         <div class="usecase">
           <strong>Employee handbook assistant</strong>
-          Let staff ask about PTO, benefits, leave, and policies from the latest approved documents.
+          Answer PTO, leave, benefits, and policy questions without forcing people to dig through folders or PDFs.
         </div>
         <div class="usecase">
           <strong>Customer support knowledge base</strong>
-          Ground support responses in docs, synced folders, and historical conversation context.
+          Give support teams a grounded answer layer they can use in inboxes, chat, and phone workflows.
         </div>
         <div class="usecase">
           <strong>Internal operations search</strong>
-          Turn SOPs, guides, playbooks, and file libraries into a searchable internal assistant.
+          Turn SOPs, training docs, playbooks, and internal notes into a searchable operating system for the team.
         </div>
         <div class="usecase">
-          <strong>Voice support agent</strong>
-          Use the same document base to power phone answers and transcript capture for support teams.
+          <strong>Voice-enabled document support</strong>
+          Reuse the same workspace for phone answers, transcript logging, and follow-up review.
         </div>
         <div class="usecase">
-          <strong>Chatbot-backed document help</strong>
-          Connect a workspace to Zoom Chat, Telegram, or Discord so users can ask in the channel they already use.
+          <strong>Bot-backed workspace help</strong>
+          Bring the knowledge base into the channels people already use: Zoom, Telegram, and Discord.
         </div>
         <div class="usecase">
-          <strong>API-ready private RAG</strong>
-          Build internal tools and workflows on top of tenant-scoped documents, chat, and connector syncs.
+          <strong>Private RAG infrastructure</strong>
+          Use Docstore as a tenant-aware backend for apps, automations, and internal tools that need grounded document context.
         </div>
       </div>
     </div>
 
     <div class="card section">
-      <h2>How it works under the hood</h2>
+      <h2>Underlying technology and tools</h2>
       <p class="section-intro">
-        Docstore uses Django and Postgres as the core application layer, pgvector for retrieval, OpenAI embeddings for semantic search,
-        Groq-hosted generation for cost-efficient chat workflows, and private object storage for uploaded and synced files. Chatbots and voice
-        agents are intentionally kept in separate execution services so the control plane stays clean and tenant-aware.
+        The product story comes first, but the underlying stack matters because reliability, privacy, and delivery discipline matter.
+        Docstore is intentionally built on boring, inspectable infrastructure where possible, with AI components used where they actually add value.
       </p>
-      <div class="feature-grid">
-        <div class="feature"><strong>Core app</strong>Django admin, auth, dashboard, tenant/workspace control, API keys, reporting, and connector management.</div>
-        <div class="feature"><strong>Retrieval layer</strong>OpenAI embeddings, pgvector search, extracted facts, and document-grounded answer generation.</div>
-        <div class="feature"><strong>Execution layer</strong>Separate bot runner and voice agent services for channel delivery and realtime conversations.</div>
+      <div class="grid-3">
+        <div class="stack-item">
+          <strong>Core application layer</strong>
+          Django drives the main product: auth, admin, dashboard, tenant/workspace control, connectors, reports, support views, and APIs.
+        </div>
+        <div class="stack-item">
+          <strong>Database and retrieval</strong>
+          Postgres is the system of record, with pgvector for semantic search and retrieval across workspace documents.
+        </div>
+        <div class="stack-item">
+          <strong>Embeddings and generation</strong>
+          OpenAI embeddings power semantic indexing, while Groq-hosted generation is used for cost-efficient chat and rewrite tasks.
+        </div>
+        <div class="stack-item">
+          <strong>Private storage</strong>
+          Files and generated assets are kept in private MinIO-backed object storage rather than open public blob URLs.
+        </div>
+        <div class="stack-item">
+          <strong>Execution plane separation</strong>
+          Chatbots and voice agents live in separate services so Django stays the control plane and channel execution stays modular.
+        </div>
+        <div class="stack-item">
+          <strong>Operational tooling</strong>
+          Celery handles background work, scheduled connector syncs, and ingestion workflows, while systemd-backed services keep the app, workers, bots, and voice agents running cleanly.
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="feature">
+          <strong>Why this stack</strong>
+          It keeps the product debuggable, deployable, and expandable. The goal is not maximum novelty. The goal is a system you can trust and grow.
+        </div>
+        <div class="feature">
+          <strong>What stays opinionated</strong>
+          Django and Postgres remain the product brain. Execution services stay separate. Storage stays private. Retrieval stays workspace-scoped.
+        </div>
+      </div>
+    </div>
+
+    <div class="card section">
+      <h2>How the product is structured</h2>
+      <div class="grid-3">
+        <div class="feature">
+          <strong>1. Bring knowledge in</strong>
+          Upload files, ingest URLs, or connect synced folders so documents enter the system in a trackable way.
+        </div>
+        <div class="feature">
+          <strong>2. Keep it tenant-aware</strong>
+          Tenants, workspaces, permissions, API keys, and connectors define who can access what and where knowledge should be used.
+        </div>
+        <div class="feature">
+          <strong>3. Deliver it where it matters</strong>
+          Use dashboard chat, support workflows, reports, bots, and voice agents as delivery surfaces on top of the same source material.
+        </div>
       </div>
     </div>
 
@@ -329,7 +360,7 @@
       <h2>Get started</h2>
       <p>
         Docstore is currently invite-based. If you already have access, log in and open your dashboard. If you’re setting up a new workspace,
-        you can start by uploading documents, importing URLs, or connecting Google Drive for folder-backed sync.
+        the easiest path is to upload a few documents, connect Google Drive, and start asking real questions against a live workspace.
       </p>
       <div class="cta-row">
         {% if request.user.is_authenticated %}
@@ -342,7 +373,7 @@
         {% endif %}
       </div>
       <div class="footer-note">
-        Powered by Django, Postgres, pgvector, OpenAI embeddings, Groq generation, MinIO-backed storage, and channel-specific runner services.
+        Built with Django, Postgres, pgvector, OpenAI embeddings, Groq generation, private object storage, and separate runner services for bots and voice.
       </div>
     </div>
   </div>
