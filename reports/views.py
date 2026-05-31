@@ -14,6 +14,22 @@ from support.models import SupportChannel, SupportConversation, SupportMessage
 from integrations.voice.models import VoiceCallRecord
 
 
+def _infer_support_source(conversation):
+    meta = conversation.metadata_json or {}
+    source = (meta.get('source') or '').strip().lower()
+    if source == 'voice':
+        return 'voice'
+    if conversation.channel_id:
+        channel_type = (conversation.channel.channel_type or '').strip().lower()
+        if channel_type == 'voice':
+            return 'voice'
+        if channel_type == 'sms':
+            return 'sms'
+        if channel_type == 'both':
+            return 'sms/voice'
+    return 'support'
+
+
 @login_required
 def support_activity_report(request):
     base = _dashboard_base(request)
@@ -92,6 +108,25 @@ def support_activity_report(request):
         'currently_pending': SupportConversation.objects.filter(tenant=tenant, status=SupportConversation.STATUS_PENDING).count(),
     }
 
+    detail_rows = []
+    conversation_list = list(conversations.select_related('channel', 'contact', 'assigned_user').order_by('-created_at')[:250])
+    for conversation in conversation_list:
+        contact = conversation.contact
+        contact_meta = contact.metadata_json or {}
+        detail_rows.append({
+            'created_at': timezone.localtime(conversation.created_at).strftime('%Y-%m-%d %H:%M'),
+            'source': _infer_support_source(conversation),
+            'contact_name': contact.name or '',
+            'contact_phone': contact.phone_number or '',
+            'contact_email': (contact_meta.get('email') or '').strip(),
+            'channel_name': conversation.channel.name if conversation.channel_id else '',
+            'assigned_user': conversation.assigned_user.username if conversation.assigned_user_id else '',
+            'subject': conversation.subject or '',
+            'status': conversation.status,
+            'last_message_at': timezone.localtime(conversation.last_message_at).strftime('%Y-%m-%d %H:%M') if conversation.last_message_at else '',
+            'conversation_id': conversation.id,
+        })
+
     if (request.GET.get('format') or '').strip().lower() == 'xlsx':
         wb = Workbook()
         ws = wb.active
@@ -121,6 +156,35 @@ def support_activity_report(request):
         ws.append(['Summary'])
         for key, value in summary.items():
             ws.append([key, value])
+
+        details = wb.create_sheet(title='Conversation Details')
+        details.append([
+            'Created At',
+            'Source',
+            'Contact Name',
+            'Contact Phone',
+            'Contact Email',
+            'Channel',
+            'Assigned User',
+            'Subject',
+            'Status',
+            'Last Message At',
+            'Conversation ID',
+        ])
+        for row in detail_rows:
+            details.append([
+                row['created_at'],
+                row['source'],
+                row['contact_name'],
+                row['contact_phone'],
+                row['contact_email'],
+                row['channel_name'],
+                row['assigned_user'],
+                row['subject'],
+                row['status'],
+                row['last_message_at'],
+                row['conversation_id'],
+            ])
         output = BytesIO()
         wb.save(output)
         output.seek(0)
@@ -142,5 +206,6 @@ def support_activity_report(request):
         'report_assigned_users': tenant.memberships.select_related('user').order_by('user__username'),
         'report_rows': rows,
         'report_summary': summary,
+        'report_detail_rows': detail_rows,
     })
     return render(request, 'dashboard/report_support_activity.html', base)

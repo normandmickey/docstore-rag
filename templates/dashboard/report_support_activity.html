@@ -69,4 +69,29 @@
     <p class="meta">No support activity found for this date range.</p>
   {% endfor %}
 </div>
+
+<div class="card">
+  <h2>Detailed conversations</h2>
+  <p class="meta">Shows end user/contact, inferred source, channel, assigned user, and status for recent matching support conversations.</p>
+  {% for row in report_detail_rows %}
+    <div class="row">
+      <strong>{{ row.created_at }}</strong> · <span class="status status-succeeded" style="background:#1a2446; color:#dbeafe;">{{ row.source }}</span><br>
+      <span class="meta">
+        Contact: {% if row.contact_name %}{{ row.contact_name }}{% else %}(no name){% endif %}
+        {% if row.contact_phone %} · {{ row.contact_phone }}{% endif %}
+        {% if row.contact_email %} · {{ row.contact_email }}{% endif %}
+      </span><br>
+      <span class="meta">
+        Channel: {{ row.channel_name|default:'—' }} ·
+        Assigned: {{ row.assigned_user|default:'—' }} ·
+        Status: {{ row.status }} ·
+        Last message: {{ row.last_message_at|default:'—' }} ·
+        Ref: {{ row.conversation_id }}
+      </span>
+      {% if row.subject %}<br><div style="margin-top:6px;">{{ row.subject }}</div>{% endif %}
+    </div>
+  {% empty %}
+    <p class="meta">No detailed support conversations found for this date range.</p>
+  {% endfor %}
+</div>
 {% endblock %}
