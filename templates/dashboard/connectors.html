@@ -101,13 +101,19 @@
         <input type="checkbox" name="recursive" value="1" {% if not google_drive_connector or google_drive_connector.config_json.recursive != False %}checked{% endif %} style="width:auto; margin:0;">
         <span>Include subfolders recursively</span>
       </label>
+      <label style="display:flex; align-items:center; gap:8px; margin: 10px 0 10px;">
+        <input type="checkbox" name="sync_enabled" value="1" {% if google_drive_connector and google_drive_connector.sync_enabled %}checked{% endif %} style="width:auto; margin:0;">
+        <span>Enable scheduled sync</span>
+      </label>
+      <label for="google_sync_frequency_minutes">Sync frequency (minutes)</label>
+      <input id="google_sync_frequency_minutes" type="number" min="15" step="15" name="sync_frequency_minutes" value="{% if google_drive_connector %}{{ google_drive_connector.sync_frequency_minutes|default:60 }}{% else %}60{% endif %}">
       <button type="submit">Save Google Drive connector</button>
     </form>
 
     {% if google_drive_connector %}
       <div class="row">
         <strong>{{ google_drive_connector.label }}</strong><br>
-        <span class="meta">Folder id: {{ google_drive_connector.config_json.folder_id|default:'root' }} · Recursive: {% if google_drive_connector.config_json.recursive == False %}No{% else %}Yes{% endif %}{% if google_drive_connector.last_synced_at %} · Last synced {{ google_drive_connector.last_synced_at }}{% endif %}</span>
+        <span class="meta">Folder id: {{ google_drive_connector.config_json.folder_id|default:'root' }} · Recursive: {% if google_drive_connector.config_json.recursive == False %}No{% else %}Yes{% endif %} · Scheduled sync: {% if google_drive_connector.sync_enabled %}Enabled every {{ google_drive_connector.sync_frequency_minutes }} min{% else %}Disabled{% endif %}{% if google_drive_connector.next_sync_at %} · Next sync {{ google_drive_connector.next_sync_at }}{% endif %}{% if google_drive_connector.last_synced_at %} · Last synced {{ google_drive_connector.last_synced_at }}{% endif %}</span>
         <form method="post" style="margin-top: 12px;">
           {% csrf_token %}
           <input type="hidden" name="action" value="sync_google_drive_connector">

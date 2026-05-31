@@ -1012,6 +1012,12 @@ def dashboard_connectors(request):
         folder_id = (request.POST.get('folder_id') or 'root').strip() or 'root'
         label = (request.POST.get('label') or '').strip() or 'Google Drive'
         recursive = (request.POST.get('recursive') or '1').strip() == '1'
+        sync_enabled = request.POST.get('sync_enabled') == '1'
+        try:
+            sync_frequency_minutes = int(request.POST.get('sync_frequency_minutes') or 60)
+        except ValueError:
+            sync_frequency_minutes = 60
+        sync_frequency_minutes = max(15, sync_frequency_minutes)
         connector, _created = Connector.objects.update_or_create(
             tenant=current_tenant,
             workspace=current_workspace,
@@ -1025,6 +1031,9 @@ def dashboard_connectors(request):
                     'folder_id': folder_id,
                     'recursive': recursive,
                 },
+                'sync_enabled': sync_enabled,
+                'sync_frequency_minutes': sync_frequency_minutes,
+                'next_sync_at': timezone.now() + timezone.timedelta(minutes=sync_frequency_minutes) if sync_enabled else None,
             },
         )
         messages.success(request, f'Saved Google Drive connector for folder id: {folder_id}.')
@@ -1076,6 +1085,9 @@ def dashboard_connectors(request):
                     'folder_id': folder_id,
                     'recursive': True,
                 },
+                'sync_enabled': False,
+                'sync_frequency_minutes': 60,
+                'next_sync_at': None,
             },
         )
         messages.success(request, f'Now using Google Drive folder "{folder_name}" for this workspace connector.')
