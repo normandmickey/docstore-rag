@@ -5,7 +5,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('control', '0006_externalaccount_google_provider'),
-        ('documents', '0004_extractedfact'),
+        ('documents', '0009_chunk_question_embedding'),
     ]
 
     operations = [
