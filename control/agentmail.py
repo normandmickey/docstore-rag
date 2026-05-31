@@ -32,7 +32,6 @@ class AgentMailClient:
             raise AgentMailError('Email body is required.')
 
         payload = {
-            'inbox_id': self.inbox_id,
             'to': [to] if isinstance(to, str) else list(to),
             'subject': subject,
         }
@@ -42,7 +41,7 @@ class AgentMailClient:
             payload['html'] = html
 
         response = requests.post(
-            f'{self.base_url}/inboxes/messages/send',
+            f'{self.base_url}/inboxes/{self.inbox_id}/messages',
             headers=self._headers(),
             json=payload,
             timeout=30,
