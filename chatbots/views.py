@@ -281,7 +281,8 @@ def chatbot_zoom_connect_callback(request):
         state_payload = {}
 
     integration_id = integration_id or state_integration_id
-    if not code or not integration_id or (expected_nonce and returned_nonce and expected_nonce != returned_nonce):
+    state_invalid = bool(returned_state) and bool(expected_nonce) and bool(returned_nonce) and expected_nonce != returned_nonce
+    if not code or not integration_id or state_invalid:
         query_snapshot = {key: request.GET.get(key) for key in request.GET.keys()}
         logger.warning(
             'Zoom OAuth callback invalid state/missing code integration_id=%s session_integration_id=%s state_integration_id=%s expected_nonce=%s returned_nonce=%s code_present=%s raw_state=%s query=%s',
