@@ -51,7 +51,10 @@
             <div><a href="/dashboard/chatbots/definitions/{{ definition.id }}/"><strong>{{ definition.name }}</strong></a></div>
             <div class="meta">Integration: {{ definition.integration.name }}{% if definition.default_workspace %} · Workspace: {{ definition.default_workspace.name }}{% endif %} · Runtime: {{ definition.get_runtime_mode_display }}</div>
           </div>
-          <div class="meta">Template: {{ definition.template_name|default:'—' }} {{ definition.template_version|default:'' }}</div>
+          <div style="text-align:right;">
+            <div class="meta">Template: {{ definition.template_name|default:'—' }} {{ definition.template_version|default:'' }}</div>
+            {% if can_manage_tenant %}<div style="margin-top:6px;"><a href="/dashboard/chatbots/definitions/{{ definition.id }}/edit/">Edit</a></div>{% endif %}
+          </div>
         </div>
       </div>
     {% endfor %}

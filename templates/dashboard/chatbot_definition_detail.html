@@ -2,9 +2,16 @@
 {% block title %}{{ chatbot_definition.name }} · Chatbot · Docstore{% endblock %}
 {% block content %}
 <div class="card">
-  <h2>{{ chatbot_definition.name }}</h2>
-  <p class="meta">Integration: {{ chatbot_definition.integration.name }} · Runtime: {{ chatbot_definition.get_runtime_mode_display }}{% if chatbot_definition.default_workspace %} · Workspace: {{ chatbot_definition.default_workspace.name }}{% endif %}</p>
-  <p class="meta">Template: {{ chatbot_definition.template_name|default:'—' }} {{ chatbot_definition.template_version|default:'' }}</p>
+  <div style="display:flex; justify-content:space-between; gap:12px; flex-wrap:wrap; align-items:flex-start;">
+    <div>
+      <h2>{{ chatbot_definition.name }}</h2>
+      <p class="meta">Integration: {{ chatbot_definition.integration.name }} · Runtime: {{ chatbot_definition.get_runtime_mode_display }}{% if chatbot_definition.default_workspace %} · Workspace: {{ chatbot_definition.default_workspace.name }}{% endif %}</p>
+      <p class="meta">Template: {{ chatbot_definition.template_name|default:'—' }} {{ chatbot_definition.template_version|default:'' }}</p>
+    </div>
+    {% if can_manage_tenant %}
+      <div><a href="/dashboard/chatbots/definitions/{{ chatbot_definition.id }}/edit/">Edit definition</a></div>
+    {% endif %}
+  </div>
   {% if chatbot_definition.system_prompt %}
     <h3>System prompt</h3>
     <pre>{{ chatbot_definition.system_prompt }}</pre>
