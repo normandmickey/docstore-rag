@@ -975,6 +975,10 @@ def dashboard_connectors(request):
     base['google_drive_files'] = []
     base['google_drive_query'] = ''
     base['google_drive_connector'] = None
+    base['google_drive_folders'] = []
+    base['google_drive_folder_parent_id'] = ''
+    base['google_drive_folder_current_id'] = 'root'
+    base['google_drive_folder_current_name'] = 'My Drive'
 
     if current_workspace and current_tenant:
         base['google_drive_connector'] = Connector.objects.filter(
@@ -1101,7 +1105,9 @@ def dashboard_connectors(request):
 
     if google_account:
         query = (request.GET.get('google_q') or '').strip()
+        folder_current_id = (request.GET.get('google_folder') or '').strip() or 'root'
         base['google_drive_query'] = query
+        base['google_drive_folder_current_id'] = folder_current_id
         try:
             client = GoogleDriveClient(google_account.access_token)
             q = None
@@ -1111,6 +1117,14 @@ def dashboard_connectors(request):
             else:
                 q = 'trashed = false'
             base['google_drive_files'] = client.list_files(q=q, page_size=20)
+
+            current_folder = {'id': 'root', 'name': 'My Drive', 'parents': []}
+            if folder_current_id != 'root':
+                current_folder = client.get_file(folder_current_id)
+            parents = current_folder.get('parents') or []
+            base['google_drive_folder_parent_id'] = parents[0] if parents else ''
+            base['google_drive_folder_current_name'] = current_folder.get('name') or 'My Drive'
+            base['google_drive_folders'] = client.list_folders(folder_id=folder_current_id, page_size=100)
         except Exception as exc:
             logger.exception('Google Drive list failed for user=%s', request.user.id)
             messages.error(request, f'Google Drive browse failed: {exc}')
