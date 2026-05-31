@@ -55,6 +55,13 @@ class ChatbotMessageIngestSerializer(serializers.Serializer):
     delivery_status = serializers.CharField(required=False, allow_blank=True)
 
 
+class ChatbotConversationContextSerializer(serializers.Serializer):
+    integration_id = serializers.IntegerField()
+    external_conversation_id = serializers.CharField(required=False, allow_blank=True)
+    external_thread_id = serializers.CharField(required=False, allow_blank=True)
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=20, default=6)
+
+
 class ChatbotResolveView(APIView):
     permission_classes = [AllowAny]
 
@@ -261,6 +268,59 @@ class ChatbotEventIngestView(APIView):
             dedupe_key=data.get('dedupe_key', ''),
         )
         return Response({'ok': True, 'event_id': event.id})
+
+
+class ChatbotConversationContextView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        api_key = get_api_key_from_header(request)
+        if api_key is None:
+            return Response({'detail': 'Authentication required.'}, status=401)
+
+        serializer = ChatbotConversationContextSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        conversation = ChatbotConversation.objects.filter(
+            tenant=api_key.tenant,
+            integration_id=data['integration_id'],
+            external_conversation_id=data.get('external_conversation_id', ''),
+            external_thread_id=data.get('external_thread_id', ''),
+        ).first()
+        if conversation is None and data.get('external_conversation_id'):
+            conversation = ChatbotConversation.objects.filter(
+                tenant=api_key.tenant,
+                integration_id=data['integration_id'],
+                external_conversation_id=data.get('external_conversation_id', ''),
+            ).first()
+        if conversation is None:
+            return Response({'ok': True, 'conversation_id': None, 'messages': [], 'transcript': ''})
+
+        messages_qs = conversation.messages.exclude(body='').order_by('-created_at', '-id')[: data.get('limit', 6)]
+        messages = list(reversed(list(messages_qs)))
+        transcript_parts = []
+        payload_messages = []
+        for msg in messages:
+            role = 'Assistant' if msg.direction == ChatbotMessage.DIR_OUTBOUND else 'User' if msg.direction == ChatbotMessage.DIR_INBOUND else 'System'
+            body = (msg.body or '').strip()
+            if not body:
+                continue
+            transcript_parts.append(f'{role}: {body}')
+            payload_messages.append({
+                'id': msg.id,
+                'direction': msg.direction,
+                'sender_label': msg.sender_label,
+                'body': body,
+                'created_at': msg.created_at.isoformat(),
+            })
+
+        return Response({
+            'ok': True,
+            'conversation_id': conversation.id,
+            'messages': payload_messages,
+            'transcript': '\n'.join(transcript_parts),
+        })
 
 
 class ChatbotMessageIngestView(APIView):
