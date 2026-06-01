@@ -19,7 +19,6 @@
   <h2>Your documents</h2>
   <form method="post">
     {% csrf_token %}
-    <input type="hidden" name="action" value="delete_document">
     {% for row in document_rows %}
       <div class="row">
         <label style="display: flex; gap: 10px; align-items: flex-start;">
@@ -44,12 +43,22 @@
       <p>No documents uploaded yet.</p>
     {% endfor %}
     {% if document_rows %}
+      <div style="margin-top: 14px; padding: 14px; border: 1px solid #243055; border-radius: 12px; background: #0f172a;">
+        <label>Assign selected documents to workspace</label>
+        <select name="workspace_id">
+          {% for workspace in available_workspaces %}
+            <option value="{{ workspace.id }}">{{ workspace.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" name="action" value="assign_documents_workspace" style="margin-top: 8px; background: #166534;">Assign selected</button>
+      </div>
       <label style="display: flex; gap: 10px; align-items: center; margin-top: 14px;">
         <input type="checkbox" name="confirm_delete" value="yes" style="width: auto;">
         <span>I understand this is a soft delete and the documents will disappear from the main dashboard.</span>
       </label>
-      <button type="submit" style="background: #991b1b; margin-top: 12px;">Delete selected</button>
+      <button type="submit" name="action" value="delete_document" style="background: #991b1b; margin-top: 12px;">Delete selected</button>
     {% endif %}
+  </form>
   </form>
 </div>
 <div class="card">

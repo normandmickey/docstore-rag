@@ -239,6 +239,33 @@ def _handle_workspace_actions(request, base):
             messages.success(request, f'Switched to workspace "{workspace.name}".')
         return redirect(request.path)
 
+    if request.method == 'POST' and request.POST.get('action') == 'assign_documents_workspace' and current_workspace:
+        document_ids = [doc_id for doc_id in request.POST.getlist('document_ids') if doc_id]
+        workspace_id = (request.POST.get('workspace_id') or '').strip()
+        target_workspace = Workspace.objects.filter(id=workspace_id, tenant=current_workspace.tenant).first() if workspace_id.isdigit() else None
+        if not document_ids:
+            messages.error(request, 'Select at least one document to assign.')
+            return redirect(request.path)
+        if not target_workspace:
+            messages.error(request, 'Select a valid workspace for assignment.')
+            return redirect(request.path)
+        documents_to_assign = list(Document.objects.filter(
+            id__in=document_ids,
+            tenant=current_workspace.tenant,
+            workspace_assignments__workspace=current_workspace,
+        ).distinct())
+        created = 0
+        for document in documents_to_assign:
+            _assignment, was_created = DocumentWorkspaceAssignment.objects.get_or_create(
+                document=document,
+                workspace=target_workspace,
+                defaults={'is_primary': target_workspace.id == document.workspace_id},
+            )
+            if was_created:
+                created += 1
+        messages.success(request, f'Assigned {created} document(s) to workspace "{target_workspace.name}".')
+        return redirect(request.path)
+
     if request.method == 'POST' and request.POST.get('action') == 'delete_document' and current_workspace:
         document_ids = request.POST.getlist('document_ids') or [request.POST.get('document_id')]
         confirm = (request.POST.get('confirm_delete') or '').strip().lower()
@@ -531,6 +558,27 @@ def document_detail(request, document_id):
             messages.success(request, f'Assigned document to workspace "{workspace.name}".')
         else:
             messages.info(request, f'Document is already assigned to workspace "{workspace.name}".')
+        return redirect(request.path)
+
+    if request.method == 'POST' and request.POST.get('action') == 'unassign_document_workspace':
+        workspace_id = (request.POST.get('workspace_id') or '').strip()
+        assignment = DocumentWorkspaceAssignment.objects.filter(
+            document=document,
+            workspace_id=workspace_id,
+        ).select_related('workspace').first() if workspace_id.isdigit() else None
+        if not assignment:
+            messages.error(request, 'Workspace assignment not found.')
+            return redirect(request.path)
+        assignment_count = DocumentWorkspaceAssignment.objects.filter(document=document).count()
+        if assignment.is_primary or assignment.workspace_id == document.workspace_id:
+            messages.error(request, 'You cannot remove the primary workspace assignment from this screen.')
+            return redirect(request.path)
+        if assignment_count <= 1:
+            messages.error(request, 'A document must remain assigned to at least one workspace.')
+            return redirect(request.path)
+        workspace_name = assignment.workspace.name
+        assignment.delete()
+        messages.success(request, f'Removed workspace assignment "{workspace_name}".')
         return redirect(request.path)
 
     if request.method == 'POST' and request.POST.get('action') == 'reingest_document':

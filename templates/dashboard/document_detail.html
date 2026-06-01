@@ -38,6 +38,25 @@
 <div class="card">
   <h2>Workspace assignments</h2>
   <p class="meta">Assign this document to other workspaces without duplicating the file, versions, chunks, or embeddings.</p>
+  <div style="margin-bottom: 16px; display: grid; gap: 10px;">
+    {% for assignment in detail_workspace_assignments %}
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 12px; border:1px solid #243055; border-radius:10px; background:#0f172a;">
+        <div>
+          <strong>{{ assignment.workspace.name }}</strong>{% if assignment.is_primary %} <span class="meta">(primary)</span>{% endif %}
+        </div>
+        {% if not assignment.is_primary and assignment.workspace_id != detail_document.workspace_id %}
+          <form method="post" style="margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="unassign_document_workspace">
+            <input type="hidden" name="workspace_id" value="{{ assignment.workspace.id }}">
+            <button type="submit" style="background:#7f1d1d;">Remove</button>
+          </form>
+        {% else %}
+          <span class="meta">Required</span>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </div>
   <form method="post">
     {% csrf_token %}
     <input type="hidden" name="action" value="assign_document_workspace">
