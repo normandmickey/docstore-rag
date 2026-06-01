@@ -154,6 +154,10 @@ ATLASSIAN_CLIENT_SECRET = os.getenv('ATLASSIAN_CLIENT_SECRET', '')
 ATLASSIAN_REDIRECT_URI = os.getenv('ATLASSIAN_REDIRECT_URI', '')
 ATLASSIAN_SCOPES = [scope.strip() for scope in os.getenv('ATLASSIAN_SCOPES', 'offline_access read:me search:confluence read:confluence-content.summary read:confluence-space.summary').split() if scope.strip()]
 
+DROPBOX_CLIENT_ID = os.getenv('DROPBOX_CLIENT_ID', '')
+DROPBOX_CLIENT_SECRET = os.getenv('DROPBOX_CLIENT_SECRET', '')
+DROPBOX_REDIRECT_URI = os.getenv('DROPBOX_REDIRECT_URI', '')
+
 ZOOM_CLIENT_ID = os.getenv('ZOOM_CLIENT_ID', '')
 ZOOM_CLIENT_SECRET = os.getenv('ZOOM_CLIENT_SECRET', '')
 ZOOM_REDIRECT_URI = os.getenv('ZOOM_REDIRECT_URI', '')

@@ -89,10 +89,12 @@ class ExternalAccount(models.Model):
     PROVIDER_MICROSOFT = 'microsoft'
     PROVIDER_GOOGLE = 'google'
     PROVIDER_ATLASSIAN = 'atlassian'
+    PROVIDER_DROPBOX = 'dropbox'
     PROVIDER_CHOICES = [
         (PROVIDER_MICROSOFT, 'Microsoft'),
         (PROVIDER_GOOGLE, 'Google'),
         (PROVIDER_ATLASSIAN, 'Atlassian'),
+        (PROVIDER_DROPBOX, 'Dropbox'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='external_accounts')

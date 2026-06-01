@@ -21,6 +21,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 
 from chatbots.models import ChatbotIntegration
+from connectors.dropbox import DropboxClient
 from connectors.google_drive import GoogleDriveClient
 from connectors.models import Connector, ExternalDocumentBinding
 from documents.models import Chunk, Document, DocumentWorkspaceAssignment, ExtractedFact
@@ -35,15 +36,19 @@ from .models import APIKey, ExternalAccount, InviteToken, ProxiWebMessage, Proxi
 from .api_auth import hash_api_key
 from .oauth import (
     atlassian_authorize_url,
+    dropbox_authorize_url,
     exchange_atlassian_code_for_tokens,
     exchange_code_for_tokens,
+    exchange_dropbox_code_for_tokens,
     exchange_google_code_for_tokens,
     fetch_atlassian_accessible_resources,
     fetch_atlassian_userinfo,
+    fetch_dropbox_current_account,
     fetch_google_userinfo,
     fetch_graph_me,
     google_authorize_url,
     microsoft_authorize_url,
+    refresh_dropbox_tokens,
     refresh_google_tokens,
 )
 from .pii import redact_pii
@@ -61,6 +66,22 @@ def _get_valid_google_access_token(account):
     if not account.refresh_token:
         return account.access_token
     tokens = refresh_google_tokens(account.refresh_token)
+    account.access_token = tokens.get('access_token', account.access_token)
+    if tokens.get('refresh_token'):
+        account.refresh_token = tokens.get('refresh_token')
+    account.expires_at = tokens.get('expires_at')
+    account.save(update_fields=['access_token', 'refresh_token', 'expires_at', 'updated_at'])
+    return account.access_token
+
+
+def _get_valid_dropbox_access_token(account):
+    if not account:
+        return ''
+    if account.expires_at and account.expires_at > timezone.now() + timezone.timedelta(minutes=5) and account.access_token:
+        return account.access_token
+    if not account.refresh_token:
+        return account.access_token
+    tokens = refresh_dropbox_tokens(account.refresh_token)
     account.access_token = tokens.get('access_token', account.access_token)
     if tokens.get('refresh_token'):
         account.refresh_token = tokens.get('refresh_token')
@@ -540,6 +561,14 @@ def atlassian_connect_start(request):
     return redirect(atlassian_authorize_url(state))
 
 
+def dropbox_connect_start(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    state = secrets.token_urlsafe(24)
+    request.session['dropbox_oauth_state'] = state
+    return redirect(dropbox_authorize_url(state))
+
+
 def google_connect_callback(request):
     if not request.user.is_authenticated:
         return redirect('login')
@@ -585,6 +614,57 @@ def google_connect_callback(request):
     except Exception as exc:
         logger.exception('Google OAuth callback failed for user=%s', request.user.id)
         messages.error(request, f'Google connection failed: {exc}')
+    return redirect('dashboard_connectors')
+
+
+def dropbox_connect_callback(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    expected_state = request.session.get('dropbox_oauth_state')
+    returned_state = request.GET.get('state')
+    code = request.GET.get('code')
+    error = request.GET.get('error')
+
+    if error:
+        messages.error(request, f'Dropbox connection failed: {error}')
+        return redirect('dashboard_connectors')
+    if not code or not expected_state or expected_state != returned_state:
+        messages.error(request, 'Dropbox connection failed: invalid OAuth state or missing code.')
+        return redirect('dashboard_connectors')
+
+    try:
+        tokens = exchange_dropbox_code_for_tokens(code)
+        profile = fetch_dropbox_current_account(tokens['access_token'])
+        if not request.session.get('current_tenant_id') or not request.session.get('current_workspace_id'):
+            tenant, workspace = _bootstrap_user_workspace(request.user, request.session)
+        else:
+            tenant = Tenant.objects.get(id=request.session['current_tenant_id'])
+            workspace = Workspace.objects.get(id=request.session['current_workspace_id'], tenant=tenant)
+
+        account_id = profile.get('account_id', '')
+        name = (((profile.get('name') or {}).get('display_name')) or '').strip()
+        email = (profile.get('email') or '').strip()
+        account, _created = ExternalAccount.objects.update_or_create(
+            user=request.user,
+            provider=ExternalAccount.PROVIDER_DROPBOX,
+            external_user_id=account_id,
+            defaults={
+                'tenant': tenant,
+                'workspace': workspace,
+                'email': email,
+                'display_name': name,
+                'access_token': tokens.get('access_token', ''),
+                'refresh_token': tokens.get('refresh_token', ''),
+                'expires_at': tokens.get('expires_at'),
+                'scopes_json': [],
+                'metadata_json': profile,
+            },
+        )
+        messages.success(request, f'Connected Dropbox account for {account.email or account.display_name or "your account"}.')
+    except Exception as exc:
+        logger.exception('Dropbox OAuth callback failed for user=%s', request.user.id)
+        messages.error(request, f'Dropbox connection failed: {exc}')
     return redirect('dashboard_connectors')
 
 
@@ -1228,7 +1308,12 @@ def dashboard_connectors(request):
         user=request.user,
         provider=ExternalAccount.PROVIDER_GOOGLE,
     ).order_by('-updated_at').first()
+    dropbox_account = ExternalAccount.objects.filter(
+        user=request.user,
+        provider=ExternalAccount.PROVIDER_DROPBOX,
+    ).order_by('-updated_at').first()
     base['google_account'] = google_account
+    base['dropbox_account'] = dropbox_account
     base['google_drive_files'] = []
     base['google_drive_query'] = ''
     base['google_drive_connector'] = None
@@ -1236,12 +1321,21 @@ def dashboard_connectors(request):
     base['google_drive_folder_parent_id'] = ''
     base['google_drive_folder_current_id'] = 'root'
     base['google_drive_folder_current_name'] = 'My Drive'
+    base['dropbox_entries'] = []
+    base['dropbox_connector'] = None
+    base['dropbox_current_path'] = ''
+    base['dropbox_parent_path'] = ''
 
     if current_workspace and current_tenant:
         base['google_drive_connector'] = Connector.objects.filter(
             tenant=current_tenant,
             workspace=current_workspace,
             provider=Connector.PROVIDER_GOOGLE_DRIVE,
+        ).order_by('-updated_at').first()
+        base['dropbox_connector'] = Connector.objects.filter(
+            tenant=current_tenant,
+            workspace=current_workspace,
+            provider=Connector.PROVIDER_DROPBOX,
         ).order_by('-updated_at').first()
 
     if request.method == 'POST' and request.POST.get('action') == 'save_google_drive_connector' and current_workspace and current_tenant:
@@ -1446,6 +1540,91 @@ def dashboard_connectors(request):
             messages.error(request, f'Google Drive import failed: {exc}')
             return redirect('dashboard_connectors')
 
+    if request.method == 'POST' and request.POST.get('action') == 'use_dropbox_folder' and current_workspace and current_tenant:
+        if not dropbox_account:
+            messages.error(request, 'Connect a Dropbox account first.')
+            return redirect('dashboard_connectors')
+        folder_path = (request.POST.get('folder_path') or '').strip()
+        folder_name = (request.POST.get('folder_name') or '').strip() or 'Dropbox'
+        connector, _created = Connector.objects.update_or_create(
+            tenant=current_tenant,
+            workspace=current_workspace,
+            provider=Connector.PROVIDER_DROPBOX,
+            defaults={
+                'label': f'Dropbox · {folder_name}',
+                'status': Connector.STATUS_ACTIVE,
+                'config_json': {
+                    'external_account_id': dropbox_account.id,
+                    'account_email': dropbox_account.email,
+                    'folder_path': folder_path,
+                    'recursive': True,
+                },
+                'sync_enabled': False,
+                'sync_frequency_minutes': 60,
+                'next_sync_at': None,
+            },
+        )
+        messages.success(request, f'Now using Dropbox folder "{folder_name}" for this workspace connector.')
+        next_path = folder_path if folder_path else ''
+        return redirect(f'/dashboard/connectors/?dropbox_path={next_path}')
+
+    if request.method == 'POST' and request.POST.get('action') == 'dropbox_import' and current_workspace and current_tenant:
+        if not dropbox_account:
+            messages.error(request, 'Connect a Dropbox account first.')
+            return redirect('dashboard_connectors')
+
+        file_path = (request.POST.get('file_path') or '').strip()
+        if not file_path:
+            messages.error(request, 'Pick a Dropbox file to import.')
+            return redirect('dashboard_connectors')
+
+        try:
+            client = DropboxClient(_get_valid_dropbox_access_token(dropbox_account))
+            raw_bytes, metadata = client.download_file_bytes(file_path)
+            filename = (metadata.get('name') or file_path.rsplit('/', 1)[-1] or 'dropbox-file').strip()
+            upload = ContentFile(raw_bytes, name=filename)
+            connector, _ = Connector.objects.get_or_create(
+                tenant=current_tenant,
+                workspace=current_workspace,
+                provider=Connector.PROVIDER_DROPBOX,
+                label='Dropbox',
+                defaults={
+                    'status': Connector.STATUS_ACTIVE,
+                    'config_json': {
+                        'external_account_id': dropbox_account.id,
+                        'account_email': dropbox_account.email,
+                    },
+                },
+            )
+            result = create_or_reuse_document(
+                tenant=current_tenant,
+                workspace=current_workspace,
+                uploaded_file=upload,
+                filename=filename,
+                mime_type='',
+                size_bytes=len(raw_bytes),
+                collection='dropbox',
+                uploaded_by=request.user,
+                source_type=Document.SOURCE_CONNECTOR,
+                source_url='',
+            )
+            ExternalDocumentBinding.objects.update_or_create(
+                connector=connector,
+                external_id=metadata.get('id', file_path),
+                defaults={
+                    'external_path': file_path,
+                    'etag': metadata.get('content_hash', ''),
+                    'document': result['document'],
+                    'metadata_json': metadata,
+                },
+            )
+            messages.success(request, f'Imported Dropbox file: {filename}.')
+            return redirect('dashboard_connectors')
+        except Exception as exc:
+            logger.exception('Dropbox import failed for user=%s workspace=%s file_path=%s', request.user.id, current_workspace.id, file_path)
+            messages.error(request, f'Dropbox import failed: {exc}')
+            return redirect('dashboard_connectors')
+
     if google_account:
         query = (request.GET.get('google_q') or '').strip()
         folder_current_id = (request.GET.get('google_folder') or '').strip() or 'root'
@@ -1471,6 +1650,20 @@ def dashboard_connectors(request):
         except Exception as exc:
             logger.exception('Google Drive list failed for user=%s', request.user.id)
             messages.error(request, f'Google Drive browse failed: {exc}')
+
+    if dropbox_account:
+        dropbox_path = (request.GET.get('dropbox_path') or '').strip()
+        base['dropbox_current_path'] = dropbox_path
+        if dropbox_path and '/' in dropbox_path.strip('/'):
+            base['dropbox_parent_path'] = '/' + '/'.join([part for part in dropbox_path.strip('/').split('/')[:-1] if part])
+        else:
+            base['dropbox_parent_path'] = ''
+        try:
+            client = DropboxClient(_get_valid_dropbox_access_token(dropbox_account))
+            base['dropbox_entries'] = client.list_folder(path=dropbox_path)
+        except Exception as exc:
+            logger.exception('Dropbox list failed for user=%s', request.user.id)
+            messages.error(request, f'Dropbox browse failed: {exc}')
 
     base['section'] = 'connectors'
     return render(request, 'dashboard/connectors.html', base)

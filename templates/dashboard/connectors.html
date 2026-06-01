@@ -145,6 +145,72 @@
   {% endif %}
 </div>
 <div class="card">
+  <h2>Dropbox connections</h2>
+  <p class="meta">Connect your Dropbox account so this workspace can browse folders and import files.</p>
+  <p><a href="/connect/dropbox/">Connect Dropbox account</a></p>
+  {% if dropbox_account %}
+    {% for account in external_accounts %}
+      {% if account.provider == 'dropbox' %}
+        <div class="row"><strong>{{ account.display_name|default:account.email|default:'Dropbox account' }}</strong><br><span class="meta">{{ account.provider }} · {{ account.email|default:'connected' }}{% if account.workspace %} · Workspace: {{ account.workspace.name }}{% endif %}</span></div>
+      {% endif %}
+    {% endfor %}
+  {% else %}
+    <p>No external Dropbox accounts connected yet.</p>
+  {% endif %}
+
+  {% if dropbox_account %}
+    <hr style="border:0; border-top:1px solid #243055; margin: 20px 0;">
+    <h3 style="margin-top:0;">Dropbox folder browser</h3>
+    <p class="meta">Browse Dropbox folders, set one as the workspace connector target, or import individual files.</p>
+    <div class="row">
+      <strong>Current folder:</strong> {% if dropbox_current_path %}{{ dropbox_current_path }}{% else %}/{% endif %}
+      <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
+        <a href="/dashboard/connectors/?dropbox_path=">Go to Dropbox root</a>
+        {% if dropbox_parent_path %}
+          <a href="/dashboard/connectors/?dropbox_path={{ dropbox_parent_path|urlencode }}">Go up one level</a>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if dropbox_entries %}
+      {% for entry in dropbox_entries %}
+        <div class="row">
+          <strong>{{ entry.name }}</strong><br>
+          <span class="meta">{{ entry['.tag'] }}{% if entry.path_display %} · {{ entry.path_display }}{% endif %}</span><br>
+          <div style="margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap;">
+            {% if entry['.tag'] == 'folder' %}
+              <a href="/dashboard/connectors/?dropbox_path={{ entry.path_display|urlencode }}">Open folder</a>
+              <form method="post" style="margin:0;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="use_dropbox_folder">
+                <input type="hidden" name="folder_path" value="{{ entry.path_display }}">
+                <input type="hidden" name="folder_name" value="{{ entry.name }}">
+                <button type="submit">Set as connector folder</button>
+              </form>
+            {% else %}
+              <form method="post" style="margin:0;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="dropbox_import">
+                <input type="hidden" name="file_path" value="{{ entry.path_display }}">
+                <button type="submit">Import file</button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="meta">No Dropbox entries found in this location.</p>
+    {% endif %}
+
+    {% if dropbox_connector %}
+      <div class="row">
+        <strong>{{ dropbox_connector.label }}</strong><br>
+        <span class="meta">Folder path: {{ dropbox_connector.config_json.folder_path|default:'/' }} · This first version supports browse, import, and saved folder selection. Scheduled sync is not wired yet for Dropbox.</span>
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+<div class="card">
   <h2>Atlassian / Confluence connections</h2>
   <p class="meta">Connect your Atlassian account to start the Confluence foundation: account linking, accessible sites, and future page import/sync flows.</p>
   <p><a href="/connect/atlassian/">Connect Atlassian account</a></p>

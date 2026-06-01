@@ -7,10 +7,12 @@ class Connector(models.Model):
     PROVIDER_SHAREPOINT = 'sharepoint'
     PROVIDER_GOOGLE_DRIVE = 'google_drive'
     PROVIDER_CONFLUENCE = 'confluence'
+    PROVIDER_DROPBOX = 'dropbox'
     PROVIDER_CHOICES = [
         (PROVIDER_SHAREPOINT, 'SharePoint'),
         (PROVIDER_GOOGLE_DRIVE, 'Google Drive'),
         (PROVIDER_CONFLUENCE, 'Confluence'),
+        (PROVIDER_DROPBOX, 'Dropbox'),
     ]
 
     STATUS_ACTIVE = 'active'

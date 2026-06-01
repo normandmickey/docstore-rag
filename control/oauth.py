@@ -18,6 +18,10 @@ ATLASSIAN_TOKEN_URL = 'https://auth.atlassian.com/oauth/token'
 ATLASSIAN_ACCESSIBLE_RESOURCES_URL = 'https://api.atlassian.com/oauth/token/accessible-resources'
 ATLASSIAN_USERINFO_URL = 'https://api.atlassian.com/me'
 
+DROPBOX_AUTH_URL = 'https://www.dropbox.com/oauth2/authorize'
+DROPBOX_TOKEN_URL = 'https://api.dropboxapi.com/oauth2/token'
+DROPBOX_CURRENT_ACCOUNT_URL = 'https://api.dropboxapi.com/2/users/get_current_account'
+
 ZOOM_AUTH_URL = 'https://zoom.us/oauth/authorize'
 ZOOM_TOKEN_URL = 'https://zoom.us/oauth/token'
 
@@ -171,6 +175,64 @@ def fetch_atlassian_accessible_resources(access_token):
     response = requests.get(
         ATLASSIAN_ACCESSIBLE_RESOURCES_URL,
         headers={'Authorization': f'Bearer {access_token}', 'Accept': 'application/json'},
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def dropbox_authorize_url(state):
+    query = urlencode({
+        'client_id': settings.DROPBOX_CLIENT_ID,
+        'response_type': 'code',
+        'redirect_uri': settings.DROPBOX_REDIRECT_URI,
+        'state': state,
+        'token_access_type': 'offline',
+    })
+    return f'{DROPBOX_AUTH_URL}?{query}'
+
+
+def exchange_dropbox_code_for_tokens(code):
+    response = requests.post(
+        DROPBOX_TOKEN_URL,
+        data={
+            'client_id': settings.DROPBOX_CLIENT_ID,
+            'client_secret': settings.DROPBOX_CLIENT_SECRET,
+            'code': code,
+            'redirect_uri': settings.DROPBOX_REDIRECT_URI,
+            'grant_type': 'authorization_code',
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    expires_in = payload.get('expires_in', 14400)
+    payload['expires_at'] = timezone.now() + timezone.timedelta(seconds=expires_in)
+    return payload
+
+
+def refresh_dropbox_tokens(refresh_token):
+    response = requests.post(
+        DROPBOX_TOKEN_URL,
+        data={
+            'client_id': settings.DROPBOX_CLIENT_ID,
+            'client_secret': settings.DROPBOX_CLIENT_SECRET,
+            'refresh_token': refresh_token,
+            'grant_type': 'refresh_token',
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    expires_in = payload.get('expires_in', 14400)
+    payload['expires_at'] = timezone.now() + timezone.timedelta(seconds=expires_in)
+    return payload
+
+
+def fetch_dropbox_current_account(access_token):
+    response = requests.post(
+        DROPBOX_CURRENT_ACCOUNT_URL,
+        headers={'Authorization': f'Bearer {access_token}'},
         timeout=30,
     )
     response.raise_for_status()
