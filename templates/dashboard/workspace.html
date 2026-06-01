@@ -48,6 +48,27 @@
 </div>
 
 <div class="card">
+  <h2>Shared out from this workspace</h2>
+  {% if shared_out_document_rows %}
+    {% for row in shared_out_document_rows %}
+      <div class="row">
+        <div class="doc-title">{{ row.document.filename }}</div>
+        <div class="doc-actions"><a href="/documents/{{ row.document.id }}/">View details</a></div>
+        <div class="doc-meta-group meta">
+          <div>Primary workspace: {{ row.document.workspace.name }}</div>
+          <div>Shared to: {% for workspace in row.assigned_workspaces %}{% if workspace.id != current_workspace_id %}{{ workspace.name }}{% if not forloop.last %}, {% endif %}{% endif %}{% endfor %}</div>
+          <div>Collection: {{ row.document.collection|default:'—' }}</div>
+          <div>Source type: {{ row.document.source_type }}</div>
+          {% if row.source_url %}<div>Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></div>{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>No shared-out documents right now.</p>
+  {% endif %}
+</div>
+
+<div class="card">
   <h2>URL source groups</h2>
   {% if url_document_groups %}
     {% for group_label, rows in url_document_groups %}

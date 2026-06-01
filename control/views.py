@@ -212,6 +212,10 @@ def _dashboard_base(request):
     can_manage_tenant = bool(current_membership and current_membership.role in {TenantMembership.ROLE_OWNER, TenantMembership.ROLE_ADMIN})
 
     shared_document_rows = [row for row in all_document_rows if row['document'].workspace_id != current_workspace_id]
+    shared_out_document_rows = [
+        row for row in all_document_rows
+        if row['document'].workspace_id == current_workspace_id and any(workspace.id != current_workspace_id for workspace in row['assigned_workspaces'])
+    ]
     collection_counts = OrderedDict()
     for row in all_document_rows:
         key = (row['document'].collection or 'Uncategorized').strip() or 'Uncategorized'
@@ -238,6 +242,7 @@ def _dashboard_base(request):
         'url_document_rows': url_document_rows,
         'url_document_groups': url_document_groups.items(),
         'shared_document_rows': shared_document_rows,
+        'shared_out_document_rows': shared_out_document_rows,
         'collection_counts': collection_counts.items(),
         'workspace_summary': workspace_summary,
         'deleted_document_rows': deleted_document_rows,
