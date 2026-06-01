@@ -272,6 +272,133 @@ Docstore now supports assigning one ingested document to multiple workspaces wit
 
 The response now includes `assigned_workspace_ids` so callers can verify which workspaces the document was assigned to at ingest time.
 
+### Language examples
+
+#### Python
+```python
+import requests
+
+BASE_URL = "https://docstore.oddsmith.net"
+API_KEY = "YOUR_DOCSTORE_API_KEY"
+HEADERS = {
+    "Authorization": f"Bearer {API_KEY}",
+}
+
+chat_payload = {
+    "tenant_id": 2,
+    "workspace_id": 3,
+    "question": "What is the PTO policy?",
+    "top_k": 5,
+}
+chat_response = requests.post(f"{BASE_URL}/api/v1/chat/", json=chat_payload, headers=HEADERS, timeout=60)
+chat_response.raise_for_status()
+print(chat_response.json())
+
+with open("employee-handbook.pdf", "rb") as fh:
+    upload_response = requests.post(
+        f"{BASE_URL}/api/v1/documents/",
+        data={
+            "tenant_id": 2,
+            "workspace_id": 3,
+            "additional_workspace_ids": [4, 5],
+            "collection": "hr",
+        },
+        files={"file": ("employee-handbook.pdf", fh, "application/pdf")},
+        headers=HEADERS,
+        timeout=120,
+    )
+upload_response.raise_for_status()
+print(upload_response.json())
+```
+
+#### Node.js
+```js
+const fs = require('fs');
+const FormData = require('form-data');
+
+const BASE_URL = 'https://docstore.oddsmith.net';
+const API_KEY = 'YOUR_DOCSTORE_API_KEY';
+const headers = {
+  Authorization: `Bearer ${API_KEY}`,
+};
+
+async function run() {
+  const chatResponse = await fetch(`${BASE_URL}/api/v1/chat/`, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      tenant_id: 2,
+      workspace_id: 3,
+      question: 'What is the PTO policy?',
+      top_k: 5,
+    }),
+  });
+  console.log(await chatResponse.json());
+
+  const form = new FormData();
+  form.append('tenant_id', '2');
+  form.append('workspace_id', '3');
+  form.append('additional_workspace_ids', '4');
+  form.append('additional_workspace_ids', '5');
+  form.append('collection', 'hr');
+  form.append('file', fs.createReadStream('employee-handbook.pdf'));
+
+  const uploadResponse = await fetch(`${BASE_URL}/api/v1/documents/`, {
+    method: 'POST',
+    headers: {
+      ...headers,
+      ...form.getHeaders(),
+    },
+    body: form,
+  });
+  console.log(await uploadResponse.json());
+}
+
+run().catch(console.error);
+```
+
+#### .NET (C#)
+```csharp
+using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+
+var baseUrl = "https://docstore.oddsmith.net";
+var apiKey = "YOUR_DOCSTORE_API_KEY";
+using var client = new HttpClient();
+client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+var chatPayload = new
+{
+    tenant_id = 2,
+    workspace_id = 3,
+    question = "What is the PTO policy?",
+    top_k = 5
+};
+var chatJson = JsonSerializer.Serialize(chatPayload);
+var chatResponse = await client.PostAsync(
+    $"{baseUrl}/api/v1/chat/",
+    new StringContent(chatJson, Encoding.UTF8, "application/json")
+);
+chatResponse.EnsureSuccessStatusCode();
+Console.WriteLine(await chatResponse.Content.ReadAsStringAsync());
+
+using var form = new MultipartFormDataContent();
+form.Add(new StringContent("2"), "tenant_id");
+form.Add(new StringContent("3"), "workspace_id");
+form.Add(new StringContent("4"), "additional_workspace_ids");
+form.Add(new StringContent("5"), "additional_workspace_ids");
+form.Add(new StringContent("hr"), "collection");
+form.Add(new StreamContent(File.OpenRead("employee-handbook.pdf")), "file", "employee-handbook.pdf");
+
+var uploadResponse = await client.PostAsync($"{baseUrl}/api/v1/documents/", form);
+uploadResponse.EnsureSuccessStatusCode();
+Console.WriteLine(await uploadResponse.Content.ReadAsStringAsync());
+```
+
 ## Environment Notes
 
 ### OpenAI embeddings
