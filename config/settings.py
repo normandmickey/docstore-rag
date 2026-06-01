@@ -149,6 +149,11 @@ GOOGLE_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', '')
 GOOGLE_REDIRECT_URI = os.getenv('GOOGLE_REDIRECT_URI', '')
 GOOGLE_SCOPES = [scope.strip() for scope in os.getenv('GOOGLE_SCOPES', 'openid email profile https://www.googleapis.com/auth/drive.readonly').split() if scope.strip()]
 
+ATLASSIAN_CLIENT_ID = os.getenv('ATLASSIAN_CLIENT_ID', '')
+ATLASSIAN_CLIENT_SECRET = os.getenv('ATLASSIAN_CLIENT_SECRET', '')
+ATLASSIAN_REDIRECT_URI = os.getenv('ATLASSIAN_REDIRECT_URI', '')
+ATLASSIAN_SCOPES = [scope.strip() for scope in os.getenv('ATLASSIAN_SCOPES', 'offline_access read:me search:confluence read:confluence-content.summary read:confluence-space.summary').split() if scope.strip()]
+
 ZOOM_CLIENT_ID = os.getenv('ZOOM_CLIENT_ID', '')
 ZOOM_CLIENT_SECRET = os.getenv('ZOOM_CLIENT_SECRET', '')
 ZOOM_REDIRECT_URI = os.getenv('ZOOM_REDIRECT_URI', '')

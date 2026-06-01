@@ -32,8 +32,12 @@ from .forms import SignUpForm, TenantSettingsForm
 from .models import APIKey, ExternalAccount, InviteToken, ProxiWebMessage, ProxiWebThread, Tenant, TenantMembership, Workspace
 from .api_auth import hash_api_key
 from .oauth import (
+    atlassian_authorize_url,
+    exchange_atlassian_code_for_tokens,
     exchange_code_for_tokens,
     exchange_google_code_for_tokens,
+    fetch_atlassian_accessible_resources,
+    fetch_atlassian_userinfo,
     fetch_google_userinfo,
     fetch_graph_me,
     google_authorize_url,
@@ -465,6 +469,14 @@ def google_connect_start(request):
     return redirect(google_authorize_url(state))
 
 
+def atlassian_connect_start(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    state = secrets.token_urlsafe(24)
+    request.session['atlassian_oauth_state'] = state
+    return redirect(atlassian_authorize_url(state))
+
+
 def google_connect_callback(request):
     if not request.user.is_authenticated:
         return redirect('login')
@@ -739,6 +751,61 @@ def dashboard_workspace(request):
         return redirect_response
     base['section'] = 'workspace'
     return render(request, 'dashboard/workspace.html', base)
+
+
+def atlassian_connect_callback(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+
+    state = request.GET.get('state', '')
+    code = request.GET.get('code', '')
+    expected_state = request.session.pop('atlassian_oauth_state', '')
+    if not state or state != expected_state or not code:
+        messages.error(request, 'Atlassian connection failed. Please try again.')
+        return redirect('dashboard_connectors')
+
+    current_workspace_id = request.session.get('current_workspace_id')
+    workspace = Workspace.objects.filter(id=current_workspace_id).first() if current_workspace_id else None
+    if workspace is None:
+        membership = TenantMembership.objects.filter(user=request.user).select_related('tenant').order_by('tenant__name').first()
+        if membership:
+            workspace = Workspace.objects.filter(tenant=membership.tenant).order_by('name').first()
+    if workspace is None:
+        messages.error(request, 'Choose a workspace before connecting Atlassian.')
+        return redirect('dashboard_connectors')
+
+    try:
+        token_payload = exchange_atlassian_code_for_tokens(code)
+        userinfo = fetch_atlassian_userinfo(token_payload['access_token'])
+        resources = fetch_atlassian_accessible_resources(token_payload['access_token'])
+    except Exception as exc:
+        logger.exception('Atlassian OAuth callback failed for user=%s', request.user.id)
+        messages.error(request, f'Atlassian connection failed: {exc}')
+        return redirect('dashboard_connectors')
+
+    external_user_id = userinfo.get('account_id') or userinfo.get('email') or userinfo.get('nickname') or f'user-{request.user.id}'
+    defaults = {
+        'tenant': workspace.tenant,
+        'workspace': workspace,
+        'email': userinfo.get('email', ''),
+        'display_name': userinfo.get('name') or userinfo.get('nickname') or '',
+        'access_token': token_payload.get('access_token', ''),
+        'refresh_token': token_payload.get('refresh_token', ''),
+        'expires_at': token_payload.get('expires_at'),
+        'scopes_json': (token_payload.get('scope') or '').split(),
+        'metadata_json': {
+            'userinfo': userinfo,
+            'accessible_resources': resources,
+        },
+    }
+    ExternalAccount.objects.update_or_create(
+        user=request.user,
+        provider=ExternalAccount.PROVIDER_ATLASSIAN,
+        external_user_id=external_user_id,
+        defaults=defaults,
+    )
+    messages.success(request, 'Atlassian account connected. Confluence groundwork is ready for site selection/import next.')
+    return redirect('dashboard_connectors')
 
 
 def dashboard_documents(request):

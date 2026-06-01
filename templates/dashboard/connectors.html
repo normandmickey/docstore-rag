@@ -151,9 +151,28 @@
   {% endif %}
 </div>
 <div class="card">
+  <h2>Atlassian / Confluence connections</h2>
+  <p class="meta">Connect your Atlassian account to start the Confluence foundation: account linking, accessible sites, and future page import/sync flows.</p>
+  <p><a href="/connect/atlassian/">Connect Atlassian account</a></p>
+  {% for account in external_accounts %}
+    {% if account.provider == 'atlassian' %}
+      <div class="row">
+        <strong>{{ account.display_name|default:account.email|default:'Atlassian account' }}</strong><br>
+        <span class="meta">{{ account.provider }} · {{ account.email|default:'connected' }}{% if account.workspace %} · Workspace: {{ account.workspace.name }}{% endif %}</span>
+        {% if account.metadata_json.accessible_resources %}
+          <div class="meta" style="margin-top: 8px;">Accessible resources: {{ account.metadata_json.accessible_resources|length }}</div>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% empty %}
+    <p>No external Atlassian accounts connected yet.</p>
+  {% endfor %}
+</div>
+<div class="card">
   <h2>Planned connector types</h2>
   <div class="row"><strong>SharePoint</strong><br><span class="meta">OAuth scaffold exists; picker and sync UI still to come.</span></div>
   <div class="row"><strong>Google Drive</strong><br><span class="meta">OAuth, folder browser, one-off import, and recursive folder sync are now in place; incremental sync and richer history come next.</span></div>
+  <div class="row"><strong>Confluence</strong><br><span class="meta">Atlassian account linking groundwork is now in place; site selection, page browse/import, and sync flows come next.</span></div>
   <div class="row"><strong>Web / URLs</strong><br><span class="meta">Already handled on the URLs page as direct imports.</span></div>
 </div>
 {% endblock %}

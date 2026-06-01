@@ -13,6 +13,11 @@ GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth'
 GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token'
 GOOGLE_USERINFO_URL = 'https://openidconnect.googleapis.com/v1/userinfo'
 
+ATLASSIAN_AUTH_URL = 'https://auth.atlassian.com/authorize'
+ATLASSIAN_TOKEN_URL = 'https://auth.atlassian.com/oauth/token'
+ATLASSIAN_ACCESSIBLE_RESOURCES_URL = 'https://api.atlassian.com/oauth/token/accessible-resources'
+ATLASSIAN_USERINFO_URL = 'https://api.atlassian.com/me'
+
 ZOOM_AUTH_URL = 'https://zoom.us/oauth/authorize'
 ZOOM_TOKEN_URL = 'https://zoom.us/oauth/token'
 
@@ -114,6 +119,58 @@ def fetch_google_userinfo(access_token):
     response = requests.get(
         GOOGLE_USERINFO_URL,
         headers={'Authorization': f'Bearer {access_token}'},
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def atlassian_authorize_url(state):
+    query = urlencode({
+        'audience': 'api.atlassian.com',
+        'client_id': settings.ATLASSIAN_CLIENT_ID,
+        'scope': ' '.join(settings.ATLASSIAN_SCOPES),
+        'redirect_uri': settings.ATLASSIAN_REDIRECT_URI,
+        'state': state,
+        'response_type': 'code',
+        'prompt': 'consent',
+    })
+    return f'{ATLASSIAN_AUTH_URL}?{query}'
+
+
+def exchange_atlassian_code_for_tokens(code):
+    response = requests.post(
+        ATLASSIAN_TOKEN_URL,
+        json={
+            'grant_type': 'authorization_code',
+            'client_id': settings.ATLASSIAN_CLIENT_ID,
+            'client_secret': settings.ATLASSIAN_CLIENT_SECRET,
+            'code': code,
+            'redirect_uri': settings.ATLASSIAN_REDIRECT_URI,
+        },
+        timeout=30,
+    )
+    response.raise_for_status()
+    payload = response.json()
+    expires_in = payload.get('expires_in', 3600)
+    payload['expires_at'] = timezone.now() + timezone.timedelta(seconds=expires_in)
+    return payload
+
+
+def fetch_atlassian_userinfo(access_token):
+    response = requests.get(
+        ATLASSIAN_USERINFO_URL,
+        headers={'Authorization': f'Bearer {access_token}', 'Accept': 'application/json'},
+        timeout=30,
+    )
+    response.raise_for_status()
+    return response.json()
+
+
+def fetch_atlassian_accessible_resources(access_token):
+    response = requests.get(
+        ATLASSIAN_ACCESSIBLE_RESOURCES_URL,
+        headers={'Authorization': f'Bearer {access_token}', 'Accept': 'application/json'},
         timeout=30,
     )
     response.raise_for_status()
