@@ -1,3 +1,4 @@
+from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -61,6 +62,43 @@ class ChatSerializer(serializers.Serializer):
 
 class SearchView(APIView):
     permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary='Search document chunks',
+        description='Run retrieval against the current tenant/workspace and return the most relevant document chunks with preferred source URLs.',
+        request=SearchSerializer,
+        responses={200: OpenApiResponse(description='Search results returned successfully.')},
+        examples=[
+            OpenApiExample(
+                'Search request',
+                value={
+                    'tenant_id': 2,
+                    'workspace_id': 3,
+                    'query': 'How do I update direct deposit?',
+                    'top_k': 5,
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                'Search response',
+                value={
+                    'results': [
+                        {
+                            'chunk_id': 11,
+                            'document_id': 123,
+                            'document': 'Employee Handbook.pdf',
+                            'chunk_index': 4,
+                            'text': 'To update direct deposit, log into the employee portal...',
+                            'distance': 0.11,
+                            'source_url': 'https://drive.google.com/file/d/.../view',
+                            'source_url_kind': 'external',
+                        }
+                    ]
+                },
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request):
         serializer = SearchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -88,6 +126,44 @@ class SearchView(APIView):
 
 class ChatView(APIView):
     permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary='Ask a question against workspace documents',
+        description='Return a grounded answer plus supporting sources from the current tenant/workspace. Sources now prefer original external URLs when available.',
+        request=ChatSerializer,
+        responses={200: OpenApiResponse(description='Grounded answer returned successfully.')},
+        examples=[
+            OpenApiExample(
+                'Chat request',
+                value={
+                    'tenant_id': 2,
+                    'workspace_id': 3,
+                    'question': 'What is the PTO policy?',
+                    'top_k': 5,
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                'Chat response',
+                value={
+                    'answer': 'Employees accrue PTO each pay period and should submit requests through the employee portal.',
+                    'sources': [
+                        {
+                            'chunk_id': 11,
+                            'document_id': 123,
+                            'document': 'Employee Handbook.pdf',
+                            'chunk_index': 4,
+                            'text': 'Paid time off is accrued each pay period...',
+                            'distance': 0.09,
+                            'source_url': 'https://drive.google.com/file/d/.../view',
+                            'source_url_kind': 'external',
+                        }
+                    ],
+                },
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request):
         serializer = ChatSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

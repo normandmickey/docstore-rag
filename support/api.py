@@ -1,3 +1,4 @@
+from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework import serializers
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -15,6 +16,38 @@ class SupportChannelLookupSerializer(serializers.Serializer):
 class SupportChannelLookupView(APIView):
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        summary='Resolve a support channel by phone number',
+        description='Look up the tenant/workspace context for an inbound support phone number. Used by support and voice integrations.',
+        request=SupportChannelLookupSerializer,
+        responses={
+            200: OpenApiResponse(description='Support channel resolved.'),
+            404: OpenApiResponse(description='Support channel not found.'),
+        },
+        examples=[
+            OpenApiExample(
+                'Support channel lookup request',
+                value={'phone_number': '+17325551234'},
+                request_only=True,
+            ),
+            OpenApiExample(
+                'Support channel lookup response',
+                value={
+                    'channel': {
+                        'id': 1,
+                        'name': 'Main Support Line',
+                        'type': 'sms',
+                        'phone_number': '+17325551234',
+                        'ai_enabled': True,
+                        'auto_reply_enabled': True,
+                    },
+                    'tenant': {'id': 2, 'name': 'NJ Moore', 'slug': 'njmoore'},
+                    'workspace': {'id': 3, 'name': 'Employee Docs', 'slug': 'employee-docs'},
+                },
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request):
         api_key = get_api_key_from_header(request)
         if api_key is None:

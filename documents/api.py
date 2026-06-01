@@ -1,3 +1,4 @@
+from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework import serializers, status
 from rest_framework.response import Response
 from rest_framework.permissions import AllowAny
@@ -27,6 +28,42 @@ class DocumentCreateSerializer(serializers.Serializer):
 
 class DocumentCreateView(APIView):
     permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary='Create or upload a document',
+        description='Upload a document into Docstore and optionally assign it to multiple workspaces at ingest time without duplicating the file, versions, chunks, or embeddings.',
+        request=DocumentCreateSerializer,
+        responses={
+            201: OpenApiResponse(description='Document created or versioned successfully.'),
+            200: OpenApiResponse(description='Existing duplicate detected; existing document returned logically.'),
+        },
+        examples=[
+            OpenApiExample(
+                'Multi-workspace document ingest',
+                value={
+                    'tenant_id': 2,
+                    'workspace_id': 3,
+                    'additional_workspace_ids': [4, 5],
+                    'filename': 'employee-handbook.pdf',
+                    'collection': 'hr',
+                    'source_type': 'upload',
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                'Create response',
+                value={
+                    'document_id': 123,
+                    'document_version_id': 456,
+                    'ingestion_job_id': 789,
+                    'status': 'pending',
+                    'mode': 'created',
+                    'assigned_workspace_ids': [3, 4, 5],
+                },
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request):
         serializer = DocumentCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -87,6 +124,46 @@ class URLIngestSerializer(serializers.Serializer):
 
 class URLIngestView(APIView):
     permission_classes = [AllowAny]
+
+    @extend_schema(
+        summary='Ingest one or more URLs',
+        description='Fetch one or more URLs, extract content, create/reuse documents, and optionally assign them to multiple workspaces at ingest time.',
+        request=URLIngestSerializer,
+        responses={200: OpenApiResponse(description='URL ingest completed.')},
+        examples=[
+            OpenApiExample(
+                'URL ingest with additional workspaces',
+                value={
+                    'tenant_id': 2,
+                    'workspace_id': 3,
+                    'additional_workspace_ids': [4, 5],
+                    'urls': ['https://example.com/handbook'],
+                    'collection': 'hr',
+                    'crawl_mode': 'single',
+                    'max_pages': 10,
+                },
+                request_only=True,
+            ),
+            OpenApiExample(
+                'URL ingest response',
+                value={
+                    'created': 1,
+                    'versioned': 0,
+                    'skipped': 0,
+                    'failed': [],
+                    'ingested': [
+                        {
+                            'url': 'https://example.com/handbook',
+                            'document_id': 123,
+                            'mode': 'created',
+                            'assigned_workspace_ids': [3, 4, 5],
+                        }
+                    ],
+                },
+                response_only=True,
+            ),
+        ],
+    )
     def post(self, request):
         serializer = URLIngestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
