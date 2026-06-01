@@ -10,12 +10,39 @@ from providers import answer_with_context, embed_texts, rewrite_question
 from control.pii import redact_pii
 
 
+TERM_EQUIVALENTS = {
+    'staff': {'employee', 'employees', 'faculty', 'worker', 'workers', 'personnel'},
+    'employee': {'staff', 'employees', 'worker', 'workers', 'personnel'},
+    'employees': {'employee', 'staff', 'worker', 'workers', 'personnel'},
+    'worker': {'employee', 'employees', 'staff', 'personnel'},
+    'workers': {'employee', 'employees', 'staff', 'personnel'},
+    'parking': {'permit', 'permits', 'garage', 'lot'},
+    'fee': {'cost', 'price', 'charge', 'rate'},
+    'cost': {'fee', 'price', 'charge', 'rate'},
+}
+
+
 def tokenize_query(text):
     return [token for token in re.findall(r"[a-z0-9']+", (text or '').lower()) if len(token) >= 3]
 
 
+def expand_query_tokens(query):
+    tokens = tokenize_query(query)
+    expanded = []
+    seen = set()
+    for token in tokens:
+        if token not in seen:
+            expanded.append(token)
+            seen.add(token)
+        for synonym in TERM_EQUIVALENTS.get(token, set()):
+            if synonym not in seen:
+                expanded.append(synonym)
+                seen.add(synonym)
+    return expanded
+
+
 def keyword_score(query, text):
-    query_tokens = tokenize_query(query)
+    query_tokens = expand_query_tokens(query)
     if not query_tokens:
         return 0.0
     haystack = (text or '').lower()
@@ -23,7 +50,7 @@ def keyword_score(query, text):
     for token in query_tokens:
         if token in haystack:
             score += 1.0
-    joined_query = ' '.join(query_tokens)
+    joined_query = ' '.join(tokenize_query(query))
     if joined_query and joined_query in haystack:
         score += 2.0
     return score / max(1.0, len(query_tokens))
@@ -224,7 +251,7 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
 
 
 def retrieve_facts(*, tenant, workspace, query, top_k=8, document_id=None):
-    query_tokens = tokenize_query(query)
+    query_tokens = expand_query_tokens(query)
     facts = ExtractedFact.objects.filter(
         tenant=tenant,
         document__status=Document.STATUS_READY,
