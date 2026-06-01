@@ -1012,44 +1012,12 @@ def dashboard_proxi_web(request):
                 )
                 context_blocks = build_context_blocks(retrieval_results)
                 web_results = []
-                if use_web:
-                    if not getattr(settings, 'BRAVE_API_KEY', ''):
-                        messages.error(request, 'Web search is not configured yet.')
-                    else:
-                        try:
-                            response = requests.get(
-                                'https://api.search.brave.com/res/v1/web/search',
-                                params={'q': question, 'count': 5},
-                                headers={
-                                    'Accept': 'application/json',
-                                    'Accept-Encoding': 'gzip',
-                                    'X-Subscription-Token': settings.BRAVE_API_KEY,
-                                },
-                                timeout=20,
-                            )
-                            response.raise_for_status()
-                            payload = response.json() or {}
-                            for item in ((payload.get('web') or {}).get('results') or [])[:5]:
-                                web_results.append({
-                                    'title': item.get('title', ''),
-                                    'url': item.get('url', ''),
-                                    'snippet': item.get('description', ''),
-                                })
-                        except Exception as exc:
-                            logger.exception('Proxi-Web web search failed for user=%s workspace=%s', request.user.id, current_workspace.id)
-                            messages.error(request, f'Web search failed: {exc}')
-                for index, item in enumerate(web_results, start=1):
-                    context_blocks.append(
-                        'UNTRUSTED WEB RESULT\n'
-                        f'[Web {index}] {item.get("title") or item.get("url") or "Web result"}\n'
-                        f'URL: {item.get("url", "")}\n'
-                        f'{item.get("snippet", "")}'
-                    )
                 answer = answer_with_general_context(
                     question,
                     context_blocks,
                     chat_history=chat_history,
-                ) if context_blocks else 'I could not find enough relevant context for that question yet.'
+                    model='groq/compound' if use_web else None,
+                ) if context_blocks or use_web else 'I could not find enough relevant context for that question yet.'
                 redacted_answer = redact_pii(answer)
                 ProxiWebMessage.objects.create(
                     thread=thread,
