@@ -199,6 +199,13 @@ Used for:
 Current configured chat/question model family:
 - `openai/gpt-oss-20b`
 
+## Install / Bootstrap
+
+For a fresh-server install guide, see:
+
+- `INSTALL.md`
+- `scripts/bootstrap-docstore-server.sh`
+
 ## Important Routes
 
 ### Web
