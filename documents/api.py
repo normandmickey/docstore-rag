@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from control.api_guard import resolve_request_context
+from control.models import Workspace
 from .models import Document
 from .upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
 
@@ -11,6 +12,7 @@ from .upload_service import collect_urls_for_ingest, create_or_reuse_document, c
 class DocumentCreateSerializer(serializers.Serializer):
     tenant_id = serializers.IntegerField(required=False)
     workspace_id = serializers.IntegerField(required=False)
+    additional_workspace_ids = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
     filename = serializers.CharField(max_length=255, required=False)
     mime_type = serializers.CharField(max_length=120, required=False, allow_blank=True)
     size_bytes = serializers.IntegerField(required=False, default=0)
@@ -38,6 +40,10 @@ class DocumentCreateView(APIView):
         uploaded_file = data.get('file')
         filename = data.get('filename') or (uploaded_file.name if uploaded_file else 'untitled.txt')
         size_bytes = data.get('size_bytes') or (uploaded_file.size if uploaded_file else 0)
+        additional_workspaces = list(Workspace.objects.filter(
+            tenant=tenant,
+            id__in=data.get('additional_workspace_ids') or [],
+        ))
 
         result = create_or_reuse_document(
             tenant=tenant,
@@ -51,6 +57,7 @@ class DocumentCreateView(APIView):
             raw_text=data.get('raw_text', ''),
             source_type=data.get('source_type', Document.SOURCE_UPLOAD),
             source_url=data.get('source_url', ''),
+            additional_workspaces=additional_workspaces,
         )
         document = result['document']
         version = result['version']
@@ -62,6 +69,7 @@ class DocumentCreateView(APIView):
                 'ingestion_job_id': job.id if job else None,
                 'status': document.status,
                 'mode': result['mode'],
+                'assigned_workspace_ids': list(document.workspace_assignments.values_list('workspace_id', flat=True)),
             },
             status=status.HTTP_201_CREATED if result['mode'] != 'duplicate' else status.HTTP_200_OK,
         )
@@ -70,6 +78,7 @@ class DocumentCreateView(APIView):
 class URLIngestSerializer(serializers.Serializer):
     tenant_id = serializers.IntegerField(required=False)
     workspace_id = serializers.IntegerField(required=False)
+    additional_workspace_ids = serializers.ListField(child=serializers.IntegerField(), required=False, default=list)
     urls = serializers.ListField(child=serializers.URLField(), allow_empty=False)
     collection = serializers.CharField(max_length=120, required=False, allow_blank=True)
     crawl_mode = serializers.ChoiceField(choices=['single', 'same_domain'], required=False, default='single')
@@ -89,6 +98,10 @@ class URLIngestView(APIView):
             workspace_id=data.get('workspace_id'),
         )
         urls = collect_urls_for_ingest(data['urls'], crawl_mode=data['crawl_mode'], max_pages=data['max_pages'])
+        additional_workspaces = list(Workspace.objects.filter(
+            tenant=tenant,
+            id__in=data.get('additional_workspace_ids') or [],
+        ))
 
         created = 0
         versioned = 0
@@ -104,11 +117,13 @@ class URLIngestView(APIView):
                     url=url,
                     collection=data.get('collection', ''),
                     uploaded_by=request.user if request.user.is_authenticated else None,
+                    additional_workspaces=additional_workspaces,
                 )
                 ingested.append({
                     'url': result.get('normalized_url', url),
                     'document_id': result['document'].id,
                     'mode': result['mode'],
+                    'assigned_workspace_ids': list(result['document'].workspace_assignments.values_list('workspace_id', flat=True)),
                 })
                 if result['mode'] == 'duplicate':
                     skipped += 1
@@ -149,8 +164,8 @@ class DocumentDeleteView(APIView):
         documents = list(Document.objects.filter(
             id__in=data['document_ids'],
             tenant=tenant,
-            workspace=workspace,
-        ).exclude(status=Document.STATUS_DELETED))
+            workspace_assignments__workspace=workspace,
+        ).exclude(status=Document.STATUS_DELETED).distinct())
 
         for document in documents:
             document.soft_delete()
@@ -176,9 +191,9 @@ class DocumentRestoreView(APIView):
         documents = list(Document.objects.filter(
             id__in=data['document_ids'],
             tenant=tenant,
-            workspace=workspace,
+            workspace_assignments__workspace=workspace,
             status=Document.STATUS_DELETED,
-        ))
+        ).distinct())
 
         for document in documents:
             document.restore()
@@ -204,9 +219,9 @@ class DocumentPurgeView(APIView):
         documents = list(Document.objects.filter(
             id__in=data['document_ids'],
             tenant=tenant,
-            workspace=workspace,
+            workspace_assignments__workspace=workspace,
             status=Document.STATUS_DELETED,
-        ))
+        ).distinct())
 
         purged_ids = []
         for document in documents:

@@ -11,7 +11,7 @@ from markdownify import markdownify as html_to_markdown
 from ingestion.models import IngestionJob
 from ingestion.tasks import ingest_document_task
 
-from .models import Document, DocumentVersion
+from .models import Document, DocumentVersion, DocumentWorkspaceAssignment
 
 
 def _file_sha256(uploaded_file):
@@ -22,8 +22,18 @@ def _file_sha256(uploaded_file):
     return hasher.hexdigest()
 
 
-def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime_type='', size_bytes=0, collection='', uploaded_by=None, raw_text='', source_type=Document.SOURCE_UPLOAD, source_url='', extractor=IngestionJob.EXTRACTOR_STANDARD):
+def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime_type='', size_bytes=0, collection='', uploaded_by=None, raw_text='', source_type=Document.SOURCE_UPLOAD, source_url='', extractor=IngestionJob.EXTRACTOR_STANDARD, additional_workspaces=None):
     content_hash = _file_sha256(uploaded_file) if uploaded_file else ''
+    additional_workspaces = list(additional_workspaces or [])
+    assignment_workspaces = []
+    seen_workspace_ids = set()
+    for candidate in [workspace, *additional_workspaces]:
+        if not candidate or getattr(candidate, 'tenant_id', None) != tenant.id:
+            continue
+        if candidate.id in seen_workspace_ids:
+            continue
+        seen_workspace_ids.add(candidate.id)
+        assignment_workspaces.append(candidate)
 
     exact_duplicate = Document.objects.filter(
         tenant=tenant,
@@ -68,6 +78,12 @@ def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime
                 extraction_metadata_json={'raw_text': raw_text},
             )
             mode = 'versioned'
+            for assigned_workspace in assignment_workspaces:
+                DocumentWorkspaceAssignment.objects.get_or_create(
+                    document=document,
+                    workspace=assigned_workspace,
+                    defaults={'is_primary': assigned_workspace.id == workspace.id},
+                )
         else:
             document = Document(
                 tenant=tenant,
@@ -86,6 +102,12 @@ def create_or_reuse_document(*, tenant, workspace, uploaded_file, filename, mime
                 document.file.save(filename, uploaded_file, save=False)
                 document.object_key = document.file.name
             document.save()
+            for assigned_workspace in assignment_workspaces:
+                DocumentWorkspaceAssignment.objects.get_or_create(
+                    document=document,
+                    workspace=assigned_workspace,
+                    defaults={'is_primary': assigned_workspace.id == workspace.id},
+                )
             version = DocumentVersion.objects.create(
                 document=document,
                 version_number=1,
@@ -156,7 +178,7 @@ def _html_to_text(html):
     return html_to_markdown(str(main))
 
 
-def create_or_reuse_url_document(*, tenant, workspace, url, collection='', uploaded_by=None):
+def create_or_reuse_url_document(*, tenant, workspace, url, collection='', uploaded_by=None, additional_workspaces=None):
     normalized_url = normalize_url(url)
 
     existing_by_url = Document.objects.filter(
@@ -192,6 +214,7 @@ def create_or_reuse_url_document(*, tenant, workspace, url, collection='', uploa
         raw_text=raw_text,
         source_type=Document.SOURCE_URL,
         source_url=normalized_url,
+        additional_workspaces=additional_workspaces,
     )
     result['normalized_url'] = normalized_url
     result['discovered_links'] = _extract_links_from_html(response.text, normalized_url) if mime_type == 'text/html' else []
