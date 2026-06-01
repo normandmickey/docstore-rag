@@ -271,10 +271,23 @@ def extract_code_lookup_answer(query, results):
         return None
 
     target_code = code_matches[0]
-    patterns = [
-        re.compile(rf'\b{re.escape(target_code)}\b\s*[:\-–—]\s*(.+)', re.IGNORECASE),
-        re.compile(rf'\b{re.escape(target_code)}\b\s+(.+)', re.IGNORECASE),
+    code_pattern = re.compile(r'\b([12][A-K])\b')
+    stop_phrases = [
+        'code description',
+        'line 16',
+        'section 4980h',
+        'qualified offer transition relief',
+        'if used, leave line 15 blank',
+        'not applicable to the shp',
     ]
+
+    def clean_meaning(text):
+        value = ' '.join((text or '').split()).strip(' .;:-')
+        for phrase in stop_phrases:
+            idx = value.lower().find(phrase)
+            if idx > 0:
+                value = value[:idx].strip(' .;:-')
+        return value
 
     for result in results or []:
         text = (getattr(result, 'text', '') or '').strip()
@@ -282,25 +295,28 @@ def extract_code_lookup_answer(query, results):
             continue
 
         normalized = ' '.join(text.split())
-        split_lines = [line.strip() for line in re.split(r'[\r\n]+|(?<=[.])\s+(?=[A-Z0-9])', text) if line.strip()]
-        candidate_lines = split_lines or [normalized]
 
-        for line in candidate_lines:
-            compact_line = ' '.join(line.split())
-            for pattern in patterns:
-                match = pattern.search(compact_line)
-                if not match:
-                    continue
-                meaning = (match.group(1) or '').strip(' .;:-')
-                if not meaning or len(meaning) < 8:
-                    continue
-                if meaning.upper().startswith(target_code):
-                    continue
+        direct_match = re.search(rf'\b{re.escape(target_code)}\b\s*[:\-–—]\s*(.+)', normalized, re.IGNORECASE)
+        if direct_match:
+            meaning = clean_meaning(direct_match.group(1))
+            if meaning and len(meaning) >= 8 and not meaning.upper().startswith(target_code):
+                return f'On Form 1095-C, code {target_code} means {meaning}.'
+
+        matches = list(code_pattern.finditer(normalized))
+        for idx, match in enumerate(matches):
+            code = match.group(1).upper()
+            if code != target_code:
+                continue
+            start = match.end()
+            end = matches[idx + 1].start() if idx + 1 < len(matches) else min(len(normalized), start + 280)
+            segment = normalized[start:end]
+            meaning = clean_meaning(segment)
+            if meaning and len(meaning) >= 8 and not meaning.upper().startswith(target_code):
                 return f'On Form 1095-C, code {target_code} means {meaning}.'
 
         around = re.search(rf'(.{{0,80}}\b{re.escape(target_code)}\b.{{0,220}})', normalized, re.IGNORECASE)
         if around:
-            snippet = ' '.join(around.group(1).split()).strip(' .;')
+            snippet = clean_meaning(around.group(1))
             if snippet and len(snippet) > len(target_code) + 12:
                 return f'Here is the matching Form 1095-C code text for {target_code}: {snippet}.'
 
