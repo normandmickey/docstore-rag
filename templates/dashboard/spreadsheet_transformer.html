@@ -18,7 +18,10 @@
         {% for error in field.errors %}<div class="meta" style="color:#fca5a5; margin-top:6px;">{{ error }}</div>{% endfor %}
       </div>
     {% endfor %}
-    <button type="submit" name="action" value="preview">Preview transform</button>
+    <button type="submit" name="action" value="prepare">Prepare prompt</button>
+    {% if spreadsheet_transform_prompt_preview %}
+      <button type="submit" name="action" value="preview" style="margin-left:10px;">Send to AI and preview transform</button>
+    {% endif %}
     {% if spreadsheet_transform_plan %}
       <button type="submit" name="action" value="download" style="margin-left:10px;">Download transformed file</button>
     {% endif %}

@@ -269,11 +269,7 @@ def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]], strict:
     return sanitized, detected
 
 
-def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_request: str, strict_sanitization: bool = False) -> tuple[dict[str, Any], dict[str, list[str]], list[dict[str, Any]], dict[str, Any]]:
-    if not settings.OPENAI_API_KEY:
-        raise SpreadsheetTransformError('OPENAI_API_KEY is not configured.')
-
-    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+def build_transform_prompt_payload(*, headers: list[str], rows: list[dict[str, Any]], user_request: str, strict_sanitization: bool = False) -> tuple[dict[str, Any], dict[str, list[str]], list[dict[str, Any]], str]:
     prompt = (
         'You are planning a spreadsheet transformation. '
         'Return valid JSON only. '
@@ -295,6 +291,20 @@ def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_reque
         'strict_sanitization': strict_sanitization,
         'instruction': 'Sample row values may be privacy-sanitized, but headers and structure reflect the real file. Build the transform plan against the real source headers.',
     }
+    return user_input, detected, sanitized_rows, prompt
+
+
+def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_request: str, strict_sanitization: bool = False) -> tuple[dict[str, Any], dict[str, list[str]], list[dict[str, Any]], dict[str, Any]]:
+    if not settings.OPENAI_API_KEY:
+        raise SpreadsheetTransformError('OPENAI_API_KEY is not configured.')
+
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    user_input, detected, sanitized_rows, prompt = build_transform_prompt_payload(
+        headers=headers,
+        rows=rows,
+        user_request=user_request,
+        strict_sanitization=strict_sanitization,
+    )
     response = client.responses.create(
         model=getattr(settings, 'SPREADSHEET_TRANSFORM_MODEL', 'gpt-4.1-mini'),
         input=[
@@ -307,7 +317,7 @@ def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_reque
         raise SpreadsheetTransformError('No transform plan was returned.')
     try:
         plan = json.loads(_extract_json_object(text))
-        return plan, detected, sanitized_rows, user_input
+        return plan, detected, sanitized_rows, {'system_prompt': prompt, 'user_payload': user_input}
     except json.JSONDecodeError as exc:
         raise SpreadsheetTransformError(f'Could not parse transform plan JSON: {exc}') from exc
 

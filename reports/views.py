@@ -18,6 +18,7 @@ from chatbots.models import ChatbotConversation, ChatbotIntegration
 from .spreadsheet_transform import (
     SpreadsheetTransformError,
     apply_transform_plan,
+    build_transform_prompt_payload,
     export_transform_csv,
     export_transform_xlsx,
     load_tabular_file,
@@ -66,7 +67,7 @@ def spreadsheet_transformer(request):
     base['spreadsheet_transform_prompt_preview'] = None
 
     if request.method == 'POST':
-        action = (request.POST.get('action') or 'preview').strip()
+        action = (request.POST.get('action') or 'prepare').strip()
         form = SpreadsheetTransformForm(request.POST, request.FILES)
         base['spreadsheet_transform_form'] = form
         if form.is_valid():
@@ -74,18 +75,46 @@ def spreadsheet_transformer(request):
                 session_table = request.session.get('spreadsheet_transform_table') or {}
                 session_result = request.session.get('spreadsheet_transform_result') or {}
 
-                if action == 'preview':
+                if action == 'prepare':
                     if not form.cleaned_data.get('file'):
-                        raise SpreadsheetTransformError('Please upload a CSV or XLSX file to preview the transform.')
+                        raise SpreadsheetTransformError('Please upload a CSV or XLSX file to prepare the transform prompt.')
                     table = load_tabular_file(form.cleaned_data['file'])
-                    plan, detected_fields, sanitized_samples, prompt_preview = plan_transform(
+                    user_payload, detected_fields, sanitized_samples, system_prompt = build_transform_prompt_payload(
                         headers=table['headers'],
                         rows=table['rows'],
                         user_request=form.cleaned_data['transform_request'],
                         strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
                     )
-                    headers, transformed_rows = apply_transform_plan(rows=table['rows'], plan=plan)
                     request.session['spreadsheet_transform_table'] = table
+                    request.session['spreadsheet_transform_result'] = {
+                        'plan': None,
+                        'detected_fields': detected_fields,
+                        'sanitized_samples': sanitized_samples,
+                        'prompt_preview': {'system_prompt': system_prompt, 'user_payload': user_payload},
+                        'headers': [],
+                        'rows': [],
+                        'export_format': form.cleaned_data['export_format'],
+                        'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
+                        'transform_request': form.cleaned_data['transform_request'],
+                    }
+                    request.session.modified = True
+                    session_result = request.session['spreadsheet_transform_result']
+                    base['spreadsheet_transform_form'] = SpreadsheetTransformForm(initial={
+                        'transform_request': session_result.get('transform_request', ''),
+                        'export_format': session_result.get('export_format', 'xlsx'),
+                        'strict_sanitization': session_result.get('strict_sanitization', False),
+                    })
+
+                elif action == 'preview':
+                    if not session_table:
+                        raise SpreadsheetTransformError('No prepared prompt is available yet. Upload a file and prepare the prompt first.')
+                    plan, detected_fields, sanitized_samples, prompt_preview = plan_transform(
+                        headers=session_table.get('headers') or [],
+                        rows=session_table.get('rows') or [],
+                        user_request=form.cleaned_data['transform_request'],
+                        strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
+                    )
+                    headers, transformed_rows = apply_transform_plan(rows=session_table.get('rows') or [], plan=plan)
                     request.session['spreadsheet_transform_result'] = {
                         'plan': plan,
                         'detected_fields': detected_fields,
