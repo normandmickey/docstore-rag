@@ -185,7 +185,7 @@ def answer_with_general_context(question, context_blocks, chat_history=None, mod
             history_text = '\n'.join(history_lines)
 
     response = client.responses.create(
-        model=model or getattr(settings, 'DEFAULT_CHAT_MODEL', 'openai/gpt-oss-20b'),
+        model=model or getattr(settings, 'DEFAULT_WEB_CHAT_MODEL', 'groq/compound'),
         input=[
             {
                 'role': 'system',
