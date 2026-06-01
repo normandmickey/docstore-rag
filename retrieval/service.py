@@ -5,7 +5,7 @@ from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from pgvector.django import CosineDistance
 
 from audit.models import RetrievalLog
-from documents.models import Chunk, Document, DocumentWorkspaceAssignment, ExtractedFact
+from documents.models import Chunk, Document, DocumentWorkspaceAssignment, DocumentVersion, ExtractedFact
 from providers import answer_with_context, embed_texts, rewrite_question
 from control.pii import redact_pii
 
@@ -264,7 +264,7 @@ def retrieve_facts(*, tenant, workspace, query, top_k=8, document_id=None):
     return scored[:top_k]
 
 
-def extract_code_lookup_answer(query, results):
+def extract_code_lookup_answer(query, results, document=None):
     query_text = (query or '').strip()
     code_matches = re.findall(r'\b([12][A-K])\b', query_text.upper())
     if not code_matches:
@@ -289,8 +289,34 @@ def extract_code_lookup_answer(query, results):
                 value = value[:idx].strip(' .;:-')
         return value
 
+    candidate_texts = []
     for result in results or []:
         text = (getattr(result, 'text', '') or '').strip()
+        if text:
+            candidate_texts.append(text)
+
+    if document is not None:
+        chunk_qs = Chunk.objects.filter(document=document).order_by('chunk_index')
+        for chunk in chunk_qs:
+            text = (chunk.text or '').strip()
+            if text and target_code in text.upper():
+                candidate_texts.append(text)
+        latest_version = DocumentVersion.objects.filter(document=document).order_by('-version_number', '-id').first()
+        if latest_version:
+            raw_preview = ((latest_version.extraction_metadata_json or {}).get('raw_text_preview') or '').strip()
+            if raw_preview and target_code in raw_preview.upper():
+                candidate_texts.append(raw_preview)
+
+    seen = set()
+    deduped_candidate_texts = []
+    for text in candidate_texts:
+        key = text[:1000]
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped_candidate_texts.append(text)
+
+    for text in deduped_candidate_texts:
         if not text or target_code not in text.upper():
             continue
 
@@ -356,7 +382,7 @@ def answer_question(*, tenant, workspace, query, top_k=5, document_id=None, temp
         document_id=document_id,
     )
     context_blocks = build_context_blocks(results, facts=facts)
-    exact_code_answer = extract_code_lookup_answer(query, results)
+    exact_code_answer = extract_code_lookup_answer(query, results, document=results[0].document if results else None)
     if exact_code_answer:
         return exact_code_answer, results
     answer = answer_with_context(query, context_blocks, temperature=temperature) if context_blocks else 'I could not find relevant document context for that question yet.'
