@@ -20,6 +20,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.text import slugify
 
+from chatbots.models import ChatbotIntegration
 from connectors.google_drive import GoogleDriveClient
 from connectors.models import Connector, ExternalDocumentBinding
 from documents.models import Chunk, Document, DocumentWorkspaceAssignment, ExtractedFact
