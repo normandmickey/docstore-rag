@@ -104,6 +104,23 @@ def _looks_like_bank_info(header: str, value: str) -> bool:
     return False
 
 
+def _looks_like_dob(header: str, value: str) -> bool:
+    header_lower = (header or '').lower()
+    if not any(marker in header_lower for marker in ['dob', 'birth', 'date of birth']):
+        return False
+    value = value.strip()
+    return any(ch.isdigit() for ch in value) and any(sep in value for sep in ['/', '-', '.'])
+
+
+def _looks_like_member_id(header: str, value: str) -> bool:
+    header_lower = (header or '').lower()
+    id_markers = ['employee id', 'employeeid', 'member id', 'memberid', 'subscriber id', 'subscriberid', 'person id']
+    if any(marker in header_lower for marker in id_markers):
+        compact = ''.join(ch for ch in value if ch.isalnum())
+        return len(compact) >= 5
+    return False
+
+
 def _looks_like_address(header: str, value: str) -> bool:
     header_lower = (header or '').lower()
     return any(marker in header_lower for marker in ['address', 'street', 'city', 'state', 'zip', 'postal'])
@@ -138,6 +155,10 @@ def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]]) -> list
             value = ''.join(str(fake.random_digit()) for _ in range(9))
         elif kind == 'account':
             value = ''.join(str(fake.random_digit()) for _ in range(12))
+        elif kind == 'dob':
+            value = fake.date_of_birth(minimum_age=21, maximum_age=70).strftime('%m/%d/%Y')
+        elif kind == 'member_id':
+            value = ''.join(str(fake.random_digit()) for _ in range(8))
         else:
             value = original
         replacements[key] = value
@@ -164,6 +185,10 @@ def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]]) -> list
                     out[header] = replace('routing', value)
                 else:
                     out[header] = replace('account', value)
+            elif _looks_like_dob(header, value):
+                out[header] = replace('dob', value)
+            elif _looks_like_member_id(header, value):
+                out[header] = replace('member_id', value)
             elif _looks_like_address(header, value):
                 if 'city' in header_lower:
                     out[header] = replace('city', value)

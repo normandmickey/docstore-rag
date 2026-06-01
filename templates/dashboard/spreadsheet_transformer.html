@@ -5,6 +5,9 @@
 <div class="card">
   <h2>Spreadsheet Transformer</h2>
   <p class="meta">Upload a CSV or XLSX file, describe the output columns and layout you want, and export a transformed spreadsheet.</p>
+  <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe;">
+    Sample row values sent to the AI planner are privacy-sanitized first. Your actual export still uses the original uploaded data.
+  </div>
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {% for field in spreadsheet_transform_form %}
