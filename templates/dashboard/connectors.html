@@ -48,7 +48,7 @@
           <input type="hidden" name="action" value="use_google_drive_folder">
           <input type="hidden" name="folder_id" value="{{ google_drive_folder_current_id }}">
           <input type="hidden" name="folder_name" value="{{ google_drive_folder_current_name }}">
-          <button type="submit">Use this folder for connector</button>
+          <button type="submit">Set as connector folder</button>
         </form>
         {% if google_drive_folder_current_id != 'root' %}
         <form method="post" style="margin:0;">
@@ -74,7 +74,7 @@
               <input type="hidden" name="action" value="use_google_drive_folder">
               <input type="hidden" name="folder_id" value="{{ folder.id }}">
               <input type="hidden" name="folder_name" value="{{ folder.name }}">
-              <button type="submit">Use this folder</button>
+              <button type="submit">Set as connector folder</button>
             </form>
             <form method="post" style="margin:0;">
               {% csrf_token %}
