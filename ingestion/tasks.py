@@ -584,6 +584,7 @@ def ingest_document_task(self, ingestion_job_id):
         version.parse_status = 'ready'
         version.extraction_metadata_json = {
             **(version.extraction_metadata_json or {}),
+            'raw_text': cleaned_text,
             'raw_text_preview': cleaned_text[:500],
             'chunk_count': len(chunks),
             'fact_count': ExtractedFact.objects.filter(document_version=version).count(),
