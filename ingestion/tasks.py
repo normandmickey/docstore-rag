@@ -137,9 +137,62 @@ def enforce_embedding_limit(chunks, max_chars=EMBEDDING_MAX_INPUT_CHARS):
 
 
 def extract_pdf_text(raw):
+    def _merge_pdf_blocks(page):
+        blocks = page.get_text('blocks') or []
+        normalized = []
+        for block in blocks:
+            if len(block) < 5:
+                continue
+            x0, y0, x1, y1, text = block[:5]
+            text = re.sub(r'\s+', ' ', (text or '')).strip()
+            if not text:
+                continue
+            normalized.append({
+                'x0': float(x0),
+                'y0': float(y0),
+                'x1': float(x1),
+                'y1': float(y1),
+                'text': text,
+            })
+
+        normalized.sort(key=lambda item: (round(item['y0'], 1), item['x0']))
+        merged_lines = []
+        row_tolerance = 6.0
+        for block in normalized:
+            placed = False
+            for row in merged_lines:
+                if abs(row['y0'] - block['y0']) <= row_tolerance:
+                    row['blocks'].append(block)
+                    row['y0'] = min(row['y0'], block['y0'])
+                    placed = True
+                    break
+            if not placed:
+                merged_lines.append({'y0': block['y0'], 'blocks': [block]})
+
+        line_texts = []
+        for row in sorted(merged_lines, key=lambda item: item['y0']):
+            row_blocks = sorted(row['blocks'], key=lambda item: item['x0'])
+            parts = []
+            for block in row_blocks:
+                token = block['text']
+                if parts and len(token) <= 4 and re.fullmatch(r'[12][A-Z]|[A-Z0-9]{1,4}', token):
+                    parts[-1] = f"{parts[-1]} {token}"
+                else:
+                    parts.append(token)
+            line = ' '.join(parts).strip()
+            if line:
+                line_texts.append(line)
+        return '\n'.join(line_texts)
+
     pdf = fitz.open(stream=raw, filetype='pdf')
     try:
-        pages = [page.get_text('text') for page in pdf]
+        pages = []
+        for page in pdf:
+            block_text = _merge_pdf_blocks(page)
+            fallback_text = page.get_text('text') or ''
+            chosen = block_text.strip() if len(block_text.strip()) >= len(fallback_text.strip()) * 0.7 else fallback_text.strip()
+            if chosen:
+                pages.append(chosen)
     finally:
         pdf.close()
     return '\n\n'.join(page.strip() for page in pages if page and page.strip())
