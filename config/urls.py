@@ -48,6 +48,7 @@ urlpatterns = [
     path('login/', AppLoginView.as_view(), name='login'),
     path('logout/', logout_view, name='logout'),
     path('signup/', signup, name='signup'),
+    path('accounts/', include('allauth.urls')),
     path('dashboard/', dashboard, name='dashboard'),
     path('dashboard/workspace/', dashboard_workspace, name='dashboard_workspace'),
     path('dashboard/documents/', dashboard_documents, name='dashboard_documents'),
