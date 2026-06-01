@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Docstore API Quickstart</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --bg-2: #0f172a;
+      --card: #121a33;
+      --border: #243055;
+      --text: #eef2ff;
+      --muted: #cbd5e1;
+      --soft: #94a3b8;
+      --blue: #2563eb;
+      --blue-soft: #93c5fd;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%); color: var(--text); }
+    a { color: var(--blue-soft); text-decoration: none; }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 28px 20px 72px; }
+    .card { background: rgba(18,26,51,0.96); border: 1px solid var(--border); border-radius: 18px; padding: 24px; margin-bottom: 20px; }
+    .nav { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+    .nav a { color: #cfe3ff; text-decoration: none; padding: 10px 14px; border-radius: 10px; background: #1a2446; }
+    h1 { font-size: clamp(2rem, 4vw, 3.2rem); margin: 0 0 12px; }
+    h2 { margin: 0 0 14px; }
+    p, li { color: var(--muted); line-height: 1.65; }
+    code { background: #0f172a; padding: 2px 6px; border-radius: 6px; color: #bfdbfe; }
+    pre { white-space: pre-wrap; background: #0f172a; border: 1px solid var(--border); padding: 14px; border-radius: 12px; overflow-x: auto; color: #dbe5ff; }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .pill { display: inline-block; padding: 8px 12px; border-radius: 999px; background: rgba(37,99,235,0.18); color: #bfdbfe; font-size: 0.92rem; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <span class="pill">Docstore API</span>
+      <h1>Quickstart</h1>
+      <p>Use this page when you want the practical version: what auth to send, which endpoints matter first, and how to call them from real code.</p>
+      <div class="nav">
+        <a href="/api/docs/" target="_blank" rel="noopener noreferrer">Open Swagger UI</a>
+        <a href="/api/schema/" target="_blank" rel="noopener noreferrer">OpenAPI schema</a>
+        <a href="/dashboard/">Dashboard</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Authentication</h2>
+      <p>Send your Docstore API key as a bearer token:</p>
+      <pre><code>Authorization: Bearer YOUR_DOCSTORE_API_KEY</code></pre>
+      <p>Most endpoints are tenant/workspace scoped. If your API key is already workspace-scoped, you may not need to send both IDs on every request, but it is still valid to do so.</p>
+    </div>
+
+    <div class="card">
+      <h2>Core endpoints</h2>
+      <div class="grid">
+        <div>
+          <p><code>POST /api/v1/chat/</code><br>Ask a grounded question against workspace documents.</p>
+          <p><code>POST /api/v1/search/</code><br>Return relevant chunks and preferred source links.</p>
+          <p><code>POST /api/v1/documents/</code><br>Upload a file for ingestion.</p>
+        </div>
+        <div>
+          <p><code>POST /api/v1/urls/ingest/</code><br>Ingest one or more URLs.</p>
+          <p><code>POST /api/v1/documents/delete/</code><br>Soft-delete documents visible to the current workspace.</p>
+          <p><code>POST /api/v1/support/channel-lookup/</code><br>Resolve support phone numbers to tenant/workspace context.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Multi-workspace ingest</h2>
+      <p>Docstore can ingest a document once and assign it to multiple workspaces without duplicating the file, versions, chunks, or embeddings.</p>
+      <pre><code>{
+  "tenant_id": 2,
+  "workspace_id": 3,
+  "additional_workspace_ids": [4, 5],
+  "collection": "hr"
+}</code></pre>
+      <p>The response includes <code>assigned_workspace_ids</code> so you can confirm where the document is available.</p>
+    </div>
+
+    <div class="card">
+      <h2>Python</h2>
+      <pre><code>import requests
+
+BASE_URL = "https://docstore.oddsmith.net"
+API_KEY = "YOUR_DOCSTORE_API_KEY"
+HEADERS = {"Authorization": f"Bearer {API_KEY}"}
+
+chat_response = requests.post(
+    f"{BASE_URL}/api/v1/chat/",
+    json={
+        "tenant_id": 2,
+        "workspace_id": 3,
+        "question": "What is the PTO policy?",
+        "top_k": 5,
+    },
+    headers=HEADERS,
+    timeout=60,
+)
+chat_response.raise_for_status()
+print(chat_response.json())</code></pre>
+    </div>
+
+    <div class="card">
+      <h2>Node.js</h2>
+      <pre><code>const fs = require('fs');
+const FormData = require('form-data');
+
+const BASE_URL = 'https://docstore.oddsmith.net';
+const API_KEY = 'YOUR_DOCSTORE_API_KEY';
+
+async function run() {
+  const form = new FormData();
+  form.append('tenant_id', '2');
+  form.append('workspace_id', '3');
+  form.append('additional_workspace_ids', '4');
+  form.append('additional_workspace_ids', '5');
+  form.append('collection', 'hr');
+  form.append('file', fs.createReadStream('employee-handbook.pdf'));
+
+  const response = await fetch(`${BASE_URL}/api/v1/documents/`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${API_KEY}`,
+      ...form.getHeaders(),
+    },
+    body: form,
+  });
+
+  console.log(await response.json());
+}
+
+run().catch(console.error);</code></pre>
+    </div>
+
+    <div class="card">
+      <h2>.NET / C#</h2>
+      <pre><code>using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
+
+var baseUrl = "https://docstore.oddsmith.net";
+var apiKey = "YOUR_DOCSTORE_API_KEY";
+using var client = new HttpClient();
+client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+var payload = new
+{
+    tenant_id = 2,
+    workspace_id = 3,
+    question = "What is the PTO policy?",
+    top_k = 5
+};
+var json = JsonSerializer.Serialize(payload);
+var response = await client.PostAsync(
+    $"{baseUrl}/api/v1/chat/",
+    new StringContent(json, Encoding.UTF8, "application/json")
+);
+response.EnsureSuccessStatusCode();
+Console.WriteLine(await response.Content.ReadAsStringAsync());</code></pre>
+    </div>
+  </div>
+</body>
+</html>

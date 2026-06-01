@@ -472,6 +472,10 @@ def google_connect_callback(request):
     return redirect('dashboard_connectors')
 
 
+def api_quickstart(request):
+    return render(request, 'api_quickstart.html')
+
+
 def dashboard(request):
     if not request.user.is_authenticated:
         return redirect('login')
