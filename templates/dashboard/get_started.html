@@ -1,0 +1,56 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Get Started · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Get Started</h2>
+  <p class="meta">Turn a new workspace into something useful: add sources, bring in documents, chat with them, and then launch a bot.</p>
+  {% if onboarding_next_step %}
+    <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe; margin-top:16px;">
+      <strong>Next best step</strong><br>
+      {{ onboarding_next_step.label }}
+      <div class="meta" style="margin-top:8px;">{{ onboarding_next_step.description }}</div>
+      <div class="nav" style="margin-top:12px;">
+        <a href="{{ onboarding_next_step.href }}" style="background:#2563eb;color:#fff;">{{ onboarding_next_step.cta }}</a>
+      </div>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">Recommended setup flow</h3>
+  <div class="grid">
+    {% for step in onboarding_steps %}
+      <div class="stat">
+        <div><strong>Step {{ forloop.counter }} · {{ step.label }}</strong></div>
+        <div class="meta" style="margin-top:8px;">{{ step.description }}</div>
+        <div class="meta" style="margin-top:10px;">Status: {% if step.done %}Complete{% else %}Not started{% endif %}</div>
+        <div style="margin-top:12px;"><a href="{{ step.href }}">{{ step.cta }}</a></div>
+      </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0;">Suggested path</h3>
+  <div class="row">
+    <strong>1. Create a workspace</strong>
+    <div class="meta" style="margin-top:6px;">Start with one workspace for a team, client, department, or knowledge base.</div>
+  </div>
+  <div class="row">
+    <strong>2. Add sources</strong>
+    <div class="meta" style="margin-top:6px;">Upload documents directly, add URLs, or connect Google Drive, SharePoint, or Confluence.</div>
+  </div>
+  <div class="row">
+    <strong>3. Review documents</strong>
+    <div class="meta" style="margin-top:6px;">Make sure documents ingest cleanly and the workspace contains the right source material.</div>
+  </div>
+  <div class="row">
+    <strong>4. Chat with your knowledge</strong>
+    <div class="meta" style="margin-top:6px;">Ask real questions before you automate anything. This is the fastest way to validate the workspace.</div>
+  </div>
+  <div class="row">
+    <strong>5. Build a bot</strong>
+    <div class="meta" style="margin-top:6px;">Once the workspace answers well, turn it into a bot for Telegram, Discord, or Zoom Chat.</div>
+  </div>
+</div>
+{% endblock %}

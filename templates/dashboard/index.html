@@ -3,7 +3,25 @@
 {% block content %}
 <div class="card">
   <h2>Overview</h2>
-  <p class="meta">Use the sections above to manage documents, import URLs, chat with your workspace, and connect external systems.</p>
+  <p class="meta">Use the sections above to manage documents, import URLs, chat with your workspace, connect external systems, and launch bots.</p>
+  {% if onboarding_steps %}
+    <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe; margin-top:16px;">
+      <strong>Getting started</strong><br>
+      {{ onboarding_completed }} of {{ onboarding_total }} steps complete for this tenant and workspace.
+      <div class="nav" style="margin-top:12px;">
+        <a href="/dashboard/get-started/" style="background:#2563eb;color:#fff;">Open setup guide</a>
+      </div>
+    </div>
+    <div class="grid" style="margin-top:16px;">
+      {% for step in onboarding_steps %}
+        <div class="stat">
+          <div><strong>{% if step.done %}✓{% else %}○{% endif %} {{ step.label }}</strong></div>
+          <div class="meta" style="margin-top:8px;">{{ step.description }}</div>
+          <div style="margin-top:12px;"><a href="{{ step.href }}">{{ step.cta }}</a></div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
   <div class="nav" style="margin-top: 16px;">
     <a href="/roadmap/scaling/" target="_blank" rel="noopener noreferrer">Scaling Roadmap</a>
     <a href="/api/quickstart/" target="_blank" rel="noopener noreferrer">API Quickstart</a>

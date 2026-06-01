@@ -14,6 +14,7 @@ from django.contrib.auth import get_user_model
 from django.core.files.base import ContentFile
 from django.core.paginator import Paginator
 from django.db.models import Count
+from django.urls import reverse
 from django.http import FileResponse, Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -215,6 +216,59 @@ def _dashboard_base(request):
     current_membership = memberships.filter(tenant_id=current_tenant_id).first() if current_tenant_id else None
     can_manage_tenant = bool(current_membership and current_membership.role in {TenantMembership.ROLE_OWNER, TenantMembership.ROLE_ADMIN})
 
+    workspace_count = Workspace.objects.filter(tenant_id=current_tenant_id).count() if current_tenant_id else 0
+    connected_account_count = ExternalAccount.objects.filter(user=request.user, tenant_id=current_tenant_id).count() if current_tenant_id else 0
+    connector_count = Connector.objects.filter(tenant_id=current_tenant_id).count() if current_tenant_id else 0
+    ready_document_count = Document.objects.filter(
+        tenant_id=current_tenant_id,
+        workspace_assignments__workspace_id=current_workspace_id,
+        status=Document.STATUS_READY,
+    ).distinct().count() if current_workspace else 0
+    chatbot_count = ChatbotIntegration.objects.filter(tenant_id=current_tenant_id, active=True).count() if current_tenant_id else 0
+    onboarding_steps = [
+        {
+            'key': 'workspace',
+            'label': 'Create your first workspace',
+            'done': workspace_count > 0,
+            'description': 'Start with a workspace for a team, project, or knowledge base.',
+            'href': reverse('dashboard_get_started'),
+            'cta': 'Set up workspace',
+        },
+        {
+            'key': 'source',
+            'label': 'Connect a source or account',
+            'done': connected_account_count > 0 or connector_count > 0,
+            'description': 'Add Google Drive, SharePoint, Confluence, or start with a direct upload.',
+            'href': reverse('dashboard_connectors'),
+            'cta': 'Add sources',
+        },
+        {
+            'key': 'documents',
+            'label': 'Add documents',
+            'done': len(all_document_rows) > 0,
+            'description': 'Upload files, ingest URLs, or pull documents in through a connector.',
+            'href': reverse('dashboard_documents'),
+            'cta': 'Add documents',
+        },
+        {
+            'key': 'chat',
+            'label': 'Ask your first question',
+            'done': ready_document_count > 0,
+            'description': 'Once documents are ready, test the workspace by chatting with your knowledge.',
+            'href': reverse('dashboard_chat'),
+            'cta': 'Open chat',
+        },
+        {
+            'key': 'bots',
+            'label': 'Build a bot',
+            'done': chatbot_count > 0,
+            'description': 'Turn this workspace into a Telegram, Discord, or Zoom Chat assistant.',
+            'href': reverse('chatbot_index'),
+            'cta': 'Create bot',
+        },
+    ]
+    onboarding_completed = sum(1 for step in onboarding_steps if step['done'])
+
     shared_document_rows = [row for row in all_document_rows if row['document'].workspace_id != current_workspace_id]
     shared_out_document_rows = [
         row for row in all_document_rows
@@ -254,6 +308,14 @@ def _dashboard_base(request):
         'external_accounts': ExternalAccount.objects.filter(user=request.user).order_by('-updated_at'),
         'api_keys': APIKey.objects.filter(tenant_id=current_tenant_id).order_by('-created_at') if current_tenant_id else APIKey.objects.none(),
         'is_staff_user': bool(request.user.is_staff),
+        'workspace_count': workspace_count,
+        'connected_account_count': connected_account_count,
+        'connector_count': connector_count,
+        'ready_document_count': ready_document_count,
+        'chatbot_count': chatbot_count,
+        'onboarding_steps': onboarding_steps,
+        'onboarding_completed': onboarding_completed,
+        'onboarding_total': len(onboarding_steps),
     }
 
 
@@ -546,6 +608,18 @@ def dashboard(request):
     base['url_count'] = len(base['url_document_rows'])
     base['trash_count'] = len(base['deleted_document_rows'])
     return render(request, 'dashboard/index.html', base)
+
+
+def dashboard_get_started(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+    base['section'] = 'get_started'
+    base['onboarding_next_step'] = next((step for step in base.get('onboarding_steps', []) if not step.get('done')), None)
+    return render(request, 'dashboard/get_started.html', base)
 
 
 def document_download(request, document_id):
