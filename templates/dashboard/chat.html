@@ -4,6 +4,17 @@
 <div class="card">
   <h2>Chat with documents</h2>
   {% if current_workspace %}
+  {% if not ready_document_count %}
+    <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe;">
+      <strong>Add documents before you chat</strong><br>
+      This workspace needs at least one fully ingested document before chat becomes useful.
+      <div class="nav" style="margin-top:12px;">
+        <a href="/dashboard/documents/">Upload documents</a>
+        <a href="/dashboard/connectors/">Connect a source</a>
+        <a href="/dashboard/urls/">Add URLs</a>
+      </div>
+    </div>
+  {% endif %}
   <form method="post">
     {% csrf_token %}
     <input type="hidden" name="action" value="ask_question">

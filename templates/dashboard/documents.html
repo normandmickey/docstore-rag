@@ -3,6 +3,16 @@
 {% block content %}
 <div class="card">
   <h2>Upload document</h2>
+  {% if not document_rows %}
+    <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe;">
+      <strong>Start here with a few files</strong><br>
+      Upload PDFs, DOCX files, text files, or HTML to make this workspace searchable.
+      <div class="nav" style="margin-top:12px;">
+        <a href="/dashboard/connectors/">Or connect Google Drive / SharePoint</a>
+        <a href="/dashboard/urls/">Add URLs instead</a>
+      </div>
+    </div>
+  {% endif %}
   {% if current_workspace %}
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
@@ -76,7 +86,7 @@
     {% endif %}
 
     {% if not document_rows %}
-      <p>No documents uploaded yet.</p>
+      <p>No documents yet in this workspace. Upload files here, add URLs, or connect a source to get started.</p>
     {% endif %}
 
     {% if document_rows %}

@@ -230,9 +230,9 @@ def _dashboard_base(request):
             'key': 'workspace',
             'label': 'Create your first workspace',
             'done': workspace_count > 0,
-            'description': 'Start with a workspace for a team, project, or knowledge base.',
-            'href': reverse('dashboard_get_started'),
-            'cta': 'Set up workspace',
+            'description': 'Start with a workspace for a team, project, client, or knowledge base.',
+            'href': reverse('dashboard_workspace'),
+            'cta': 'Create workspace',
         },
         {
             'key': 'source',
@@ -463,7 +463,7 @@ def signup(request):
         else:
             _bootstrap_user_workspace(user, request.session)
         login(request, user)
-        return redirect('dashboard')
+        return redirect('dashboard_get_started')
     return render(request, 'auth/signup.html', {'form': form, 'invite_token': token_value, 'invite': invite})
 
 

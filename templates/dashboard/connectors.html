@@ -3,7 +3,17 @@
 {% block content %}
 <div class="card">
   <h2>Connectors</h2>
-  <p class="meta">This page is for external knowledge sources. Microsoft / SharePoint and Google Drive are the first account-link flows here.</p>
+  <p class="meta">Connect external sources so this workspace can pull in documents from systems your team already uses.</p>
+  {% if not connected_account_count and not connector_count %}
+    <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe; margin-top:16px;">
+      <strong>Bring in documents from another system</strong><br>
+      Connect an account here if you want to import from Google Drive, SharePoint, or Confluence instead of uploading files manually.
+      <div class="nav" style="margin-top:12px;">
+        <a href="/dashboard/documents/">Upload files instead</a>
+        <a href="/dashboard/urls/">Import from URLs</a>
+      </div>
+    </div>
+  {% endif %}
 </div>
 <div class="card">
   <h2>Microsoft / SharePoint connections</h2>

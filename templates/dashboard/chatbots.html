@@ -3,7 +3,18 @@
 {% block content %}
 <div class="card">
   <h2>Chatbots</h2>
-  <p class="meta">Tenant-owned chatbot integrations live here. Workspace context should guide grounding, while runtime hosting stays in a separate bot-runner service.</p>
+  <p class="meta">Turn a workspace into a Telegram, Discord, or Zoom Chat assistant once your documents and answers look right.</p>
+  {% if not chatbot_integrations and not chatbot_definitions %}
+    <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe; margin-top:16px;">
+      <strong>Build bots after the workspace is working</strong><br>
+      The best flow is: add documents, test chat, then launch a bot for the channels your team actually uses.
+      <div class="nav" style="margin-top:12px;">
+        <a href="/dashboard/chat/">Test chat first</a>
+        <a href="/dashboard/documents/">Add documents</a>
+        <a href="/dashboard/chatbots/definitions/new/">Create bot definition</a>
+      </div>
+    </div>
+  {% endif %}
   <div class="grid">
     <div class="stat"><strong>Integrations</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ chatbot_integrations|length }}</div></div>
     <div class="stat"><strong>Bot definitions</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ chatbot_definitions|length }}</div></div>
