@@ -1660,7 +1660,10 @@ def dashboard_connectors(request):
             base['dropbox_parent_path'] = ''
         try:
             client = DropboxClient(_get_valid_dropbox_access_token(dropbox_account))
-            base['dropbox_entries'] = client.list_folder(path=dropbox_path)
+            entries = client.list_folder(path=dropbox_path)
+            for entry in entries:
+                entry['tag_type'] = entry.get('.tag', '')
+            base['dropbox_entries'] = entries
         except Exception as exc:
             logger.exception('Dropbox list failed for user=%s', request.user.id)
             messages.error(request, f'Dropbox browse failed: {exc}')

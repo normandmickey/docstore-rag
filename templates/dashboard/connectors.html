@@ -176,9 +176,9 @@
       {% for entry in dropbox_entries %}
         <div class="row">
           <strong>{{ entry.name }}</strong><br>
-          <span class="meta">{{ entry['.tag'] }}{% if entry.path_display %} · {{ entry.path_display }}{% endif %}</span><br>
+          <span class="meta">{{ entry.tag_type }}{% if entry.path_display %} · {{ entry.path_display }}{% endif %}</span><br>
           <div style="margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap;">
-            {% if entry['.tag'] == 'folder' %}
+            {% if entry.tag_type == 'folder' %}
               <a href="/dashboard/connectors/?dropbox_path={{ entry.path_display|urlencode }}">Open folder</a>
               <form method="post" style="margin:0;">
                 {% csrf_token %}
