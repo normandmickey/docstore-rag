@@ -291,10 +291,21 @@ def retrieve_facts(*, tenant, workspace, query, top_k=8, document_id=None):
     return scored[:top_k]
 
 
+def _normalize_code_query(text: str) -> str:
+    return ' '.join(re.sub(r'[^a-z0-9]+', ' ', (text or '').lower()).split())
+
+
 def extract_code_lookup_answer(query, results, document=None):
     query_text = (query or '').strip()
+    normalized_query = _normalize_code_query(query_text)
+    broad_request_markers = [
+        'all codes', 'explain all', 'all of the codes', 'what are the codes', 'list the codes',
+        'summarize the codes', 'code explanations', 'line 14 and 16', 'lines 14 and 16', 'series 1 and 2'
+    ]
+    if any(marker in normalized_query for marker in broad_request_markers):
+        return None
     code_matches = re.findall(r'\b([12][A-K])\b', query_text.upper())
-    if not code_matches:
+    if len(set(code_matches)) != 1:
         return None
 
     target_code = code_matches[0]
