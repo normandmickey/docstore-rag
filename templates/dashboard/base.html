@@ -97,6 +97,7 @@
         <a href="/dashboard/support/" class="{% if section == 'support' %}active{% endif %}">Support</a>
         <a href="/dashboard/reports/support/" class="{% if section == 'reports' %}active{% endif %}">Reports</a>
         <a href="/dashboard/reports/interactions/" class="{% if report_name == 'interactions' %}active{% endif %}">Interactions</a>
+        <a href="/dashboard/reports/spreadsheet-transformer/" class="{% if report_name == 'spreadsheet_transformer' %}active{% endif %}">Spreadsheet Transformer</a>
         {% if can_manage_tenant %}<a href="/dashboard/tenant/" class="{% if section == 'tenant' %}active{% endif %}">Tenant</a>{% endif %}
         <a href="/dashboard/api-keys/" class="{% if section == 'api_keys' %}active{% endif %}">API Keys</a>
         <a href="/roadmap/scaling/" target="_blank" rel="noopener noreferrer">Scaling Roadmap</a>

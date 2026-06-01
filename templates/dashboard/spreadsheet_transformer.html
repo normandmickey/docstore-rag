@@ -1,0 +1,54 @@
+{% extends 'dashboard/base.html' %}
+{% load dashboard_extras %}
+{% block title %}Spreadsheet Transformer · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Spreadsheet Transformer</h2>
+  <p class="meta">Upload a CSV or XLSX file, describe the output columns and layout you want, and export a transformed spreadsheet.</p>
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% for field in spreadsheet_transform_form %}
+      <div class="row">
+        <strong>{{ field.label }}</strong><br>
+        {{ field }}
+        {% if field.help_text %}<div class="meta" style="margin-top:6px;">{{ field.help_text }}</div>{% endif %}
+        {% for error in field.errors %}<div class="meta" style="color:#fca5a5; margin-top:6px;">{{ error }}</div>{% endfor %}
+      </div>
+    {% endfor %}
+    <button type="submit">Transform spreadsheet</button>
+  </form>
+</div>
+
+{% if spreadsheet_transform_plan %}
+<div class="card">
+  <h2>Generated transform plan</h2>
+  <pre style="white-space:pre-wrap;">{{ spreadsheet_transform_plan }}</pre>
+</div>
+{% endif %}
+
+{% if spreadsheet_transform_preview_headers %}
+<div class="card">
+  <h2>Preview</h2>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          {% for header in spreadsheet_transform_preview_headers %}
+            <th>{{ header }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in spreadsheet_transform_preview_rows %}
+          <tr>
+            {% for header in spreadsheet_transform_preview_headers %}
+              <td>{{ row|get_item:header }}</td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

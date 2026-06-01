@@ -1,0 +1,168 @@
+from __future__ import annotations
+
+import csv
+import json
+from io import BytesIO, StringIO
+from typing import Any
+
+from django.conf import settings
+from openai import OpenAI
+from openpyxl import Workbook, load_workbook
+
+
+class SpreadsheetTransformError(Exception):
+    pass
+
+
+def load_tabular_file(uploaded_file) -> dict[str, Any]:
+    name = (getattr(uploaded_file, 'name', '') or '').lower()
+    raw = uploaded_file.read()
+    uploaded_file.seek(0)
+
+    if name.endswith('.csv'):
+        text = raw.decode('utf-8-sig', errors='ignore')
+        reader = csv.DictReader(StringIO(text))
+        rows = [dict(row) for row in reader]
+        headers = list(reader.fieldnames or [])
+        return {
+            'sheet_name': 'Sheet1',
+            'headers': headers,
+            'rows': rows,
+            'row_count': len(rows),
+            'source_type': 'csv',
+        }
+
+    if name.endswith('.xlsx'):
+        wb = load_workbook(BytesIO(raw), data_only=True)
+        ws = wb[wb.sheetnames[0]]
+        values = list(ws.iter_rows(values_only=True))
+        if not values:
+            return {
+                'sheet_name': ws.title,
+                'headers': [],
+                'rows': [],
+                'row_count': 0,
+                'source_type': 'xlsx',
+            }
+        headers = [str(value).strip() if value is not None else '' for value in values[0]]
+        rows = []
+        for value_row in values[1:]:
+            row = {}
+            for idx, header in enumerate(headers):
+                key = header or f'column_{idx + 1}'
+                cell = value_row[idx] if idx < len(value_row) else None
+                row[key] = '' if cell is None else str(cell)
+            if any(str(v).strip() for v in row.values()):
+                rows.append(row)
+        return {
+            'sheet_name': ws.title,
+            'headers': headers,
+            'rows': rows,
+            'row_count': len(rows),
+            'source_type': 'xlsx',
+        }
+
+    raise SpreadsheetTransformError('Unsupported file type. Please upload a CSV or XLSX file.')
+
+
+def _sample_rows(rows: list[dict[str, Any]], limit: int = 8) -> list[dict[str, Any]]:
+    return rows[:limit]
+
+
+def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_request: str) -> dict[str, Any]:
+    if not settings.OPENAI_API_KEY:
+        raise SpreadsheetTransformError('OPENAI_API_KEY is not configured.')
+
+    client = OpenAI(api_key=settings.OPENAI_API_KEY)
+    prompt = (
+        'You are planning a spreadsheet transformation. '
+        'Return valid JSON only. '
+        'Given source headers, sample rows, and a user request, produce a transform plan with this shape: '
+        '{"output_columns": [{"name": string, "source": string|null, "instruction": string}], '
+        '"filters": [{"column": string, "operator": string, "value": string}], '
+        '"notes": [string]}. '
+        'Use source=null only when the column must be derived from multiple fields or a transformation instruction. '
+        'Be conservative. Do not invent source columns that are not present. '
+        'Supported filter operators: equals, contains, not_equals. '
+        'If the request is broad, still propose the most likely output columns. '
+    )
+    user_input = {
+        'source_headers': headers,
+        'sample_rows': _sample_rows(rows),
+        'user_request': user_request,
+    }
+    response = client.responses.create(
+        model=getattr(settings, 'SPREADSHEET_TRANSFORM_MODEL', 'gpt-4.1-mini'),
+        input=[
+            {'role': 'system', 'content': [{'type': 'input_text', 'text': prompt}]},
+            {'role': 'user', 'content': [{'type': 'input_text', 'text': json.dumps(user_input)}]},
+        ],
+    )
+    text = (getattr(response, 'output_text', '') or '').strip()
+    if not text:
+        raise SpreadsheetTransformError('No transform plan was returned.')
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise SpreadsheetTransformError(f'Could not parse transform plan JSON: {exc}') from exc
+
+
+def apply_transform_plan(*, rows: list[dict[str, Any]], plan: dict[str, Any]) -> tuple[list[str], list[dict[str, Any]]]:
+    output_columns = plan.get('output_columns') or []
+    filters = plan.get('filters') or []
+    if not output_columns:
+        raise SpreadsheetTransformError('Transform plan did not include output columns.')
+
+    filtered_rows = []
+    for row in rows:
+        keep = True
+        for rule in filters:
+            column = (rule.get('column') or '').strip()
+            operator = (rule.get('operator') or '').strip()
+            value = str(rule.get('value') or '')
+            cell = str(row.get(column, '') or '')
+            if operator == 'equals' and cell != value:
+                keep = False
+            elif operator == 'not_equals' and cell == value:
+                keep = False
+            elif operator == 'contains' and value.lower() not in cell.lower():
+                keep = False
+        if keep:
+            filtered_rows.append(row)
+
+    headers = [col.get('name') or 'Column' for col in output_columns]
+    transformed = []
+    for row in filtered_rows:
+        out = {}
+        for col in output_columns:
+            name = col.get('name') or 'Column'
+            source = col.get('source')
+            instruction = (col.get('instruction') or '').strip()
+            if source:
+                out[name] = row.get(source, '')
+            else:
+                out[name] = instruction
+        transformed.append(out)
+    return headers, transformed
+
+
+def export_transform_csv(headers: list[str], rows: list[dict[str, Any]]) -> bytes:
+    buffer = StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=headers)
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({header: row.get(header, '') for header in headers})
+    return buffer.getvalue().encode('utf-8')
+
+
+def export_transform_xlsx(headers: list[str], rows: list[dict[str, Any]]) -> bytes:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = 'Transformed'
+    ws.append(headers)
+    for row in rows:
+        ws.append([row.get(header, '') for header in headers])
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()

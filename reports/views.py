@@ -1,6 +1,8 @@
 from datetime import timedelta
 from io import BytesIO
 
+from django import forms
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse
@@ -13,6 +15,20 @@ from control.views import _dashboard_base, _handle_workspace_actions
 from support.models import SupportChannel, SupportConversation, SupportMessage
 from integrations.voice.models import VoiceCallRecord
 from chatbots.models import ChatbotConversation, ChatbotIntegration
+from .spreadsheet_transform import (
+    SpreadsheetTransformError,
+    apply_transform_plan,
+    export_transform_csv,
+    export_transform_xlsx,
+    load_tabular_file,
+    plan_transform,
+)
+
+
+class SpreadsheetTransformForm(forms.Form):
+    file = forms.FileField()
+    transform_request = forms.CharField(widget=forms.Textarea(attrs={'rows': 5}), help_text='Describe the columns and layout you want in the exported file.')
+    export_format = forms.ChoiceField(choices=[('xlsx', 'XLSX'), ('csv', 'CSV')], initial='xlsx')
 
 
 def _infer_support_source(conversation):
@@ -29,6 +45,58 @@ def _infer_support_source(conversation):
         if channel_type == 'both':
             return 'sms/voice'
     return 'support'
+
+
+@login_required
+def spreadsheet_transformer(request):
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+
+    base['section'] = 'reports'
+    base['report_name'] = 'spreadsheet_transformer'
+    base['spreadsheet_transform_form'] = SpreadsheetTransformForm()
+    base['spreadsheet_transform_preview_headers'] = []
+    base['spreadsheet_transform_preview_rows'] = []
+    base['spreadsheet_transform_plan'] = None
+
+    if request.method == 'POST':
+        form = SpreadsheetTransformForm(request.POST, request.FILES)
+        base['spreadsheet_transform_form'] = form
+        if form.is_valid():
+            try:
+                table = load_tabular_file(form.cleaned_data['file'])
+                plan = plan_transform(
+                    headers=table['headers'],
+                    rows=table['rows'],
+                    user_request=form.cleaned_data['transform_request'],
+                )
+                headers, transformed_rows = apply_transform_plan(rows=table['rows'], plan=plan)
+                base['spreadsheet_transform_plan'] = plan
+                base['spreadsheet_transform_preview_headers'] = headers
+                base['spreadsheet_transform_preview_rows'] = transformed_rows[:20]
+
+                export_format = form.cleaned_data['export_format']
+                if export_format == 'csv':
+                    payload = export_transform_csv(headers, transformed_rows)
+                    response = HttpResponse(payload, content_type='text/csv')
+                    response['Content-Disposition'] = 'attachment; filename="spreadsheet-transform.csv"'
+                    return response
+
+                payload = export_transform_xlsx(headers, transformed_rows)
+                response = HttpResponse(
+                    payload,
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                )
+                response['Content-Disposition'] = 'attachment; filename="spreadsheet-transform.xlsx"'
+                return response
+            except SpreadsheetTransformError as exc:
+                messages.error(request, str(exc))
+            except Exception as exc:
+                messages.error(request, f'Spreadsheet transform failed: {exc}')
+
+    return render(request, 'dashboard/spreadsheet_transformer.html', base)
 
 
 @login_required
