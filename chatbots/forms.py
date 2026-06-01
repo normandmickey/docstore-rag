@@ -76,19 +76,22 @@ class ChatbotDefinitionForm(forms.ModelForm):
     prefill_from_integration = forms.BooleanField(
         required=False,
         initial=True,
-        help_text='For new definitions, prefill prompts and policy fields from the selected integration platform when those fields are blank.',
+        label='Prefill from integration',
+        help_text='For new definitions, use the selected integration to prefill blank prompts and default settings.',
     )
     response_temperature = forms.FloatField(
         required=False,
         min_value=0,
         max_value=2,
-        help_text='Optional model temperature for chatbot replies. Leave blank to use the runner/system default.',
+        label='Response temperature',
+        help_text='Controls how steady or creative the bot’s grounded reply should be. Leave blank to use the default.',
     )
     rewrite_temperature = forms.FloatField(
         required=False,
         min_value=0,
         max_value=2,
-        help_text='Optional temperature for any rewrite/presentation layer. Leave blank to use the runner/system default.',
+        label='Rewrite temperature',
+        help_text='Controls how much the final wording can vary when the bot polishes a reply before sending it. Leave blank to use the default.',
     )
 
     class Meta:
@@ -119,6 +122,20 @@ class ChatbotDefinitionForm(forms.ModelForm):
             'handoff_policy_json': forms.Textarea(attrs={'rows': 4}),
             'logging_policy_json': forms.Textarea(attrs={'rows': 4}),
             'metadata_json': forms.Textarea(attrs={'rows': 4}),
+        }
+        labels = {
+            'allowed_tools_json': 'Allowed tools JSON',
+            'response_policy_json': 'Response policy JSON',
+            'handoff_policy_json': 'Handoff policy JSON',
+            'logging_policy_json': 'Logging policy JSON',
+            'metadata_json': 'Metadata JSON',
+        }
+        help_texts = {
+            'allowed_tools_json': 'Optional tool access and capability flags for this bot definition.',
+            'response_policy_json': 'Optional reply-style and channel-behavior settings.',
+            'handoff_policy_json': 'Optional handoff and escalation settings.',
+            'logging_policy_json': 'Optional controls for what chatbot activity gets stored.',
+            'metadata_json': 'Optional extra settings for this definition that do not belong in prompts or policy fields.',
         }
 
     def __init__(self, *args, tenant=None, **kwargs):
