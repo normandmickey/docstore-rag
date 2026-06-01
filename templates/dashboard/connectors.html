@@ -124,32 +124,6 @@
       </div>
     {% endif %}
 
-    <hr style="border:0; border-top:1px solid #243055; margin: 20px 0;">
-    <h3 style="margin-top:0;">Browse recent Drive files</h3>
-    <form method="get" action="/dashboard/connectors/">
-      <input type="hidden" name="google_folder" value="{{ google_drive_folder_current_id }}">
-      <label for="google_q">Search Drive by name</label>
-      <input id="google_q" type="text" name="google_q" value="{{ google_drive_query }}" placeholder="e.g. handbook, PTO, pricing">
-      <button type="submit">Search Drive</button>
-    </form>
-
-    {% if google_drive_files %}
-      {% for item in google_drive_files %}
-        <div class="row">
-          <strong>{{ item.name }}</strong><br>
-          <span class="meta">{{ item.mimeType }}{% if item.modifiedTime %} · Updated {{ item.modifiedTime }}{% endif %}</span>
-          {% if item.webViewLink %}<br><a href="{{ item.webViewLink }}" target="_blank" rel="noopener">Open in Google Drive</a>{% endif %}
-          <form method="post" style="margin-top: 12px;">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="google_drive_import">
-            <input type="hidden" name="file_id" value="{{ item.id }}">
-            <button type="submit">Import into current workspace</button>
-          </form>
-        </div>
-      {% endfor %}
-    {% else %}
-      <p class="meta">No recent Drive files found yet for this account/query.</p>
-    {% endif %}
   {% endif %}
 </div>
 <div class="card">
