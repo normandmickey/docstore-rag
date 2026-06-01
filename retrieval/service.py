@@ -281,7 +281,7 @@ def build_context_blocks(results, facts=None):
     return blocks
 
 
-def answer_question(*, tenant, workspace, query, top_k=5, document_id=None):
+def answer_question(*, tenant, workspace, query, top_k=5, document_id=None, temperature=None):
     facts = retrieve_facts(
         tenant=tenant,
         workspace=workspace,
@@ -297,5 +297,5 @@ def answer_question(*, tenant, workspace, query, top_k=5, document_id=None):
         document_id=document_id,
     )
     context_blocks = build_context_blocks(results, facts=facts)
-    answer = answer_with_context(query, context_blocks) if context_blocks else 'I could not find relevant document context for that question yet.'
+    answer = answer_with_context(query, context_blocks, temperature=temperature) if context_blocks else 'I could not find relevant document context for that question yet.'
     return answer, results

@@ -42,7 +42,7 @@ def embed_texts(texts, model=None):
     return vectors
 
 
-def rewrite_question(question, chat_history=None, model=None):
+def rewrite_question(question, chat_history=None, model=None, temperature=None):
     client = get_groq_client()
     history_text = ''
     if chat_history:
@@ -55,9 +55,9 @@ def rewrite_question(question, chat_history=None, model=None):
         if history_lines:
             history_text = '\n'.join(history_lines)
 
-    response = client.responses.create(
-        model=model or getattr(settings, 'DEFAULT_CHAT_MODEL', 'openai/gpt-oss-20b'),
-        input=[
+    kwargs = {
+        'model': model or getattr(settings, 'DEFAULT_CHAT_MODEL', 'openai/gpt-oss-20b'),
+        'input': [
             {
                 'role': 'system',
                 'content': [
@@ -80,16 +80,19 @@ def rewrite_question(question, chat_history=None, model=None):
                 ],
             },
         ],
-    )
+    }
+    if temperature is not None:
+        kwargs['temperature'] = temperature
+    response = client.responses.create(**kwargs)
     return (response.output_text or question).strip()
 
 
-def answer_with_context(question, context_blocks, model=None):
+def answer_with_context(question, context_blocks, model=None, temperature=None):
     client = get_groq_client()
     joined_context = "\n\n".join(context_blocks)
-    response = client.responses.create(
-        model=model or getattr(settings, 'DEFAULT_CHAT_MODEL', 'openai/gpt-oss-20b'),
-        input=[
+    kwargs = {
+        'model': model or getattr(settings, 'DEFAULT_CHAT_MODEL', 'openai/gpt-oss-20b'),
+        'input': [
             {
                 'role': 'system',
                 'content': [
@@ -118,7 +121,10 @@ def answer_with_context(question, context_blocks, model=None):
                 ],
             },
         ],
-    )
+    }
+    if temperature is not None:
+        kwargs['temperature'] = temperature
+    response = client.responses.create(**kwargs)
     return response.output_text
 
 
@@ -170,7 +176,7 @@ def generate_chunk_questions(chunk_text, model=None):
     return deduped[:2]
 
 
-def answer_with_general_context(question, context_blocks, chat_history=None, model=None):
+def answer_with_general_context(question, context_blocks, chat_history=None, model=None, temperature=None):
     client = get_groq_client()
     joined_context = "\n\n".join(context_blocks)
     history_text = ''
@@ -184,9 +190,9 @@ def answer_with_general_context(question, context_blocks, chat_history=None, mod
         if history_lines:
             history_text = '\n'.join(history_lines)
 
-    response = client.responses.create(
-        model=model or getattr(settings, 'DEFAULT_WEB_CHAT_MODEL', 'groq/compound'),
-        input=[
+    kwargs = {
+        'model': model or getattr(settings, 'DEFAULT_WEB_CHAT_MODEL', 'groq/compound'),
+        'input': [
             {
                 'role': 'system',
                 'content': [
@@ -218,7 +224,10 @@ def answer_with_general_context(question, context_blocks, chat_history=None, mod
                 ],
             },
         ],
-    )
+    }
+    if temperature is not None:
+        kwargs['temperature'] = temperature
+    response = client.responses.create(**kwargs)
     return response.output_text
 
 

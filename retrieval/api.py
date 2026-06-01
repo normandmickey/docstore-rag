@@ -58,6 +58,7 @@ class ChatSerializer(serializers.Serializer):
     question = serializers.CharField()
     top_k = serializers.IntegerField(required=False, default=5, min_value=1, max_value=20)
     document_id = serializers.IntegerField(required=False)
+    temperature = serializers.FloatField(required=False, min_value=0, max_value=2)
 
 
 class SearchView(APIView):
@@ -181,6 +182,7 @@ class ChatView(APIView):
             query=data['question'].strip(),
             top_k=data['top_k'],
             document_id=data.get('document_id'),
+            temperature=data.get('temperature'),
         )
 
         return Response({

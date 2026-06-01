@@ -219,6 +219,7 @@ class ChatbotResolveView(APIView):
                 'response_policy_json': bot_definition.response_policy_json if bot_definition else {},
                 'handoff_policy_json': bot_definition.handoff_policy_json if bot_definition else {},
                 'logging_policy_json': bot_definition.logging_policy_json if bot_definition else {},
+                'metadata_json': bot_definition.metadata_json if bot_definition else {},
             },
             'workspace': {
                 'id': workspace.id if workspace else None,
