@@ -144,7 +144,7 @@ def _looks_like_address(header: str, value: str) -> bool:
     return any(marker in header_lower for marker in ['address', 'street', 'city', 'state', 'zip', 'postal'])
 
 
-def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
+def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]], strict: bool = False) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
     fake = Faker()
     fake.seed_instance(42)
     replacements = {}
@@ -245,12 +245,16 @@ def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]]) -> tupl
                     mark(header, 'address')
                     out[header] = replace('address', value)
             else:
-                out[header] = value
+                if strict and value and len(value.strip()) >= 6 and any(ch.isdigit() for ch in value):
+                    mark(header, 'strict_generic_numeric')
+                    out[header] = ''.join(str(fake.random_digit()) if ch.isdigit() else ch for ch in value)
+                else:
+                    out[header] = value
         sanitized.append(out)
     return sanitized, detected
 
 
-def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_request: str) -> tuple[dict[str, Any], dict[str, list[str]], list[dict[str, Any]]]:
+def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_request: str, strict_sanitization: bool = False) -> tuple[dict[str, Any], dict[str, list[str]], list[dict[str, Any]]]:
     if not settings.OPENAI_API_KEY:
         raise SpreadsheetTransformError('OPENAI_API_KEY is not configured.')
 
@@ -267,12 +271,13 @@ def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_reque
         'Supported filter operators: equals, contains, not_equals. '
         'If the request is broad, still propose the most likely output columns. '
     )
-    sanitized_rows, detected = sanitize_sample_rows(headers, _sample_rows(rows))
+    sanitized_rows, detected = sanitize_sample_rows(headers, _sample_rows(rows), strict=strict_sanitization)
     user_input = {
         'source_headers': headers,
         'sample_rows': sanitized_rows,
         'user_request': user_request,
         'sample_rows_are_sanitized': True,
+        'strict_sanitization': strict_sanitization,
         'instruction': 'Sample row values may be privacy-sanitized, but headers and structure reflect the real file. Build the transform plan against the real source headers.',
     }
     response = client.responses.create(
