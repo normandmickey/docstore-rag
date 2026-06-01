@@ -3,22 +3,22 @@
 {% block content %}
 <div class="card">
   <h2>{{ chatbot_form_title }}</h2>
-  <p class="meta">This is the control-plane form layer for chatbot integrations, definitions, endpoints, and bindings.</p>
+  <p class="meta">Set up how this chatbot behaves, where it runs, and how it routes messages across your connected channels.</p>
   {% if chatbot_prefill_help %}
     <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe;">
       <strong>Platform prefills</strong><br>
-      If you choose an integration first, this form can prefill prompts, templates, and policy JSON with service-specific defaults for Telegram, Discord, or Zoom Chat.
+      Choose an integration first to prefill prompts, templates, and default settings for Telegram, Discord, or Zoom Chat. You can still edit everything before saving.
     </div>
   {% endif %}
   {% if chatbot_zoom_help %}
     <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe;">
       <strong>Zoom Chat setup notes</strong><br>
-      Use platform <strong>Zoom Chat</strong> for Team Chat style integrations. Current scaffold supports webhook receive/verification, resolve, message/event logging, and draft reply generation in the shared runner.<br><br>
-      For v1 setup:
+      Use platform <strong>Zoom Chat</strong> for Team Chat integrations. This setup supports webhook verification, message ingest, routing, logging, and shared-runner replies.<br><br>
+      For the current setup:
       <ul style="margin:8px 0 0 18px;">
-        <li>Use <strong>external_app_id</strong> for your Zoom app/client id.</li>
-        <li>The webhook URL should be <code>https://bots.docstore.oddsmith.net/webhooks/zoom-chat/{{ chatbot_runner_key_preview }}</code>.</li>
-        <li>Outbound send back to Zoom Chat is still pending, so this is currently an inbound/logging/control-plane scaffold.</li>
+        <li>Use <strong>external_app_id</strong> for your Zoom app/client ID.</li>
+        <li>Set the webhook URL to <code>https://bots.docstore.oddsmith.net/webhooks/zoom-chat/{{ chatbot_runner_key_preview }}</code>.</li>
+        <li>Replies are handled through the shared bot runner for this integration.</li>
       </ul>
     </div>
   {% endif %}
