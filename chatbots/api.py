@@ -7,6 +7,7 @@ from rest_framework.views import APIView
 from control.api_auth import get_api_key_from_header
 from control.api_guard import resolve_request_context
 from control.oauth import refresh_zoom_tokens, request_zoom_chatbot_token
+from providers import answer_with_general_context
 
 from .models import ChatbotConversation, ChatbotDefinition, ChatbotEndpoint, ChatbotEventLog, ChatbotIntegration, ChatbotMessage
 
@@ -60,6 +61,13 @@ class ChatbotConversationContextSerializer(serializers.Serializer):
     external_conversation_id = serializers.CharField(required=False, allow_blank=True)
     external_thread_id = serializers.CharField(required=False, allow_blank=True)
     limit = serializers.IntegerField(required=False, min_value=1, max_value=20, default=6)
+
+
+class ChatbotReplyRewriteSerializer(serializers.Serializer):
+    answer_text = serializers.CharField()
+    user_text = serializers.CharField(required=False, allow_blank=True)
+    transcript = serializers.CharField(required=False, allow_blank=True)
+    temperature = serializers.FloatField(required=False, min_value=0, max_value=2)
 
 
 class ChatbotResolveView(APIView):
@@ -322,6 +330,50 @@ class ChatbotConversationContextView(APIView):
             'messages': payload_messages,
             'transcript': '\n'.join(transcript_parts),
         })
+
+
+class ChatbotReplyRewriteView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        serializer = ChatbotReplyRewriteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        api_key = get_api_key_from_header(request)
+        if api_key is None:
+            return Response({'detail': 'Authentication required.'}, status=401)
+
+        answer_text = (data.get('answer_text') or '').strip()
+        if not answer_text:
+            return Response({'answer': ''})
+
+        transcript = (data.get('transcript') or '').strip()
+        user_text = (data.get('user_text') or '').strip()
+        context_blocks = []
+        if transcript:
+            context_blocks.append(f'RECENT CHAT HISTORY\n{transcript}')
+        context_blocks.append(
+            'DRAFT ANSWER TO POLISH\n'
+            f'{answer_text}'
+        )
+
+        rewritten = answer_with_general_context(
+            (
+                f'Please rewrite the draft assistant reply so it sounds natural, concise, and helpful for this chat user. '
+                f'Preserve meaning, do not invent facts, do not mention sources unless already present, and keep it conversational.\n\n'
+                f'Current user message:\n{user_text or "(none)"}'
+            ),
+            context_blocks,
+            chat_history=None,
+            model='openai/gpt-oss-20b',
+            temperature=data.get('temperature'),
+        )
+
+        cleaned = (rewritten or '').strip()
+        if not cleaned:
+            cleaned = answer_text
+        return Response({'answer': cleaned})
 
 
 class ChatbotMessageIngestView(APIView):
