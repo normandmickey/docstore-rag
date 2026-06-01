@@ -6,6 +6,7 @@ from io import BytesIO, StringIO
 from typing import Any
 
 from django.conf import settings
+from faker import Faker
 from openai import OpenAI
 from openpyxl import Workbook, load_workbook
 
@@ -69,6 +70,85 @@ def _sample_rows(rows: list[dict[str, Any]], limit: int = 8) -> list[dict[str, A
     return rows[:limit]
 
 
+def _looks_like_email(value: str) -> bool:
+    return '@' in value and '.' in value.split('@')[-1]
+
+
+def _looks_like_phone(value: str) -> bool:
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    return len(digits) >= 10 and len(digits) <= 15
+
+
+def _looks_like_person_name(header: str, value: str) -> bool:
+    header_lower = (header or '').lower()
+    if 'name' not in header_lower:
+        return False
+    parts = [part for part in value.strip().split() if part]
+    return 1 <= len(parts) <= 4 and all(part[:1].isalpha() for part in parts)
+
+
+def _looks_like_address(header: str, value: str) -> bool:
+    header_lower = (header or '').lower()
+    return any(marker in header_lower for marker in ['address', 'street', 'city', 'state', 'zip', 'postal'])
+
+
+def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    fake = Faker()
+    fake.seed_instance(42)
+    replacements = {}
+
+    def replace(kind: str, original: str):
+        key = (kind, original)
+        if key in replacements:
+            return replacements[key]
+        if kind == 'email':
+            value = fake.email()
+        elif kind == 'phone':
+            value = fake.phone_number()
+        elif kind == 'name':
+            value = fake.name()
+        elif kind == 'address':
+            value = fake.street_address()
+        elif kind == 'city':
+            value = fake.city()
+        elif kind == 'state':
+            value = fake.state_abbr()
+        elif kind == 'zip':
+            value = fake.postcode()
+        else:
+            value = original
+        replacements[key] = value
+        return value
+
+    sanitized = []
+    for row in rows:
+        out = {}
+        for header in headers:
+            value = str(row.get(header, '') or '')
+            header_lower = (header or '').lower()
+            if not value:
+                out[header] = value
+            elif _looks_like_email(value):
+                out[header] = replace('email', value)
+            elif _looks_like_phone(value):
+                out[header] = replace('phone', value)
+            elif _looks_like_person_name(header, value):
+                out[header] = replace('name', value)
+            elif _looks_like_address(header, value):
+                if 'city' in header_lower:
+                    out[header] = replace('city', value)
+                elif 'state' in header_lower:
+                    out[header] = replace('state', value)
+                elif 'zip' in header_lower or 'postal' in header_lower:
+                    out[header] = replace('zip', value)
+                else:
+                    out[header] = replace('address', value)
+            else:
+                out[header] = value
+        sanitized.append(out)
+    return sanitized
+
+
 def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_request: str) -> dict[str, Any]:
     if not settings.OPENAI_API_KEY:
         raise SpreadsheetTransformError('OPENAI_API_KEY is not configured.')
@@ -88,8 +168,10 @@ def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_reque
     )
     user_input = {
         'source_headers': headers,
-        'sample_rows': _sample_rows(rows),
+        'sample_rows': sanitize_sample_rows(headers, _sample_rows(rows)),
         'user_request': user_request,
+        'sample_rows_are_sanitized': True,
+        'instruction': 'Sample row values may be privacy-sanitized, but headers and structure reflect the real file. Build the transform plan against the real source headers.',
     }
     response = client.responses.create(
         model=getattr(settings, 'SPREADSHEET_TRANSFORM_MODEL', 'gpt-4.1-mini'),
