@@ -114,10 +114,28 @@ def _looks_like_dob(header: str, value: str) -> bool:
 
 def _looks_like_member_id(header: str, value: str) -> bool:
     header_lower = (header or '').lower()
-    id_markers = ['employee id', 'employeeid', 'member id', 'memberid', 'subscriber id', 'subscriberid', 'person id']
+    id_markers = ['employee id', 'employeeid', 'member id', 'memberid', 'subscriber id', 'subscriberid', 'person id', 'group number', 'group no', 'policy number', 'policy no']
     if any(marker in header_lower for marker in id_markers):
         compact = ''.join(ch for ch in value if ch.isalnum())
         return len(compact) >= 5
+    return False
+
+
+def _looks_like_tax_id(header: str, value: str) -> bool:
+    header_lower = (header or '').lower()
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    tax_markers = ['ein', 'tax id', 'taxid', 'tin', 'federal id']
+    if any(marker in header_lower for marker in tax_markers):
+        return len(digits) == 9
+    return False
+
+
+def _looks_like_license_or_passport(header: str, value: str) -> bool:
+    header_lower = (header or '').lower()
+    markers = ['driver', 'license', 'licence', 'passport']
+    if any(marker in header_lower for marker in markers):
+        compact = ''.join(ch for ch in value if ch.isalnum())
+        return len(compact) >= 6
     return False
 
 
@@ -165,6 +183,10 @@ def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]]) -> tupl
             value = fake.date_of_birth(minimum_age=21, maximum_age=70).strftime('%m/%d/%Y')
         elif kind == 'member_id':
             value = ''.join(str(fake.random_digit()) for _ in range(8))
+        elif kind == 'tax_id':
+            value = ''.join(str(fake.random_digit()) for _ in range(9))
+        elif kind == 'license_or_passport':
+            value = ''.join(fake.random_choices(elements='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', length=9))
         else:
             value = original
         replacements[key] = value
@@ -203,6 +225,12 @@ def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]]) -> tupl
             elif _looks_like_member_id(header, value):
                 mark(header, 'member_id')
                 out[header] = replace('member_id', value)
+            elif _looks_like_tax_id(header, value):
+                mark(header, 'tax_id')
+                out[header] = replace('tax_id', value)
+            elif _looks_like_license_or_passport(header, value):
+                mark(header, 'license_or_passport')
+                out[header] = replace('license_or_passport', value)
             elif _looks_like_address(header, value):
                 if 'city' in header_lower:
                     mark(header, 'city')
