@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Docstore Scaling Roadmap</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --bg-2: #0f172a;
+      --card: #121a33;
+      --border: #243055;
+      --text: #eef2ff;
+      --muted: #cbd5e1;
+      --soft: #94a3b8;
+      --blue: #2563eb;
+      --blue-soft: #93c5fd;
+      --green-soft: #86efac;
+      --yellow-soft: #fde68a;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%); color: var(--text); }
+    a { color: var(--blue-soft); text-decoration: none; }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 28px 20px 80px; }
+    .card { background: rgba(18,26,51,0.96); border: 1px solid var(--border); border-radius: 18px; padding: 26px; margin-bottom: 20px; }
+    .nav { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 18px; }
+    .nav a { color: #cfe3ff; text-decoration: none; padding: 10px 14px; border-radius: 10px; background: #1a2446; }
+    h1 { font-size: clamp(2rem, 4.5vw, 3.5rem); margin: 0 0 12px; }
+    h2 { font-size: 1.6rem; margin: 0 0 14px; }
+    h3 { margin: 0 0 8px; }
+    p, li { color: var(--muted); line-height: 1.7; }
+    .pill { display: inline-block; padding: 8px 12px; border-radius: 999px; background: rgba(37,99,235,0.18); color: #bfdbfe; font-size: 0.92rem; font-weight: 700; }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .mini { background: #0f172a; border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+    .label-good { color: var(--green-soft); font-weight: 700; }
+    .label-watch { color: var(--yellow-soft); font-weight: 700; }
+    ul { padding-left: 20px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <span class="pill">Docstore Roadmap</span>
+      <h1>Scaling to thousands of tenants and documents</h1>
+      <p>Docstore can scale, but the important idea is this: the current single-VPS production shape is a solid early product foundation, not the forever architecture. The right path is staged hardening, workload separation, and operational maturity — not a panicked rewrite.</p>
+      <div class="nav">
+        <a href="/dashboard/">Dashboard</a>
+        <a href="/api/quickstart/">API Quickstart</a>
+        <a href="/api/docs/" target="_blank" rel="noopener noreferrer">Swagger</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Short answer</h2>
+      <div class="grid">
+        <div class="mini">
+          <h3>Will it scale?</h3>
+          <p><span class="label-good">Yes.</span> The underlying direction is sound: Postgres, pgvector, object storage, async ingestion, and separate bot/voice execution planes are all reasonable building blocks.</p>
+        </div>
+        <div class="mini">
+          <h3>What won’t scale forever?</h3>
+          <p><span class="label-watch">The current one-box deployment.</span> The first limits will likely be database pressure, worker contention, retrieval latency, and noisy-neighbor effects.</p>
+        </div>
+        <div class="mini">
+          <h3>Do we need a rewrite?</h3>
+          <p><span class="label-good">No.</span> The smarter path is staged infra and product hardening: observability, queue isolation, retrieval tuning, and cleaner workload separation.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>What already scales reasonably well</h2>
+      <ul>
+        <li><strong>Tenant/workspace model</strong> — the app is already scoped in a way that supports many customers cleanly.</li>
+        <li><strong>Object storage</strong> — files are not tied to local disk-only assumptions.</li>
+        <li><strong>Async ingestion</strong> — uploads, URL ingest, and sync jobs belong in workers, not request latency paths.</li>
+        <li><strong>Separate runners</strong> — bots and voice staying outside Django is a good scaling move.</li>
+        <li><strong>Assignment-based document visibility</strong> — shared documents can be reused across workspaces without duplicating storage and embeddings.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>What breaks first at 10×</h2>
+      <div class="grid">
+        <div class="mini">
+          <h3>Database pressure</h3>
+          <p>Postgres + pgvector can go surprisingly far, but more chunks, more embeddings, and more concurrent retrieval will eventually push CPU, memory, index size, and maintenance overhead.</p>
+        </div>
+        <div class="mini">
+          <h3>Worker contention</h3>
+          <p>Heavy extraction, embeddings, connector sync, reports, and chat-adjacent background tasks should not all compete in one undifferentiated worker pool forever.</p>
+        </div>
+        <div class="mini">
+          <h3>Noisy neighbors</h3>
+          <p>One big tenant with massive syncs or lots of traffic can distort everyone else’s experience unless we add queue isolation, limits, and fairness controls.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>What to change at 10×</h2>
+      <ul>
+        <li>Move to a stronger or managed Postgres deployment and watch vector-query performance closely.</li>
+        <li>Separate worker pools by job type: ingestion, connector sync, reports, and other heavy workloads.</li>
+        <li>Add queue depth, ingest latency, and slow-query monitoring.</li>
+        <li>Introduce basic rate limits and per-tenant fairness controls.</li>
+        <li>Keep object storage durable and observable instead of treating it as an afterthought.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>What to change at 100×</h2>
+      <div class="grid">
+        <div class="mini">
+          <h3>App layer</h3>
+          <p>Run multiple app instances behind a proper load balancer instead of assuming one gunicorn node is enough.</p>
+        </div>
+        <div class="mini">
+          <h3>Retrieval layer</h3>
+          <p>Stay on Postgres + pgvector if it still performs, but be willing to isolate retrieval-heavy concerns or tune indexes/table layouts aggressively.</p>
+        </div>
+        <div class="mini">
+          <h3>Operational controls</h3>
+          <p>Add quotas, tenant-aware scheduling, usage analytics, and stronger admission control so growth stays predictable instead of chaotic.</p>
+        </div>
+      </div>
+      <ul>
+        <li>Split ingestion and sync workloads from user-facing app traffic even more deliberately.</li>
+        <li>Add stronger caching for repeated retrieval/chat patterns where it actually helps.</li>
+        <li>Separate reporting and back-office analytics from the hot path.</li>
+        <li>Tighten backup/restore discipline for both Postgres and object storage.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>What not to over-engineer yet</h2>
+      <ul>
+        <li>Do not assume you need a totally different vector database just because “thousands of tenants” sounds big.</li>
+        <li>Do not rewrite the app into a complex microservice maze before you have real bottleneck data.</li>
+        <li>Do not optimize for hypothetical global scale before adding solid observability and queue discipline.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>Practical scaling roadmap</h2>
+      <div class="grid">
+        <div class="mini">
+          <h3>Now</h3>
+          <p>Keep shipping product features, but add observability, queue visibility, and database performance checks so scaling conversations are grounded in data.</p>
+        </div>
+        <div class="mini">
+          <h3>Next</h3>
+          <p>Split worker roles, improve tenant fairness, and strengthen retrieval performance before traffic makes those decisions for us.</p>
+        </div>
+        <div class="mini">
+          <h3>Later</h3>
+          <p>Scale out app nodes, harden storage, and introduce stronger quota/isolation controls as the customer base and corpus size justify it.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

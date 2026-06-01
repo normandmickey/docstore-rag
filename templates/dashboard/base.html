@@ -97,6 +97,7 @@
         <a href="/dashboard/reports/interactions/" class="{% if report_name == 'interactions' %}active{% endif %}">Interactions</a>
         {% if can_manage_tenant %}<a href="/dashboard/tenant/" class="{% if section == 'tenant' %}active{% endif %}">Tenant</a>{% endif %}
         <a href="/dashboard/api-keys/" class="{% if section == 'api_keys' %}active{% endif %}">API Keys</a>
+        <a href="/roadmap/scaling/" target="_blank" rel="noopener noreferrer">Scaling Roadmap</a>
         <a href="/api/quickstart/" target="_blank" rel="noopener noreferrer">API Quickstart</a>
         <a href="/api/docs/" target="_blank" rel="noopener noreferrer">API Docs</a>
         {% if is_staff_user %}

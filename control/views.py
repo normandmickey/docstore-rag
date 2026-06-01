@@ -496,6 +496,10 @@ def api_quickstart(request):
     return render(request, 'api_quickstart.html')
 
 
+def document_scale_roadmap(request):
+    return render(request, 'scaling_roadmap.html')
+
+
 def dashboard(request):
     if not request.user.is_authenticated:
         return redirect('login')
