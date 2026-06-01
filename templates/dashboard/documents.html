@@ -67,7 +67,6 @@
                     {% if row.latest_job %}<div><span class="status status-{{ row.latest_job.status }}">Job {{ row.latest_job.status }}</span> Stage: {{ row.latest_job.stage }}</div>{% endif %}
                     {% if row.source_url %}<div>Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></div>{% endif %}
                   </div>
-                  {% if row.preview %}<pre class="preview-clamp">{{ row.preview }}</pre>{% endif %}
                 </span>
               </label>
             </div>
