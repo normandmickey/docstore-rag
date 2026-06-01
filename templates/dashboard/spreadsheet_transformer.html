@@ -41,6 +41,13 @@
 </div>
 {% endif %}
 
+{% if spreadsheet_transform_prompt_preview %}
+<div class="card">
+  <h2>Planner prompt preview</h2>
+  <pre style="white-space:pre-wrap;">{{ spreadsheet_transform_prompt_preview }}</pre>
+</div>
+{% endif %}
+
 {% if spreadsheet_transform_plan %}
 <div class="card">
   <h2>Generated transform plan</h2>

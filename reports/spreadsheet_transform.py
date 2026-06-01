@@ -254,7 +254,7 @@ def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]], strict:
     return sanitized, detected
 
 
-def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_request: str, strict_sanitization: bool = False) -> tuple[dict[str, Any], dict[str, list[str]], list[dict[str, Any]]]:
+def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_request: str, strict_sanitization: bool = False) -> tuple[dict[str, Any], dict[str, list[str]], list[dict[str, Any]], dict[str, Any]]:
     if not settings.OPENAI_API_KEY:
         raise SpreadsheetTransformError('OPENAI_API_KEY is not configured.')
 
@@ -292,7 +292,7 @@ def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_reque
         raise SpreadsheetTransformError('No transform plan was returned.')
     try:
         plan = json.loads(text)
-        return plan, detected, sanitized_rows
+        return plan, detected, sanitized_rows, user_input
     except json.JSONDecodeError as exc:
         raise SpreadsheetTransformError(f'Could not parse transform plan JSON: {exc}') from exc
 

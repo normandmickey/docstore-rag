@@ -63,6 +63,7 @@ def spreadsheet_transformer(request):
     base['spreadsheet_transform_plan'] = None
     base['spreadsheet_transform_detected_fields'] = {}
     base['spreadsheet_transform_sanitized_samples'] = []
+    base['spreadsheet_transform_prompt_preview'] = None
 
     if request.method == 'POST':
         form = SpreadsheetTransformForm(request.POST, request.FILES)
@@ -70,7 +71,7 @@ def spreadsheet_transformer(request):
         if form.is_valid():
             try:
                 table = load_tabular_file(form.cleaned_data['file'])
-                plan, detected_fields, sanitized_samples = plan_transform(
+                plan, detected_fields, sanitized_samples, prompt_preview = plan_transform(
                     headers=table['headers'],
                     rows=table['rows'],
                     user_request=form.cleaned_data['transform_request'],
@@ -80,6 +81,7 @@ def spreadsheet_transformer(request):
                 base['spreadsheet_transform_plan'] = plan
                 base['spreadsheet_transform_detected_fields'] = detected_fields
                 base['spreadsheet_transform_sanitized_samples'] = sanitized_samples
+                base['spreadsheet_transform_prompt_preview'] = prompt_preview
                 base['spreadsheet_transform_preview_headers'] = headers
                 base['spreadsheet_transform_preview_rows'] = transformed_rows[:20]
 
