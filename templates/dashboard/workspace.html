@@ -1,0 +1,84 @@
+{% extends 'dashboard/base.html' %}
+{% block title %}Workspace · Docstore{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Workspace knowledge view</h2>
+  <p class="meta">A workspace-first view of what knowledge is available here, where it comes from, and what is shared in from elsewhere.</p>
+  <div class="grid">
+    <div class="stat"><strong>Total docs</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ workspace_summary.total_documents }}</div></div>
+    <div class="stat"><strong>Uploaded/file docs</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ workspace_summary.file_documents }}</div></div>
+    <div class="stat"><strong>URL docs</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ workspace_summary.url_documents }}</div></div>
+    <div class="stat"><strong>Shared in</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ workspace_summary.shared_documents }}</div></div>
+    <div class="stat"><strong>Collections</strong><div style="font-size: 1.8rem; margin-top: 8px;">{{ workspace_summary.collection_count }}</div></div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Collections</h2>
+  {% if collection_counts %}
+    <div class="grid">
+      {% for label, count in collection_counts %}
+        <div class="stat"><strong>{{ label }}</strong><div style="font-size: 1.4rem; margin-top: 8px;">{{ count }}</div></div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p>No collections yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Shared into this workspace</h2>
+  {% if shared_document_rows %}
+    {% for row in shared_document_rows %}
+      <div class="row">
+        <div class="doc-title">{{ row.document.filename }}</div>
+        <div class="doc-actions"><a href="/documents/{{ row.document.id }}/">View details</a></div>
+        <div class="doc-meta-group meta">
+          <div>Primary workspace: {{ row.document.workspace.name }}</div>
+          <div>Collection: {{ row.document.collection|default:'—' }}</div>
+          <div>Source type: {{ row.document.source_type }}</div>
+          <div>Assigned here from another workspace</div>
+          {% if row.source_url %}<div>Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></div>{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>No shared-in documents right now.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>URL source groups</h2>
+  {% if url_document_groups %}
+    {% for group_label, rows in url_document_groups %}
+      <div class="row">
+        <div class="doc-title">{{ group_label }}</div>
+        <div class="meta">{{ rows|length }} page{{ rows|length|pluralize }}</div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>No URL groups in this workspace yet.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Recent knowledge</h2>
+  {% if document_rows %}
+    {% for row in document_rows|slice:':12' %}
+      <div class="row">
+        <div class="doc-title">{{ row.document.filename }}</div>
+        <div class="doc-actions"><a href="/documents/{{ row.document.id }}/">View details</a></div>
+        <div class="doc-meta-group meta">
+          <div>Status: {{ row.document.status }}</div>
+          <div>Collection: {{ row.document.collection|default:'—' }}</div>
+          <div>Uploaded: {{ row.document.created_at }}</div>
+          <div>Source type: {{ row.document.source_type }}</div>
+          {% if row.source_url %}<div>Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></div>{% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  {% else %}
+    <p>No documents in this workspace yet.</p>
+  {% endif %}
+</div>
+{% endblock %}

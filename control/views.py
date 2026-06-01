@@ -211,6 +211,19 @@ def _dashboard_base(request):
     current_membership = memberships.filter(tenant_id=current_tenant_id).first() if current_tenant_id else None
     can_manage_tenant = bool(current_membership and current_membership.role in {TenantMembership.ROLE_OWNER, TenantMembership.ROLE_ADMIN})
 
+    shared_document_rows = [row for row in all_document_rows if row['document'].workspace_id != current_workspace_id]
+    collection_counts = OrderedDict()
+    for row in all_document_rows:
+        key = (row['document'].collection or 'Uncategorized').strip() or 'Uncategorized'
+        collection_counts[key] = collection_counts.get(key, 0) + 1
+    workspace_summary = {
+        'total_documents': len(all_document_rows),
+        'file_documents': len(file_document_rows),
+        'url_documents': len(url_document_rows),
+        'shared_documents': len(shared_document_rows),
+        'collection_count': len(collection_counts),
+    }
+
     return {
         'memberships': memberships,
         'current_tenant_id': current_tenant_id,
@@ -224,6 +237,9 @@ def _dashboard_base(request):
         'file_document_rows': file_document_rows,
         'url_document_rows': url_document_rows,
         'url_document_groups': url_document_groups.items(),
+        'shared_document_rows': shared_document_rows,
+        'collection_counts': collection_counts.items(),
+        'workspace_summary': workspace_summary,
         'deleted_document_rows': deleted_document_rows,
         'failed_document_rows': failed_document_rows,
         'external_accounts': ExternalAccount.objects.filter(user=request.user).order_by('-updated_at'),
@@ -706,6 +722,18 @@ def document_search(request, document_id):
         'search_results': results,
     })
     return render(request, 'dashboard/document_search.html', base)
+
+
+def dashboard_workspace(request):
+    if not request.user.is_authenticated:
+        return redirect('login')
+    base = _dashboard_base(request)
+    if base is None:
+        return redirect('login')
+    if (redirect_response := _handle_workspace_actions(request, base)) is not None:
+        return redirect_response
+    base['section'] = 'workspace'
+    return render(request, 'dashboard/workspace.html', base)
 
 
 def dashboard_documents(request):

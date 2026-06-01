@@ -5,7 +5,7 @@ from django.template.loader import render_to_string
 from django.urls import include, path
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 from documents.api import DocumentCreateView, DocumentDeleteView, DocumentPurgeView, DocumentRestoreView, URLIngestView
-from control.views import AppLoginView, api_quickstart, dashboard, dashboard_api_keys, dashboard_chat, dashboard_connectors, dashboard_documents, dashboard_proxi_web, dashboard_tenant_settings, dashboard_urls, document_chunks, document_detail, document_download, document_facts, document_scale_roadmap, document_search, google_connect_callback, google_connect_start, logout_view, microsoft_connect_callback, microsoft_connect_start, signup, staff_dashboard
+from control.views import AppLoginView, api_quickstart, dashboard, dashboard_api_keys, dashboard_chat, dashboard_connectors, dashboard_documents, dashboard_proxi_web, dashboard_tenant_settings, dashboard_urls, dashboard_workspace, document_chunks, document_detail, document_download, document_facts, document_scale_roadmap, document_search, google_connect_callback, google_connect_start, logout_view, microsoft_connect_callback, microsoft_connect_start, signup, staff_dashboard
 from retrieval.api import ChatView, SearchView
 from support.api import SupportChannelLookupView
 
@@ -49,6 +49,7 @@ urlpatterns = [
     path('logout/', logout_view, name='logout'),
     path('signup/', signup, name='signup'),
     path('dashboard/', dashboard, name='dashboard'),
+    path('dashboard/workspace/', dashboard_workspace, name='dashboard_workspace'),
     path('dashboard/documents/', dashboard_documents, name='dashboard_documents'),
     path('dashboard/urls/', dashboard_urls, name='dashboard_urls'),
     path('dashboard/chat/', dashboard_chat, name='dashboard_chat'),
