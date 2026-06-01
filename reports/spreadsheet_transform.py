@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from io import BytesIO, StringIO
 from typing import Any
 
@@ -13,6 +14,20 @@ from openpyxl import Workbook, load_workbook
 
 class SpreadsheetTransformError(Exception):
     pass
+
+
+def _extract_json_object(text: str) -> str:
+    value = (text or '').strip()
+    if not value:
+        raise SpreadsheetTransformError('No transform plan was returned.')
+    fenced = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', value, re.DOTALL | re.IGNORECASE)
+    if fenced:
+        return fenced.group(1).strip()
+    start = value.find('{')
+    end = value.rfind('}')
+    if start >= 0 and end > start:
+        return value[start:end + 1].strip()
+    return value
 
 
 def load_tabular_file(uploaded_file) -> dict[str, Any]:
@@ -291,7 +306,7 @@ def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_reque
     if not text:
         raise SpreadsheetTransformError('No transform plan was returned.')
     try:
-        plan = json.loads(text)
+        plan = json.loads(_extract_json_object(text))
         return plan, detected, sanitized_rows, user_input
     except json.JSONDecodeError as exc:
         raise SpreadsheetTransformError(f'Could not parse transform plan JSON: {exc}') from exc
