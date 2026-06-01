@@ -30,6 +30,9 @@
     pre { white-space: pre-wrap; background: #0f172a; border: 1px solid var(--border); padding: 14px; border-radius: 12px; overflow-x: auto; color: #dbe5ff; }
     .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
     .pill { display: inline-block; padding: 8px 12px; border-radius: 999px; background: rgba(37,99,235,0.18); color: #bfdbfe; font-size: 0.92rem; font-weight: 700; }
+    .code-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+    .copy-button { background: #1d4ed8; color: white; border: 0; border-radius: 10px; padding: 8px 12px; cursor: pointer; font-weight: 600; }
+    .copy-button.copied { background: #166534; }
   </style>
 </head>
 <body>
@@ -46,9 +49,12 @@
     </div>
 
     <div class="card">
-      <h2>Authentication</h2>
+      <div class="code-header">
+        <h2>Authentication</h2>
+        <button class="copy-button" type="button" data-copy-target="auth-code">Copy</button>
+      </div>
       <p>Send your Docstore API key as a bearer token:</p>
-      <pre><code>Authorization: Bearer YOUR_DOCSTORE_API_KEY</code></pre>
+      <pre><code id="auth-code">Authorization: Bearer YOUR_DOCSTORE_API_KEY</code></pre>
       <p>Most endpoints are tenant/workspace scoped. If your API key is already workspace-scoped, you may not need to send both IDs on every request, but it is still valid to do so.</p>
     </div>
 
@@ -69,9 +75,12 @@
     </div>
 
     <div class="card">
-      <h2>Multi-workspace ingest</h2>
+      <div class="code-header">
+        <h2>Multi-workspace ingest</h2>
+        <button class="copy-button" type="button" data-copy-target="multi-workspace-code">Copy</button>
+      </div>
       <p>Docstore can ingest a document once and assign it to multiple workspaces without duplicating the file, versions, chunks, or embeddings.</p>
-      <pre><code>{
+      <pre><code id="multi-workspace-code">{
   "tenant_id": 2,
   "workspace_id": 3,
   "additional_workspace_ids": [4, 5],
@@ -81,8 +90,11 @@
     </div>
 
     <div class="card">
-      <h2>Python</h2>
-      <pre><code>import requests
+      <div class="code-header">
+        <h2>Python</h2>
+        <button class="copy-button" type="button" data-copy-target="python-code">Copy</button>
+      </div>
+      <pre><code id="python-code">import requests
 
 BASE_URL = "https://docstore.oddsmith.net"
 API_KEY = "YOUR_DOCSTORE_API_KEY"
@@ -104,8 +116,11 @@ print(chat_response.json())</code></pre>
     </div>
 
     <div class="card">
-      <h2>Node.js</h2>
-      <pre><code>const fs = require('fs');
+      <div class="code-header">
+        <h2>Node.js</h2>
+        <button class="copy-button" type="button" data-copy-target="node-code">Copy</button>
+      </div>
+      <pre><code id="node-code">const fs = require('fs');
 const FormData = require('form-data');
 
 const BASE_URL = 'https://docstore.oddsmith.net';
@@ -136,8 +151,11 @@ run().catch(console.error);</code></pre>
     </div>
 
     <div class="card">
-      <h2>.NET / C#</h2>
-      <pre><code>using System.Net.Http.Headers;
+      <div class="code-header">
+        <h2>.NET / C#</h2>
+        <button class="copy-button" type="button" data-copy-target="dotnet-code">Copy</button>
+      </div>
+      <pre><code id="dotnet-code">using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -162,5 +180,29 @@ response.EnsureSuccessStatusCode();
 Console.WriteLine(await response.Content.ReadAsStringAsync());</code></pre>
     </div>
   </div>
+  <script>
+    document.querySelectorAll('.copy-button').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const targetId = button.getAttribute('data-copy-target');
+        const code = document.getElementById(targetId);
+        if (!code) return;
+        try {
+          await navigator.clipboard.writeText(code.textContent || '');
+          const original = button.textContent;
+          button.textContent = 'Copied';
+          button.classList.add('copied');
+          setTimeout(() => {
+            button.textContent = original;
+            button.classList.remove('copied');
+          }, 1500);
+        } catch (err) {
+          button.textContent = 'Failed';
+          setTimeout(() => {
+            button.textContent = 'Copy';
+          }, 1500);
+        }
+      });
+    });
+  </script>
 </body>
 </html>
