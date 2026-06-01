@@ -50,6 +50,7 @@
           <input type="hidden" name="folder_name" value="{{ google_drive_folder_current_name }}">
           <button type="submit">Use this folder for connector</button>
         </form>
+        {% if google_drive_folder_current_id != 'root' %}
         <form method="post" style="margin:0;">
           {% csrf_token %}
           <input type="hidden" name="action" value="sync_google_drive_folder_now">
@@ -57,6 +58,7 @@
           <input type="hidden" name="folder_name" value="{{ google_drive_folder_current_name }}">
           <button type="submit">Sync this folder now</button>
         </form>
+        {% endif %}
       </div>
     </div>
 
