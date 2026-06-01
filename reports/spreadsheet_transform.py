@@ -87,6 +87,23 @@ def _looks_like_person_name(header: str, value: str) -> bool:
     return 1 <= len(parts) <= 4 and all(part[:1].isalpha() for part in parts)
 
 
+def _looks_like_ssn(header: str, value: str) -> bool:
+    header_lower = (header or '').lower()
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    if 'ssn' in header_lower or 'social security' in header_lower:
+        return len(digits) == 9
+    return bool(__import__('re').fullmatch(r'\d{3}-?\d{2}-?\d{4}', value.strip()))
+
+
+def _looks_like_bank_info(header: str, value: str) -> bool:
+    header_lower = (header or '').lower()
+    digits = ''.join(ch for ch in value if ch.isdigit())
+    bank_markers = ['bank', 'routing', 'account', 'acct', 'iban']
+    if any(marker in header_lower for marker in bank_markers):
+        return len(digits) >= 6 or len(value.strip()) >= 8
+    return False
+
+
 def _looks_like_address(header: str, value: str) -> bool:
     header_lower = (header or '').lower()
     return any(marker in header_lower for marker in ['address', 'street', 'city', 'state', 'zip', 'postal'])
@@ -115,6 +132,12 @@ def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]]) -> list
             value = fake.state_abbr()
         elif kind == 'zip':
             value = fake.postcode()
+        elif kind == 'ssn':
+            value = fake.ssn()
+        elif kind == 'routing':
+            value = ''.join(str(fake.random_digit()) for _ in range(9))
+        elif kind == 'account':
+            value = ''.join(str(fake.random_digit()) for _ in range(12))
         else:
             value = original
         replacements[key] = value
@@ -134,6 +157,13 @@ def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]]) -> list
                 out[header] = replace('phone', value)
             elif _looks_like_person_name(header, value):
                 out[header] = replace('name', value)
+            elif _looks_like_ssn(header, value):
+                out[header] = replace('ssn', value)
+            elif _looks_like_bank_info(header, value):
+                if 'routing' in header_lower:
+                    out[header] = replace('routing', value)
+                else:
+                    out[header] = replace('account', value)
             elif _looks_like_address(header, value):
                 if 'city' in header_lower:
                     out[header] = replace('city', value)
