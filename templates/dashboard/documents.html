@@ -19,29 +19,67 @@
   <h2>Your documents</h2>
   <form method="post">
     {% csrf_token %}
-    {% for row in document_rows %}
-      <div class="row">
-        <label style="display: flex; gap: 10px; align-items: flex-start;">
-          <input type="checkbox" name="document_ids" value="{{ row.document.id }}" style="width: auto; margin-top: 6px;">
-          <span style="flex: 1;">
-            <div class="doc-title">{{ row.document.filename }}</div>
-            <div class="doc-actions"><a href="/documents/{{ row.document.id }}/">View details</a>{% if row.document.file %} · <a href="/documents/{{ row.document.id }}/download/" target="_blank" rel="noopener noreferrer">Open document</a>{% endif %}</div>
-            <div class="doc-meta-group meta">
-              <div>Status: {{ row.document.status }}</div>
-              <div>Collection: {{ row.document.collection|default:'—' }}</div>
-              <div>Workspaces: {% for workspace in row.assigned_workspaces %}{{ workspace.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</div>
-              <div>Uploaded: {{ row.document.created_at }}</div>
-              <div>Versions: {{ row.version_count }}{% if row.latest_version %} · Latest v{{ row.latest_version.version_number }}{% endif %}{% if row.chunk_count %} · Chunks: {{ row.chunk_count }}{% endif %}</div>
-              {% if row.latest_job %}<div><span class="status status-{{ row.latest_job.status }}">Job {{ row.latest_job.status }}</span> Stage: {{ row.latest_job.stage }}</div>{% endif %}
-              {% if row.source_url %}<div>Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></div>{% endif %}
+
+    {% if file_document_rows %}
+      <h3 style="margin-top: 0;">Files and other documents</h3>
+      {% for row in file_document_rows %}
+        <div class="row">
+          <label style="display: flex; gap: 10px; align-items: flex-start;">
+            <input type="checkbox" name="document_ids" value="{{ row.document.id }}" style="width: auto; margin-top: 6px;">
+            <span style="flex: 1;">
+              <div class="doc-title">{{ row.document.filename }}</div>
+              <div class="doc-actions"><a href="/documents/{{ row.document.id }}/">View details</a>{% if row.document.file %} · <a href="/documents/{{ row.document.id }}/download/" target="_blank" rel="noopener noreferrer">Open document</a>{% endif %}</div>
+              <div class="doc-meta-group meta">
+                <div>Status: {{ row.document.status }}</div>
+                <div>Collection: {{ row.document.collection|default:'—' }}</div>
+                <div>Workspaces: {% for workspace in row.assigned_workspaces %}{{ workspace.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</div>
+                <div>Uploaded: {{ row.document.created_at }}</div>
+                <div>Versions: {{ row.version_count }}{% if row.latest_version %} · Latest v{{ row.latest_version.version_number }}{% endif %}{% if row.chunk_count %} · Chunks: {{ row.chunk_count }}{% endif %}</div>
+                {% if row.latest_job %}<div><span class="status status-{{ row.latest_job.status }}">Job {{ row.latest_job.status }}</span> Stage: {{ row.latest_job.stage }}</div>{% endif %}
+                {% if row.source_url %}<div>Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></div>{% endif %}
+              </div>
+              {% if row.preview %}<pre class="preview-clamp">{{ row.preview }}</pre>{% endif %}
+            </span>
+          </label>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% if url_document_groups %}
+      <h3 style="margin-top: 20px;">URL documents</h3>
+      {% for group_label, rows in url_document_groups %}
+        <div style="margin-top: 16px; padding: 14px; border: 1px solid #243055; border-radius: 12px; background: #0f172a;">
+          <div style="font-weight: 700; margin-bottom: 4px;">{{ group_label }}</div>
+          <div class="meta">{{ rows|length }} page{{ rows|length|pluralize }}</div>
+          {% for row in rows %}
+            <div class="row">
+              <label style="display: flex; gap: 10px; align-items: flex-start;">
+                <input type="checkbox" name="document_ids" value="{{ row.document.id }}" style="width: auto; margin-top: 6px;">
+                <span style="flex: 1;">
+                  <div class="doc-title">{{ row.document.filename }}</div>
+                  <div class="doc-actions"><a href="/documents/{{ row.document.id }}/">View details</a>{% if row.document.file %} · <a href="/documents/{{ row.document.id }}/download/" target="_blank" rel="noopener noreferrer">Open document</a>{% endif %}</div>
+                  <div class="doc-meta-group meta">
+                    <div>Status: {{ row.document.status }}</div>
+                    <div>Collection: {{ row.document.collection|default:'—' }}</div>
+                    <div>Workspaces: {% for workspace in row.assigned_workspaces %}{{ workspace.name }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</div>
+                    <div>Uploaded: {{ row.document.created_at }}</div>
+                    <div>Versions: {{ row.version_count }}{% if row.latest_version %} · Latest v{{ row.latest_version.version_number }}{% endif %}{% if row.chunk_count %} · Chunks: {{ row.chunk_count }}{% endif %}</div>
+                    {% if row.latest_job %}<div><span class="status status-{{ row.latest_job.status }}">Job {{ row.latest_job.status }}</span> Stage: {{ row.latest_job.stage }}</div>{% endif %}
+                    {% if row.source_url %}<div>Source URL: <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer">{{ row.source_url }}</a></div>{% endif %}
+                  </div>
+                  {% if row.preview %}<pre class="preview-clamp">{{ row.preview }}</pre>{% endif %}
+                </span>
+              </label>
             </div>
-            {% if row.preview %}<pre class="preview-clamp">{{ row.preview }}</pre>{% endif %}
-          </span>
-        </label>
-      </div>
-    {% empty %}
+          {% endfor %}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% if not document_rows %}
       <p>No documents uploaded yet.</p>
-    {% endfor %}
+    {% endif %}
+
     {% if document_rows %}
       <div style="margin-top: 14px; padding: 14px; border: 1px solid #243055; border-radius: 12px; background: #0f172a;">
         <label>Assign selected documents to workspace</label>
@@ -58,7 +96,6 @@
       </label>
       <button type="submit" name="action" value="delete_document" style="background: #991b1b; margin-top: 12px;">Delete selected</button>
     {% endif %}
-  </form>
   </form>
 </div>
 <div class="card">

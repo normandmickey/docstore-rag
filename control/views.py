@@ -1,6 +1,8 @@
 import logging
 import secrets
 import subprocess
+from collections import OrderedDict
+from urllib.parse import urlparse
 
 import requests
 
@@ -121,6 +123,19 @@ def _apply_invite_membership(invite, user, session):
     return tenant, workspace
 
 
+def _group_key_for_url_document(source_url: str) -> str:
+    parsed = urlparse(source_url or '')
+    host = (parsed.netloc or '').strip().lower()
+    path_parts = [part for part in (parsed.path or '').split('/') if part]
+    if not host:
+        return 'Other URL documents'
+    if not path_parts:
+        return f'{host}/'
+    if len(path_parts) == 1:
+        return f'{host}/{path_parts[0]}/'
+    return f'{host}/{path_parts[0]}/'
+
+
 def _dashboard_base(request):
     if not request.user.is_authenticated:
         return None
@@ -188,6 +203,10 @@ def _dashboard_base(request):
     failed_document_rows = build_document_rows(failed_documents)
     url_document_rows = [row for row in all_document_rows if row['document'].source_type == Document.SOURCE_URL]
     file_document_rows = [row for row in all_document_rows if row['document'].source_type != Document.SOURCE_URL]
+    url_document_groups = OrderedDict()
+    for row in url_document_rows:
+        group_key = _group_key_for_url_document(row['source_url'])
+        url_document_groups.setdefault(group_key, []).append(row)
 
     current_membership = memberships.filter(tenant_id=current_tenant_id).first() if current_tenant_id else None
     can_manage_tenant = bool(current_membership and current_membership.role in {TenantMembership.ROLE_OWNER, TenantMembership.ROLE_ADMIN})
@@ -204,6 +223,7 @@ def _dashboard_base(request):
         'document_rows': all_document_rows,
         'file_document_rows': file_document_rows,
         'url_document_rows': url_document_rows,
+        'url_document_groups': url_document_groups.items(),
         'deleted_document_rows': deleted_document_rows,
         'failed_document_rows': failed_document_rows,
         'external_accounts': ExternalAccount.objects.filter(user=request.user).order_by('-updated_at'),
