@@ -227,6 +227,8 @@ Current configured chat/question model family:
 - `/connect/microsoft/callback/`
 
 ### API
+- `GET /api/schema/`
+- `GET /api/docs/`
 - `POST /api/v1/documents/`
 - `POST /api/v1/documents/delete/`
 - `POST /api/v1/documents/restore/`
@@ -239,6 +241,36 @@ Current configured chat/question model family:
 - `POST /api/v1/chatbots/resolve/`
 - `POST /api/v1/chatbots/messages/ingest/`
 - `POST /api/v1/chatbots/events/ingest/`
+
+### API docs
+- OpenAPI schema: `/api/schema/`
+- Swagger UI: `/api/docs/`
+
+### Multi-workspace ingest
+Docstore now supports assigning one ingested document to multiple workspaces without duplicating the file, versions, chunks, or embeddings.
+
+#### File/document ingest example
+```json
+{
+  "tenant_id": 2,
+  "workspace_id": 3,
+  "additional_workspace_ids": [4, 5],
+  "collection": "hr"
+}
+```
+
+#### URL ingest example
+```json
+{
+  "tenant_id": 2,
+  "workspace_id": 3,
+  "additional_workspace_ids": [4, 5],
+  "urls": ["https://example.com/handbook"],
+  "crawl_mode": "single"
+}
+```
+
+The response now includes `assigned_workspace_ids` so callers can verify which workspaces the document was assigned to at ingest time.
 
 ## Environment Notes
 
