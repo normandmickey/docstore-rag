@@ -126,10 +126,16 @@ def _looks_like_address(header: str, value: str) -> bool:
     return any(marker in header_lower for marker in ['address', 'street', 'city', 'state', 'zip', 'postal'])
 
 
-def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, list[str]]]:
     fake = Faker()
     fake.seed_instance(42)
     replacements = {}
+    detected = {}
+
+    def mark(header: str, kind: str):
+        detected.setdefault(header, [])
+        if kind not in detected[header]:
+            detected[header].append(kind)
 
     def replace(kind: str, original: str):
         key = (kind, original)
@@ -173,38 +179,50 @@ def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]]) -> list
             if not value:
                 out[header] = value
             elif _looks_like_email(value):
+                mark(header, 'email')
                 out[header] = replace('email', value)
             elif _looks_like_phone(value):
+                mark(header, 'phone')
                 out[header] = replace('phone', value)
             elif _looks_like_person_name(header, value):
+                mark(header, 'name')
                 out[header] = replace('name', value)
             elif _looks_like_ssn(header, value):
+                mark(header, 'ssn')
                 out[header] = replace('ssn', value)
             elif _looks_like_bank_info(header, value):
                 if 'routing' in header_lower:
+                    mark(header, 'routing')
                     out[header] = replace('routing', value)
                 else:
+                    mark(header, 'account')
                     out[header] = replace('account', value)
             elif _looks_like_dob(header, value):
+                mark(header, 'dob')
                 out[header] = replace('dob', value)
             elif _looks_like_member_id(header, value):
+                mark(header, 'member_id')
                 out[header] = replace('member_id', value)
             elif _looks_like_address(header, value):
                 if 'city' in header_lower:
+                    mark(header, 'city')
                     out[header] = replace('city', value)
                 elif 'state' in header_lower:
+                    mark(header, 'state')
                     out[header] = replace('state', value)
                 elif 'zip' in header_lower or 'postal' in header_lower:
+                    mark(header, 'zip')
                     out[header] = replace('zip', value)
                 else:
+                    mark(header, 'address')
                     out[header] = replace('address', value)
             else:
                 out[header] = value
         sanitized.append(out)
-    return sanitized
+    return sanitized, detected
 
 
-def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_request: str) -> dict[str, Any]:
+def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_request: str) -> tuple[dict[str, Any], dict[str, list[str]], list[dict[str, Any]]]:
     if not settings.OPENAI_API_KEY:
         raise SpreadsheetTransformError('OPENAI_API_KEY is not configured.')
 
@@ -221,9 +239,10 @@ def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_reque
         'Supported filter operators: equals, contains, not_equals. '
         'If the request is broad, still propose the most likely output columns. '
     )
+    sanitized_rows, detected = sanitize_sample_rows(headers, _sample_rows(rows))
     user_input = {
         'source_headers': headers,
-        'sample_rows': sanitize_sample_rows(headers, _sample_rows(rows)),
+        'sample_rows': sanitized_rows,
         'user_request': user_request,
         'sample_rows_are_sanitized': True,
         'instruction': 'Sample row values may be privacy-sanitized, but headers and structure reflect the real file. Build the transform plan against the real source headers.',
@@ -239,7 +258,8 @@ def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_reque
     if not text:
         raise SpreadsheetTransformError('No transform plan was returned.')
     try:
-        return json.loads(text)
+        plan = json.loads(text)
+        return plan, detected, sanitized_rows
     except json.JSONDecodeError as exc:
         raise SpreadsheetTransformError(f'Could not parse transform plan JSON: {exc}') from exc
 

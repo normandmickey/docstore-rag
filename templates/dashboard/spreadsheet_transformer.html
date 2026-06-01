@@ -22,6 +22,25 @@
   </form>
 </div>
 
+{% if spreadsheet_transform_detected_fields %}
+<div class="card">
+  <h2>Detected sensitive sample fields</h2>
+  {% for header, kinds in spreadsheet_transform_detected_fields.items %}
+    <div class="row">
+      <strong>{{ header }}</strong><br>
+      <span class="meta">{{ kinds|join:", " }}</span>
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% if spreadsheet_transform_sanitized_samples %}
+<div class="card">
+  <h2>Sanitized sample rows sent to planner</h2>
+  <pre style="white-space:pre-wrap;">{{ spreadsheet_transform_sanitized_samples }}</pre>
+</div>
+{% endif %}
+
 {% if spreadsheet_transform_plan %}
 <div class="card">
   <h2>Generated transform plan</h2>
