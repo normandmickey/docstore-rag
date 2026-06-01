@@ -264,6 +264,49 @@ def retrieve_facts(*, tenant, workspace, query, top_k=8, document_id=None):
     return scored[:top_k]
 
 
+def extract_code_lookup_answer(query, results):
+    query_text = (query or '').strip()
+    code_matches = re.findall(r'\b([12][A-K])\b', query_text.upper())
+    if not code_matches:
+        return None
+
+    target_code = code_matches[0]
+    patterns = [
+        re.compile(rf'\b{re.escape(target_code)}\b\s*[:\-–—]\s*(.+)', re.IGNORECASE),
+        re.compile(rf'\b{re.escape(target_code)}\b\s+(.+)', re.IGNORECASE),
+    ]
+
+    for result in results or []:
+        text = (getattr(result, 'text', '') or '').strip()
+        if not text or target_code not in text.upper():
+            continue
+
+        normalized = ' '.join(text.split())
+        split_lines = [line.strip() for line in re.split(r'[\r\n]+|(?<=[.])\s+(?=[A-Z0-9])', text) if line.strip()]
+        candidate_lines = split_lines or [normalized]
+
+        for line in candidate_lines:
+            compact_line = ' '.join(line.split())
+            for pattern in patterns:
+                match = pattern.search(compact_line)
+                if not match:
+                    continue
+                meaning = (match.group(1) or '').strip(' .;:-')
+                if not meaning or len(meaning) < 8:
+                    continue
+                if meaning.upper().startswith(target_code):
+                    continue
+                return f'On Form 1095-C, code {target_code} means {meaning}.'
+
+        around = re.search(rf'(.{{0,80}}\b{re.escape(target_code)}\b.{{0,220}})', normalized, re.IGNORECASE)
+        if around:
+            snippet = ' '.join(around.group(1).split()).strip(' .;')
+            if snippet and len(snippet) > len(target_code) + 12:
+                return f'Here is the matching Form 1095-C code text for {target_code}: {snippet}.'
+
+    return None
+
+
 def build_context_blocks(results, facts=None):
     blocks = []
     for idx, fact in enumerate(facts or [], start=1):
@@ -297,5 +340,8 @@ def answer_question(*, tenant, workspace, query, top_k=5, document_id=None, temp
         document_id=document_id,
     )
     context_blocks = build_context_blocks(results, facts=facts)
+    exact_code_answer = extract_code_lookup_answer(query, results)
+    if exact_code_answer:
+        return exact_code_answer, results
     answer = answer_with_context(query, context_blocks, temperature=temperature) if context_blocks else 'I could not find relevant document context for that question yet.'
     return answer, results
