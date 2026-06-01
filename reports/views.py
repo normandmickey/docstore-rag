@@ -26,7 +26,7 @@ from .spreadsheet_transform import (
 
 
 class SpreadsheetTransformForm(forms.Form):
-    file = forms.FileField()
+    file = forms.FileField(required=False)
     transform_request = forms.CharField(widget=forms.Textarea(attrs={'rows': 5}), help_text='Describe the columns and layout you want in the exported file.')
     export_format = forms.ChoiceField(choices=[('xlsx', 'XLSX'), ('csv', 'CSV')], initial='xlsx')
     strict_sanitization = forms.BooleanField(required=False, initial=False, help_text='Use more aggressive prompt-side masking for sample rows before AI planning.')
@@ -66,39 +66,71 @@ def spreadsheet_transformer(request):
     base['spreadsheet_transform_prompt_preview'] = None
 
     if request.method == 'POST':
+        action = (request.POST.get('action') or 'preview').strip()
         form = SpreadsheetTransformForm(request.POST, request.FILES)
         base['spreadsheet_transform_form'] = form
         if form.is_valid():
             try:
-                table = load_tabular_file(form.cleaned_data['file'])
-                plan, detected_fields, sanitized_samples, prompt_preview = plan_transform(
-                    headers=table['headers'],
-                    rows=table['rows'],
-                    user_request=form.cleaned_data['transform_request'],
-                    strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
-                )
-                headers, transformed_rows = apply_transform_plan(rows=table['rows'], plan=plan)
-                base['spreadsheet_transform_plan'] = plan
-                base['spreadsheet_transform_detected_fields'] = detected_fields
-                base['spreadsheet_transform_sanitized_samples'] = sanitized_samples
-                base['spreadsheet_transform_prompt_preview'] = prompt_preview
-                base['spreadsheet_transform_preview_headers'] = headers
-                base['spreadsheet_transform_preview_rows'] = transformed_rows[:20]
+                session_table = request.session.get('spreadsheet_transform_table') or {}
+                session_result = request.session.get('spreadsheet_transform_result') or {}
 
-                export_format = form.cleaned_data['export_format']
-                if export_format == 'csv':
-                    payload = export_transform_csv(headers, transformed_rows)
-                    response = HttpResponse(payload, content_type='text/csv')
-                    response['Content-Disposition'] = 'attachment; filename="spreadsheet-transform.csv"'
+                if action == 'preview':
+                    if not form.cleaned_data.get('file'):
+                        raise SpreadsheetTransformError('Please upload a CSV or XLSX file to preview the transform.')
+                    table = load_tabular_file(form.cleaned_data['file'])
+                    plan, detected_fields, sanitized_samples, prompt_preview = plan_transform(
+                        headers=table['headers'],
+                        rows=table['rows'],
+                        user_request=form.cleaned_data['transform_request'],
+                        strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
+                    )
+                    headers, transformed_rows = apply_transform_plan(rows=table['rows'], plan=plan)
+                    request.session['spreadsheet_transform_table'] = table
+                    request.session['spreadsheet_transform_result'] = {
+                        'plan': plan,
+                        'detected_fields': detected_fields,
+                        'sanitized_samples': sanitized_samples,
+                        'prompt_preview': prompt_preview,
+                        'headers': headers,
+                        'rows': transformed_rows,
+                        'export_format': form.cleaned_data['export_format'],
+                        'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
+                        'transform_request': form.cleaned_data['transform_request'],
+                    }
+                    request.session.modified = True
+                    session_result = request.session['spreadsheet_transform_result']
+                    base['spreadsheet_transform_form'] = SpreadsheetTransformForm(initial={
+                        'transform_request': session_result.get('transform_request', ''),
+                        'export_format': session_result.get('export_format', 'xlsx'),
+                        'strict_sanitization': session_result.get('strict_sanitization', False),
+                    })
+
+                elif action == 'download':
+                    if not session_result:
+                        raise SpreadsheetTransformError('No preview is available yet. Run a preview first.')
+                    headers = session_result.get('headers') or []
+                    transformed_rows = session_result.get('rows') or []
+                    export_format = form.cleaned_data['export_format'] or session_result.get('export_format') or 'xlsx'
+                    if export_format == 'csv':
+                        payload = export_transform_csv(headers, transformed_rows)
+                        response = HttpResponse(payload, content_type='text/csv')
+                        response['Content-Disposition'] = 'attachment; filename="spreadsheet-transform.csv"'
+                        return response
+                    payload = export_transform_xlsx(headers, transformed_rows)
+                    response = HttpResponse(
+                        payload,
+                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    )
+                    response['Content-Disposition'] = 'attachment; filename="spreadsheet-transform.xlsx"'
                     return response
 
-                payload = export_transform_xlsx(headers, transformed_rows)
-                response = HttpResponse(
-                    payload,
-                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                )
-                response['Content-Disposition'] = 'attachment; filename="spreadsheet-transform.xlsx"'
-                return response
+                if session_result:
+                    base['spreadsheet_transform_plan'] = session_result.get('plan')
+                    base['spreadsheet_transform_detected_fields'] = session_result.get('detected_fields', {})
+                    base['spreadsheet_transform_sanitized_samples'] = session_result.get('sanitized_samples', [])
+                    base['spreadsheet_transform_prompt_preview'] = session_result.get('prompt_preview')
+                    base['spreadsheet_transform_preview_headers'] = session_result.get('headers', [])
+                    base['spreadsheet_transform_preview_rows'] = (session_result.get('rows') or [])[:20]
             except SpreadsheetTransformError as exc:
                 messages.error(request, str(exc))
             except Exception as exc:
