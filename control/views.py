@@ -1174,6 +1174,9 @@ def dashboard_connectors(request):
             messages.error(request, 'Connect a Google account first.')
             return redirect('dashboard_connectors')
         folder_id = (request.POST.get('folder_id') or 'root').strip() or 'root'
+        if folder_id == 'root':
+            messages.error(request, 'Google Drive connectors must target a specific folder. Browsing My Drive root is allowed, but syncing root is blocked.')
+            return redirect('dashboard_connectors')
         label = (request.POST.get('label') or '').strip() or 'Google Drive'
         recursive = (request.POST.get('recursive') or '1').strip() == '1'
         sync_enabled = request.POST.get('sync_enabled') == '1'
@@ -1211,6 +1214,9 @@ def dashboard_connectors(request):
         ).order_by('-updated_at').first()
         if not connector:
             messages.error(request, 'Save a Google Drive connector first.')
+            return redirect('dashboard_connectors')
+        if (connector.config_json or {}).get('folder_id') == 'root':
+            messages.error(request, 'Google Drive connector sync is blocked for My Drive root. Choose a specific folder first.')
             return redirect('dashboard_connectors')
         try:
             result = subprocess.run(
@@ -1263,6 +1269,9 @@ def dashboard_connectors(request):
             return redirect('dashboard_connectors')
         folder_id = (request.POST.get('folder_id') or 'root').strip() or 'root'
         folder_name = (request.POST.get('folder_name') or '').strip() or 'Google Drive'
+        if folder_id == 'root':
+            messages.error(request, 'Syncing My Drive root is blocked. Open a specific folder first.')
+            return redirect('dashboard_connectors')
         connector, _created = Connector.objects.update_or_create(
             tenant=current_tenant,
             workspace=current_workspace,

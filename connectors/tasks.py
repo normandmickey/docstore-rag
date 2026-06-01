@@ -13,6 +13,9 @@ def run_google_drive_connector_sync(connector_id: int):
     if connector is None:
         return {'ok': False, 'reason': 'connector_not_found'}
 
+    if (connector.config_json or {}).get('folder_id') == 'root':
+        return {'ok': False, 'reason': 'root_folder_blocked'}
+
     recent_running = connector.sync_runs.filter(
         status=ConnectorSyncRun.STATUS_RUNNING,
         started_at__gte=timezone.now() - timezone.timedelta(minutes=30),
