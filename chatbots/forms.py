@@ -78,6 +78,18 @@ class ChatbotDefinitionForm(forms.ModelForm):
         initial=True,
         help_text='For new definitions, prefill prompts and policy fields from the selected integration platform when those fields are blank.',
     )
+    response_temperature = forms.FloatField(
+        required=False,
+        min_value=0,
+        max_value=2,
+        help_text='Optional model temperature for chatbot replies. Leave blank to use the runner/system default.',
+    )
+    rewrite_temperature = forms.FloatField(
+        required=False,
+        min_value=0,
+        max_value=2,
+        help_text='Optional temperature for any rewrite/presentation layer. Leave blank to use the runner/system default.',
+    )
 
     class Meta:
         model = ChatbotDefinition
@@ -90,6 +102,8 @@ class ChatbotDefinitionForm(forms.ModelForm):
             'runtime_mode',
             'template_name',
             'template_version',
+            'response_temperature',
+            'rewrite_temperature',
             'allowed_tools_json',
             'response_policy_json',
             'handoff_policy_json',
@@ -127,6 +141,9 @@ class ChatbotDefinitionForm(forms.ModelForm):
         for field_name in json_field_names:
             if field_name in self.fields:
                 self.fields[field_name].initial = json.dumps(getattr(self.instance, field_name, {}) or {}, indent=2, sort_keys=True)
+        metadata = getattr(self.instance, 'metadata_json', {}) or {}
+        self.fields['response_temperature'].initial = metadata.get('response_temperature')
+        self.fields['rewrite_temperature'].initial = metadata.get('rewrite_temperature')
         if self.instance and self.instance.pk:
             self.fields['integration'].initial = self.instance.integration_id
             self.fields['default_workspace'].initial = self.instance.default_workspace_id
@@ -165,6 +182,18 @@ class ChatbotDefinitionForm(forms.ModelForm):
                     setattr(instance, field_name, json.loads(json.dumps(preset_value)))
                 else:
                     setattr(instance, field_name, preset_value)
+        metadata = dict(getattr(instance, 'metadata_json', {}) or {})
+        response_temperature = self.cleaned_data.get('response_temperature')
+        rewrite_temperature = self.cleaned_data.get('rewrite_temperature')
+        if response_temperature is None:
+            metadata.pop('response_temperature', None)
+        else:
+            metadata['response_temperature'] = response_temperature
+        if rewrite_temperature is None:
+            metadata.pop('rewrite_temperature', None)
+        else:
+            metadata['rewrite_temperature'] = rewrite_temperature
+        instance.metadata_json = metadata
         if commit:
             instance.save()
             self.save_m2m()

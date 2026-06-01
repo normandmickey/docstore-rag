@@ -207,6 +207,8 @@ def chatbot_definition_edit(request, definition_id):
                 'runtime_mode': definition.runtime_mode,
                 'template_name': definition.template_name,
                 'template_version': definition.template_version,
+                'response_temperature': (definition.metadata_json or {}).get('response_temperature'),
+                'rewrite_temperature': (definition.metadata_json or {}).get('rewrite_temperature'),
                 'allowed_tools_json': json.dumps(definition.allowed_tools_json or {}, indent=2, sort_keys=True),
                 'response_policy_json': json.dumps(definition.response_policy_json or {}, indent=2, sort_keys=True),
                 'handoff_policy_json': json.dumps(definition.handoff_policy_json or {}, indent=2, sort_keys=True),
