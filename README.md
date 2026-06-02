@@ -21,9 +21,10 @@ Docstore is now well past the initial scaffold stage. The live product currently
 - invite-only signup
 - SharePoint OAuth foundation
 - MinIO-backed production file storage
-- tenant-scoped support flows (SMS/voice scaffolding)
+- tenant-scoped support flows across SMS, voice, and email
+- tenant-scoped shipping manager integrations for package lookup workflows
 - optional voice transcript ingest endpoint
-- chatbot control plane for Telegram/Discord-style integrations
+- chatbot control plane for Telegram/Discord/Zoom-style integrations
 
 ## What Works Now
 
@@ -84,6 +85,17 @@ Docstore is now well past the initial scaffold stage. The live product currently
 - dashboard visibility for support voice calls:
   - `/dashboard/support/calls/`
 - legacy voicemail-style support threads hidden from main support inbox
+- shipping-aware support replies across bots, email, and voice for tenant-connected shipping managers
+
+### Support email + shipping integrations
+- tenant-scoped AgentMail support inbox integration managed from the Connectors page
+- inbound AgentMail webhook ingestion into support conversations/messages
+- outbound support email replies through the tenant AgentMail inbox
+- email auto-replies can now use:
+  - shipping manager responses for package/tracking requests
+  - normal Docstore chat responses for other support emails
+- tenant-scoped shipping manager connection managed from the Connectors page
+- package lookup support for dashboard/API/bots/email/voice flows
 
 ### Chatbot control plane
 Docstore now includes a tenant-scoped chatbot control plane for external bot runtimes.
@@ -115,6 +127,7 @@ Runner-facing APIs now include:
 Current live bot runtimes using this control plane:
 - Telegram via `docstore-bot-runner`
 - Discord via `docstore-bot-runner`
+- Zoom Chat via `docstore-bot-runner`
 
 ## Architecture
 
@@ -244,10 +257,12 @@ For a fresh-server install guide, see:
 - `POST /api/v1/search/`
 - `POST /api/v1/chat/`
 - `POST /api/v1/support/channel-lookup/`
+- `POST /api/v1/support/email/agentmail/inbound/`
 - `POST /api/v1/support/shipping/health/`
 - `POST /api/v1/support/shipping/search/`
 - `POST /api/v1/support/shipping/package/`
 - `POST /api/v1/support/shipping/latest-status/`
+- `POST /api/v1/support/shipping/bot-lookup/`
 - `POST /api/v1/integrations/voice/calls/ingest/`
 - `POST /api/v1/chatbots/resolve/`
 - `POST /api/v1/chatbots/messages/ingest/`
@@ -530,6 +545,8 @@ Current pieces:
 - inbound webhook endpoint:
   - `POST /api/v1/support/email/agentmail/inbound/`
 - inbound emails map into support conversations/messages
+- outbound replies send through the tenant AgentMail inbox
+- email auto-replies can use shipping responses first, then normal workspace chat responses
 - support email ownership stays tenant-scoped, with an optional default workspace context
 
 ### Shipping manager integration
@@ -549,6 +566,10 @@ Current API bridge endpoints in Docstore:
 - `POST /api/v1/support/shipping/latest-status/`
 
 These routes are intended for trusted signed-in tenant admins/owners or Bearer API-key callers already scoped to the tenant/workspace.
+
+Current product behavior:
+- shipping managers are tenant-scoped and configured from the Connectors page
+- shipping lookups now power dashboard/API calls, bot replies, support email replies, and voice-call answers
 
 ### AgentMail setup
 Docstore can now use an AgentMail inbox for project email.

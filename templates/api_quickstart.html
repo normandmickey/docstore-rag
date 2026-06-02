@@ -70,6 +70,8 @@
           <p><code>POST /api/v1/urls/ingest/</code><br>Ingest one or more URLs.</p>
           <p><code>POST /api/v1/documents/delete/</code><br>Soft-delete documents visible to the current workspace.</p>
           <p><code>POST /api/v1/support/channel-lookup/</code><br>Resolve support phone numbers to tenant/workspace context.</p>
+          <p><code>POST /api/v1/support/shipping/bot-lookup/</code><br>Resolve shipping/package questions through the tenant shipping manager.</p>
+          <p><code>POST /api/v1/support/email/agentmail/inbound/</code><br>Receive inbound support email events from AgentMail.</p>
         </div>
       </div>
     </div>
@@ -87,6 +89,21 @@
   "collection": "hr"
 }</code></pre>
       <p>The response includes <code>assigned_workspace_ids</code> so you can confirm where the document is available.</p>
+    </div>
+
+    <div class="card">
+      <h2>Support and integrations</h2>
+      <div class="grid">
+        <div>
+          <p><strong>Shipping manager</strong><br>Tenant-scoped shipping integrations can power package lookup workflows across bots, voice, support email, and internal support tools.</p>
+        </div>
+        <div>
+          <p><strong>Support email</strong><br>AgentMail-backed tenant inboxes can ingest inbound email into support conversations and send replies from the same inbox identity.</p>
+        </div>
+        <div>
+          <p><strong>Connectors and delivery surfaces</strong><br>Docstore can connect source systems like Google Drive / Dropbox / SharePoint and deliver answers into chatbots, voice, support inboxes, and dashboard workflows.</p>
+        </div>
+      </div>
     </div>
 
     <div class="card">

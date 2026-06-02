@@ -94,6 +94,7 @@
 - [ ] Add JSON schema or OpenAPI generation for the public API
 
 ## Connectors
+- [ ] Add in-app connector docs/help blocks for shipping manager, support email, Google Drive, Dropbox, and SharePoint setup
 - [ ] Add ElevenLabs connector for voice workflows (voice selection, TTS generation, and possible audio response/export hooks)
 - [ ] Add SharePoint site/drive/folder picker UI
 - [ ] Link Connector records to per-user ExternalAccount records
@@ -128,6 +129,7 @@
 - [ ] Add smoke-test script for post-deploy verification on VPS
 
 ## README / docs / maintenance
+- [ ] Add a dedicated integrations/support docs page covering shipping manager, support email, bots, and voice surfaces
 - [ ] Document dashboard subpage structure in README
 - [ ] Document the new API-key inferred tenant/workspace behavior more explicitly in README
 - [ ] Add sample request/response bodies for document upload endpoint in README
