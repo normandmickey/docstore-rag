@@ -151,7 +151,7 @@
       {% for item in spreadsheet_transform_output_plan %}
         <div style="border:1px solid #243041; border-radius:10px; padding:14px; margin-top:12px;">
           <div class="meta" style="margin-bottom:10px;">Source column {% if item.letter %}{{ item.letter }} · {% endif %}{{ item.source_hint }}</div>
-          <div style="display:grid; grid-template-columns: 100px 1fr 1fr 1fr 1fr 2fr; gap:12px; align-items:start;">
+          <div style="display:grid; grid-template-columns: 100px 1fr 1fr 1fr 1fr 1fr 2fr; gap:12px; align-items:start;">
             <label>
               <div class="meta">Order</div>
               <input type="number" name="output_plan_{{ forloop.counter0 }}_order" value="{{ item.order|default:forloop.counter }}" min="1">
@@ -172,6 +172,17 @@
                 <option value="derive" {% if item.operation == 'derive' %}selected{% endif %}>Derive / custom</option>
                 <option value="time_to_decimal_hours" {% if item.operation == 'time_to_decimal_hours' %}selected{% endif %}>Convert hh:mm to decimal hours</option>
                 <option value="visible_only" {% if item.operation == 'visible_only' %}selected{% endif %}>Keep visible rows only</option>
+              </select>
+            </label>
+            <label>
+              <div class="meta">Format</div>
+              <select name="output_plan_{{ forloop.counter0 }}_format">
+                <option value="keep_source" {% if item.format == 'keep_source' %}selected{% endif %}>Keep source format</option>
+                <option value="number" {% if item.format == 'number' %}selected{% endif %}>Number</option>
+                <option value="currency" {% if item.format == 'currency' %}selected{% endif %}>Currency</option>
+                <option value="percent" {% if item.format == 'percent' %}selected{% endif %}>Percent</option>
+                <option value="decimal_hours" {% if item.format == 'decimal_hours' %}selected{% endif %}>Decimal hours</option>
+                <option value="text" {% if item.format == 'text' %}selected{% endif %}>Text</option>
               </select>
             </label>
             <label>

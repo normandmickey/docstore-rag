@@ -295,6 +295,7 @@ def build_output_column_planner(headers: list[str]) -> list[dict[str, Any]]:
             'order': idx + 1,
             'name': header,
             'operation': 'keep',
+            'format': 'keep_source',
             'source_a': header,
             'source_b': '',
             'source_hint': header,
@@ -637,13 +638,53 @@ def export_transform_csv(headers: list[str], rows: list[dict[str, Any]]) -> byte
     return buffer.getvalue().encode('utf-8')
 
 
-def export_transform_xlsx(headers: list[str], rows: list[dict[str, Any]]) -> bytes:
+def _xlsx_number_format_for_column(column_name: str, output_plan: list[dict[str, Any]] | None) -> str | None:
+    if not output_plan:
+        return None
+    for item in output_plan:
+        if (item.get('name') or '').strip() != column_name:
+            continue
+        fmt = (item.get('format') or 'keep_source').strip().lower()
+        if fmt == 'number' or fmt == 'decimal_hours':
+            return '0.00'
+        if fmt == 'currency':
+            return '$#,##0.00'
+        if fmt == 'percent':
+            return '0.00%'
+        if fmt == 'text':
+            return '@'
+        return None
+    return None
+
+
+def _xlsx_typed_value(value: Any, column_name: str, output_plan: list[dict[str, Any]] | None):
+    text = value if isinstance(value, str) else str(value if value is not None else '')
+    fmt = _xlsx_number_format_for_column(column_name, output_plan)
+    if fmt == '@':
+        return text
+    numeric = _coerce_numeric(text)
+    if numeric is None:
+        return text
+    if fmt == '0.00%':
+        if '%' in text:
+            return numeric / 100.0
+        return numeric
+    return numeric
+
+
+def export_transform_xlsx(headers: list[str], rows: list[dict[str, Any]], output_plan: list[dict[str, Any]] | None = None) -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = 'Transformed'
     ws.append(headers)
     for row in rows:
-        ws.append([row.get(header, '') for header in headers])
+        ws.append([_xlsx_typed_value(row.get(header, ''), header, output_plan) for header in headers])
+    for col_idx, header in enumerate(headers, start=1):
+        number_format = _xlsx_number_format_for_column(header, output_plan)
+        if not number_format:
+            continue
+        for row_idx in range(2, ws.max_row + 1):
+            ws.cell(row=row_idx, column=col_idx).number_format = number_format
     output = BytesIO()
     wb.save(output)
     output.seek(0)

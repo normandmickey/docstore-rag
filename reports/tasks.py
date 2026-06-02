@@ -19,11 +19,12 @@ def build_spreadsheet_transform_export(self, job_id: int):
     try:
         headers = list(job.headers_json or [])
         rows = list(job.rows_json or [])
+        output_plan = list((job.plan_json or {}).get('output_plan') or [])
         if job.export_format == SpreadsheetTransformJob.EXPORT_CSV:
             payload = export_transform_csv(headers, rows)
             filename = f'spreadsheet-transform-{job.id}.csv'
         else:
-            payload = export_transform_xlsx(headers, rows)
+            payload = export_transform_xlsx(headers, rows, output_plan=output_plan)
             filename = f'spreadsheet-transform-{job.id}.xlsx'
 
         job.output_file.save(filename, ContentFile(payload), save=False)
