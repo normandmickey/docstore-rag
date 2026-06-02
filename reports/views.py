@@ -148,13 +148,7 @@ def spreadsheet_transformer(request):
                     }
                     request.session.modified = True
                     messages.success(request, f"Inspected spreadsheet: {table.get('sheet_name') or 'Sheet1'} with {table.get('row_count') or 0} row(s). Step 2 is ready below.")
-                    session_result = request.session['spreadsheet_transform_result']
-                    base['spreadsheet_transform_form'] = SpreadsheetTransformForm(initial={
-                        'transform_request': session_result.get('transform_request', ''),
-                        'export_format': session_result.get('export_format', 'xlsx'),
-                        'strict_sanitization': session_result.get('strict_sanitization', False),
-                        'has_prepared_file': True,
-                    })
+                    return redirect('spreadsheet_transformer')
 
                 elif action == 'prepare':
                     if not session_table:
