@@ -12,7 +12,7 @@
 
 <div class="card">
   <h2>Step 1 · Upload and inspect</h2>
-  <p class="meta">Start by uploading a CSV or XLSX file and inspecting the real parsed spreadsheet before any AI planning step.</p>
+  <p class="meta">Start by uploading a CSV or XLSX file and then submitting it for inspection. Step 2 will appear below after the file is uploaded and inspected.</p>
   <form method="post" enctype="multipart/form-data" id="spreadsheet-transform-form">
     {% csrf_token %}
     {% for field in spreadsheet_transform_form %}
@@ -27,7 +27,8 @@
         </div>
       {% endif %}
     {% endfor %}
-    <button type="submit" name="action" value="inspect">Inspect file</button>
+    <button type="submit" name="action" value="inspect">Upload and inspect file</button>
+    <div class="meta" style="margin-top:8px;">After inspection, the original file preview and Step 2 will appear below.</div>
   </form>
 </div>
 
