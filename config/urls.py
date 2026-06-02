@@ -8,6 +8,7 @@ from documents.api import DocumentCreateView, DocumentDeleteView, DocumentPurgeV
 from control.views import AppLoginView, api_quickstart, atlassian_connect_callback, atlassian_connect_start, dashboard, dashboard_api_keys, dashboard_chat, dashboard_connectors, dashboard_documents, dashboard_get_started, dashboard_proxi_web, dashboard_tenant_settings, dashboard_urls, dashboard_workspace, document_chunks, document_detail, document_download, document_facts, document_scale_roadmap, document_search, dropbox_connect_callback, dropbox_connect_start, google_connect_callback, google_connect_start, logout_view, microsoft_connect_callback, microsoft_connect_start, signup, staff_dashboard
 from retrieval.api import ChatView, SearchView
 from support.api import SupportChannelLookupView
+from support.bot_shipping_api import BotShippingLookupView
 from support.shipping_api import ShippingHealthView, ShippingLatestStatusView, ShippingPackageDetailView, ShippingPackageSearchView
 
 
@@ -94,6 +95,7 @@ urlpatterns = [
     path('api/v1/support/shipping/search/', ShippingPackageSearchView.as_view()),
     path('api/v1/support/shipping/package/', ShippingPackageDetailView.as_view()),
     path('api/v1/support/shipping/latest-status/', ShippingLatestStatusView.as_view()),
+    path('api/v1/support/shipping/bot-lookup/', BotShippingLookupView.as_view()),
     path('api/v1/chatbots/', include('chatbots.api_urls')),
     path('api/v1/integrations/voice/', include('integrations.voice.urls')),
     path('admin/', admin.site.urls),

@@ -12,8 +12,9 @@ from support.shipping import ShippingManagerClient, ShippingManagerError, Shippi
 
 
 SHIPPING_QUERY_HINTS = [
-    'tracking', 'shipment', 'package', 'fedex', 'delivered', 'delivery status', 'where is my package',
-    'where is the package', 'where is my shipment', 'latest status', 'tracking number'
+    'tracking', 'shipment', 'package', 'packages', 'fedex', 'delivered', 'delivery status', 'where is my package',
+    'where is the package', 'where is my shipment', 'latest status', 'tracking number', 'find package', 'find packages',
+    'recent delivered packages', 'recent packages', 'show packages', 'show shipments'
 ]
 
 
@@ -400,7 +401,7 @@ def _extract_tracking_number(query: str) -> str:
 
 
 
-def maybe_answer_shipping_question(*, tenant, workspace, query: str):
+def shipping_answer_payload(*, tenant, query: str, limit: int = 3):
     normalized = (query or '').strip().lower()
     tracking_number = _extract_tracking_number(query)
     if not tracking_number and not any(hint in normalized for hint in SHIPPING_QUERY_HINTS):
@@ -410,6 +411,13 @@ def maybe_answer_shipping_question(*, tenant, workspace, query: str):
         client = ShippingManagerClient.for_tenant(tenant)
     except ShippingManagerNotConfigured:
         return None
+
+    source = {
+        'document': 'Shipping Manager',
+        'source_url': '',
+        'source_url_kind': 'shipping_manager',
+        'shipping_manager': True,
+    }
 
     try:
         if tracking_number:
@@ -424,23 +432,28 @@ def maybe_answer_shipping_question(*, tenant, workspace, query: str):
                 pieces.append(f'Location: {location}.')
             if details:
                 pieces.append(details)
+            source.update({
+                'tracking_number': tracking_number,
+                'status': status,
+                'location': location,
+            })
             return {
                 'answer': ' '.join(piece.strip() for piece in pieces if piece).strip(),
-                'sources': [],
+                'sources': [source],
                 'shipping_lookup': True,
                 'tracking_number': tracking_number,
-            }, []
+            }
 
-        payload = client.search_packages(query.strip(), limit=3)
+        payload = client.search_packages(query.strip(), limit=limit)
         results = payload.get('results') or []
         if not results:
             return {
                 'answer': 'I could not find a matching package in the tenant shipping manager.',
-                'sources': [],
+                'sources': [source],
                 'shipping_lookup': True,
-            }, []
+            }
         lines = []
-        for row in results[:3]:
+        for row in results[:limit]:
             tracking = row.get('tracking_number') or 'unknown'
             status = row.get('status') or 'Unknown'
             location = row.get('latest_location') or ''
@@ -450,15 +463,23 @@ def maybe_answer_shipping_question(*, tenant, workspace, query: str):
             lines.append(snippet)
         return {
             'answer': 'Here are the closest shipping matches:\n- ' + '\n- '.join(lines),
-            'sources': [],
+            'sources': [{**source, 'tracking_number': row.get('tracking_number') or ''} for row in results[:limit]],
             'shipping_lookup': True,
-        }, []
+        }
     except ShippingManagerError:
         return {
             'answer': 'I had trouble reaching the tenant shipping manager just now.',
-            'sources': [],
+            'sources': [source],
             'shipping_lookup': True,
-        }, []
+        }
+
+
+
+def maybe_answer_shipping_question(*, tenant, workspace, query: str):
+    payload = shipping_answer_payload(tenant=tenant, query=query, limit=3)
+    if payload is None:
+        return None
+    return payload['answer'], []
 
 
 

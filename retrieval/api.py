@@ -5,7 +5,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from control.api_guard import resolve_request_context
-from .service import answer_question, retrieve_chunks
+from .service import answer_question, retrieve_chunks, shipping_answer_payload
 
 
 def _preferred_source_url(row):
@@ -184,6 +184,14 @@ class ChatView(APIView):
             document_id=data.get('document_id'),
             temperature=data.get('temperature'),
         )
+
+        if isinstance(answer, dict):
+            return Response({
+                'answer': answer.get('answer', ''),
+                'sources': answer.get('sources', []),
+                'shipping_lookup': bool(answer.get('shipping_lookup')),
+                'tracking_number': answer.get('tracking_number', ''),
+            })
 
         return Response({
             'answer': answer,
