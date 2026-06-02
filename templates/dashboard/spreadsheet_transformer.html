@@ -124,8 +124,8 @@
 </div>
 
 <div class="card">
-  <h2>Step 2 · Describe the target output</h2>
-  <p class="meta">Describe the spreadsheet you want to create, then sketch the desired output columns below so the planner knows the target shape — not just the source columns.</p>
+  <h2>Step 2 · Transformation setup</h2>
+  <p class="meta">This is the main transformation setup step. Review or edit the prefilled template-backed output operations here, then preview the transformed file.</p>
   {% if spreadsheet_transform_selected_template_id %}
     <div class="msg" style="margin-top:12px; background:#13203f; border-color:#2563eb; color:#dbeafe;">This transformation setup was prefilled from the loaded template. Review it, make any needed adjustments, then continue.</div>
   {% endif %}
@@ -209,7 +209,7 @@
       {% endif %}
     {% endfor %}
 
-    <button type="submit" name="action" value="prepare">Prepare prompt</button>
+    <button type="submit" name="action" value="preview">Preview transformed file</button>
   </form>
 </div>
 {% endif %}
@@ -223,129 +223,6 @@
       <span class="meta">{{ kinds|join:", " }}</span>
     </div>
   {% endfor %}
-</div>
-{% endif %}
-
-{% if spreadsheet_transform_output_plan %}
-<div class="card">
-  <h2>Step 3 · Review transformation setup</h2>
-  <p class="meta">Review the output operations and source mappings before previewing the transformed file.</p>
-  <form method="post" enctype="multipart/form-data" id="spreadsheet-transform-preview-form">
-    {% csrf_token %}
-    {% for field in spreadsheet_transform_form %}
-      {% if field.name == 'has_prepared_file' %}
-        {{ field }}
-      {% elif field.name == 'transform_request' or field.name == 'strict_sanitization' or field.name == 'export_format' %}
-        <input type="hidden" name="{{ field.name }}" value="{{ field.value|default_if_none:'' }}">
-      {% endif %}
-    {% endfor %}
-    <input type="hidden" name="output_plan_total" value="{{ spreadsheet_transform_output_plan|length }}">
-    {% for item in spreadsheet_transform_output_plan %}
-      <div class="row" style="border:1px solid #243041; border-radius:10px; padding:14px; margin-bottom:12px;">
-        <strong>{% if item.letter %}{{ item.letter }} · {% endif %}{{ item.name }}</strong>
-        <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr 2fr; gap:12px; align-items:start; margin-top:10px;">
-          <label>
-            <div class="meta">Output column name</div>
-            <input type="text" name="output_plan_{{ forloop.counter0 }}_name" value="{{ item.name }}">
-          </label>
-          <label>
-            <div class="meta">Operation</div>
-            <select name="output_plan_{{ forloop.counter0 }}_operation">
-              <option value="keep" {% if item.operation == 'keep' %}selected{% endif %}>Keep</option>
-              <option value="rename" {% if item.operation == 'rename' %}selected{% endif %}>Rename</option>
-              <option value="multiply" {% if item.operation == 'multiply' %}selected{% endif %}>Multiply</option>
-              <option value="divide" {% if item.operation == 'divide' %}selected{% endif %}>Divide</option>
-              <option value="add" {% if item.operation == 'add' %}selected{% endif %}>Add</option>
-              <option value="subtract" {% if item.operation == 'subtract' %}selected{% endif %}>Subtract</option>
-              <option value="derive" {% if item.operation == 'derive' %}selected{% endif %}>Derive / custom</option>
-            </select>
-          </label>
-          <label>
-            <div class="meta">Source A</div>
-            <input type="text" name="output_plan_{{ forloop.counter0 }}_source_a" value="{{ item.source_a|default:'' }}">
-          </label>
-          <label>
-            <div class="meta">Source B</div>
-            <input type="text" name="output_plan_{{ forloop.counter0 }}_source_b" value="{{ item.source_b|default:'' }}">
-          </label>
-          <label>
-            <div class="meta">Optional notes / freeform instructions</div>
-            <input type="text" name="output_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}">
-          </label>
-        </div>
-        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_source_hint" value="{{ item.source_hint }}">
-      </div>
-    {% endfor %}
-
-    {% if spreadsheet_transform_column_plan %}
-      <input type="hidden" name="column_plan_total" value="{{ spreadsheet_transform_column_plan|length }}">
-      {% for item in spreadsheet_transform_column_plan %}
-        <input type="hidden" name="column_plan_{{ forloop.counter0 }}_source_column" value="{{ item.source_column }}">
-        <input type="hidden" name="column_plan_{{ forloop.counter0 }}_action" value="{{ item.action }}">
-        <input type="hidden" name="column_plan_{{ forloop.counter0 }}_target_column" value="{{ item.target_column }}">
-        <input type="hidden" name="column_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}">
-      {% endfor %}
-    {% endif %}
-    <button type="submit" name="action" value="preview">Preview transformed file</button>
-  </form>
-</div>
-{% endif %}
-
-{% if spreadsheet_transform_column_plan %}
-<div class="card">
-  <h2>Step 4 · Review column-by-column planning</h2>
-  <p class="meta">Review each detected source column and tell the planner what should happen to it before generating the transform preview.</p>
-  <form method="post" enctype="multipart/form-data" id="spreadsheet-transform-preview-form">
-    {% csrf_token %}
-    {% for field in spreadsheet_transform_form %}
-      {% if field.name == 'has_prepared_file' %}
-        {{ field }}
-      {% elif field.name == 'transform_request' or field.name == 'strict_sanitization' or field.name == 'export_format' %}
-        <input type="hidden" name="{{ field.name }}" value="{{ field.value|default_if_none:'' }}">
-      {% endif %}
-    {% endfor %}
-    {% if spreadsheet_transform_output_plan %}
-      <input type="hidden" name="output_plan_total" value="{{ spreadsheet_transform_output_plan|length }}">
-      {% for item in spreadsheet_transform_output_plan %}
-        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_name" value="{{ item.name }}">
-        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_operation" value="{{ item.operation|default:'keep' }}">
-        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_source_a" value="{{ item.source_a|default:'' }}">
-        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_source_b" value="{{ item.source_b|default:'' }}">
-        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_source_hint" value="{{ item.source_hint }}">
-        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}">
-      {% endfor %}
-    {% endif %}
-    <input type="hidden" name="column_plan_total" value="{{ spreadsheet_transform_column_plan|length }}">
-    {% for item in spreadsheet_transform_column_plan %}
-      <div class="row" style="border:1px solid #243041; border-radius:10px; padding:14px; margin-bottom:12px;">
-        <strong>{% if item.letter %}{{ item.letter }} · {% endif %}{{ item.source_column }}</strong>
-        {% if item.samples %}<div class="meta" style="margin:6px 0 10px 0;">Samples: {{ item.samples|join:" | " }}</div>{% endif %}
-        {% if item.detected_sensitive_types %}<div class="meta" style="margin-bottom:10px;">Sensitive types: {{ item.detected_sensitive_types|join:", " }}</div>{% endif %}
-        <input type="hidden" name="column_plan_{{ forloop.counter0 }}_source_column" value="{{ item.source_column }}">
-        <div style="display:grid; grid-template-columns: 180px 1fr 2fr; gap:12px; align-items:start;">
-          <label>
-            <div class="meta">Action</div>
-            <select name="column_plan_{{ forloop.counter0 }}_action">
-              <option value="keep" {% if item.action == 'keep' %}selected{% endif %}>Keep</option>
-              <option value="rename" {% if item.action == 'rename' %}selected{% endif %}>Rename</option>
-              <option value="drop" {% if item.action == 'drop' %}selected{% endif %}>Drop</option>
-              <option value="transform" {% if item.action == 'transform' %}selected{% endif %}>Transform</option>
-              <option value="derive" {% if item.action == 'derive' %}selected{% endif %}>Use in derived field</option>
-            </select>
-          </label>
-          <label>
-            <div class="meta">Target column</div>
-            <input type="text" name="column_plan_{{ forloop.counter0 }}_target_column" value="{{ item.target_column }}">
-          </label>
-          <label>
-            <div class="meta">Instructions for this column</div>
-            <input type="text" name="column_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}" placeholder="Example: split full name, normalize phone format, map department abbreviations">
-          </label>
-        </div>
-      </div>
-    {% endfor %}
-    <button type="submit" name="action" value="preview">Preview transformed file</button>
-  </form>
 </div>
 {% endif %}
 
