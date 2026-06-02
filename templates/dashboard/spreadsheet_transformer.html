@@ -151,7 +151,7 @@
       {% for item in spreadsheet_transform_output_plan %}
         <div style="border:1px solid #243041; border-radius:10px; padding:14px; margin-top:12px;">
           <div class="meta" style="margin-bottom:10px;">Source column {% if item.letter %}{{ item.letter }} · {% endif %}{{ item.source_hint }}</div>
-          <div style="display:grid; grid-template-columns: 100px 1fr 1fr 1fr 1fr 1fr 2fr; gap:12px; align-items:start;">
+          <div style="display:grid; grid-template-columns: 100px 1fr 1fr 1fr 1fr 1fr; gap:12px; align-items:start;">
             <label>
               <div class="meta">Order</div>
               <input type="number" name="output_plan_{{ forloop.counter0 }}_order" value="{{ item.order|default:forloop.counter }}" min="1">
@@ -187,27 +187,24 @@
               </select>
             </label>
             <label>
-              <div class="meta">Source A</div>
-              <input type="text" name="output_plan_{{ forloop.counter0 }}_source_a" value="{{ item.source_a }}" placeholder="Example: H or Employee">
+              <div class="meta">Main file source</div>
+              <input type="text" name="output_plan_{{ forloop.counter0 }}_source_a" value="{{ item.source_a }}" placeholder="Example: H or Employee ID">
             </label>
             <label>
-              <div class="meta">Source B</div>
-              <input type="text" name="output_plan_{{ forloop.counter0 }}_source_b" value="{{ item.source_b }}" placeholder="Example: L or Employee %">
+              <div class="meta">Secondary source / Source B</div>
+              <input type="text" name="output_plan_{{ forloop.counter0 }}_source_b" value="{{ item.source_b }}" placeholder="Used for math operations like multiply/divide">
             </label>
             <label>
-              <div class="meta">Lookup key / return</div>
+              <div class="meta">Reference lookup</div>
+              <div class="meta" style="margin-bottom:6px;">For lookup: Main file key → Lookup file key → Return column</div>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                <input type="text" name="output_plan_{{ forloop.counter0 }}_lookup_key" value="{{ item.lookup_key|default:'' }}" placeholder="Lookup key column">
-                <input type="text" name="output_plan_{{ forloop.counter0 }}_lookup_return" value="{{ item.lookup_return|default:'' }}" placeholder="Lookup return column">
+                <input type="text" name="output_plan_{{ forloop.counter0 }}_lookup_key" value="{{ item.lookup_key|default:'' }}" placeholder="Lookup file key column">
+                <input type="text" name="output_plan_{{ forloop.counter0 }}_lookup_return" value="{{ item.lookup_return|default:'' }}" placeholder="Return column from lookup file">
               </div>
             </label>
             <label>
               <div class="meta">Optional notes / freeform instructions</div>
-" placeholder="Example: L or Employee %">
-            </label>
-            <label>
-              <div class="meta">Optional notes / freeform instructions</div>
-              <input type="text" name="output_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}" placeholder="Example: multiply and write result here, round to whole dollars, or custom reshape notes">
+              <input type="text" name="output_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}" placeholder="Optional extra guidance, fallback notes, or custom behavior">
             </label>
           </div>
           <input type="hidden" name="output_plan_{{ forloop.counter0 }}_source_hint" value="{{ item.source_hint }}">
