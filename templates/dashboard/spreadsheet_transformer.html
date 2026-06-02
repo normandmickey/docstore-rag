@@ -8,7 +8,7 @@
   <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe;">
     Sample row values sent to the AI planner are privacy-sanitized first. Your actual export still uses the original uploaded data.
   </div>
-  <form method="post" enctype="multipart/form-data">
+  <form method="post" enctype="multipart/form-data" id="spreadsheet-transform-form">
     {% csrf_token %}
     {% for field in spreadsheet_transform_form %}
       {% if field.name == 'has_prepared_file' %}
@@ -48,6 +48,42 @@
 <div class="card">
   <h2>Sanitized sample rows sent to planner</h2>
   <pre style="white-space:pre-wrap;">{{ spreadsheet_transform_sanitized_samples }}</pre>
+</div>
+{% endif %}
+
+{% if spreadsheet_transform_column_plan %}
+<div class="card">
+  <h2>Column-by-column planning</h2>
+  <p class="meta">Review each detected source column and tell the planner what should happen to it. This gets included in the AI planning payload before preview/export.</p>
+  <input type="hidden" form="spreadsheet-transform-form" name="column_plan_total" value="{{ spreadsheet_transform_column_plan|length }}">
+  {% for item in spreadsheet_transform_column_plan %}
+    <div class="row" style="border:1px solid #243041; border-radius:10px; padding:14px; margin-bottom:12px;">
+      <strong>{{ item.source_column }}</strong>
+      {% if item.samples %}<div class="meta" style="margin:6px 0 10px 0;">Samples: {{ item.samples|join:" | " }}</div>{% endif %}
+      {% if item.detected_sensitive_types %}<div class="meta" style="margin-bottom:10px;">Sensitive types: {{ item.detected_sensitive_types|join:", " }}</div>{% endif %}
+      <input type="hidden" form="spreadsheet-transform-form" name="column_plan_{{ forloop.counter0 }}_source_column" value="{{ item.source_column }}">
+      <div style="display:grid; grid-template-columns: 180px 1fr 2fr; gap:12px; align-items:start;">
+        <label>
+          <div class="meta">Action</div>
+          <select form="spreadsheet-transform-form" name="column_plan_{{ forloop.counter0 }}_action">
+            <option value="keep" {% if item.action == 'keep' %}selected{% endif %}>Keep</option>
+            <option value="rename" {% if item.action == 'rename' %}selected{% endif %}>Rename</option>
+            <option value="drop" {% if item.action == 'drop' %}selected{% endif %}>Drop</option>
+            <option value="transform" {% if item.action == 'transform' %}selected{% endif %}>Transform</option>
+            <option value="derive" {% if item.action == 'derive' %}selected{% endif %}>Use in derived field</option>
+          </select>
+        </label>
+        <label>
+          <div class="meta">Target column</div>
+          <input form="spreadsheet-transform-form" type="text" name="column_plan_{{ forloop.counter0 }}_target_column" value="{{ item.target_column }}">
+        </label>
+        <label>
+          <div class="meta">Instructions for this column</div>
+          <input form="spreadsheet-transform-form" type="text" name="column_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}" placeholder="Example: split full name, normalize phone format, map department abbreviations">
+        </label>
+      </div>
+    </div>
+  {% endfor %}
 </div>
 {% endif %}
 

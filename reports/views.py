@@ -20,6 +20,7 @@ from .tasks import build_spreadsheet_transform_export
 from .spreadsheet_transform import (
     SpreadsheetTransformError,
     apply_transform_plan,
+    build_column_planner,
     build_transform_prompt_payload,
     export_transform_csv,
     export_transform_xlsx,
@@ -53,6 +54,21 @@ def _infer_support_source(conversation):
 
 
 @login_required
+def _read_column_plan_from_post(request) -> list[dict]:
+    total = int((request.POST.get('column_plan_total') or '0').strip() or 0)
+    items = []
+    for idx in range(total):
+        items.append({
+            'source_column': (request.POST.get(f'column_plan_{idx}_source_column') or '').strip(),
+            'action': (request.POST.get(f'column_plan_{idx}_action') or 'keep').strip(),
+            'target_column': (request.POST.get(f'column_plan_{idx}_target_column') or '').strip(),
+            'instructions': (request.POST.get(f'column_plan_{idx}_instructions') or '').strip(),
+            'samples': [],
+            'detected_sensitive_types': [],
+        })
+    return [item for item in items if item.get('source_column')]
+
+
 def spreadsheet_transformer(request):
     base = _dashboard_base(request)
     handled = _handle_workspace_actions(request, base)
@@ -68,6 +84,7 @@ def spreadsheet_transformer(request):
     base['spreadsheet_transform_detected_fields'] = {}
     base['spreadsheet_transform_sanitized_samples'] = []
     base['spreadsheet_transform_prompt_preview'] = None
+    base['spreadsheet_transform_column_plan'] = []
     current_tenant = base.get('current_tenant')
     current_workspace = base.get('current_workspace')
     base['spreadsheet_transform_jobs'] = SpreadsheetTransformJob.objects.filter(
@@ -88,11 +105,19 @@ def spreadsheet_transformer(request):
                     if not form.cleaned_data.get('file'):
                         raise SpreadsheetTransformError('Please upload a CSV or XLSX file to prepare the transform prompt.')
                     table = load_tabular_file(form.cleaned_data['file'])
+                    preliminary_payload, detected_fields, sanitized_samples, _ = build_transform_prompt_payload(
+                        headers=table['headers'],
+                        rows=table['rows'],
+                        user_request=form.cleaned_data['transform_request'],
+                        strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
+                    )
+                    column_plan = build_column_planner(table['headers'], sanitized_samples, detected_fields)
                     user_payload, detected_fields, sanitized_samples, system_prompt = build_transform_prompt_payload(
                         headers=table['headers'],
                         rows=table['rows'],
                         user_request=form.cleaned_data['transform_request'],
                         strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
+                        column_plan=column_plan,
                     )
                     request.session['spreadsheet_transform_table'] = table
                     request.session['spreadsheet_transform_result'] = {
@@ -105,6 +130,7 @@ def spreadsheet_transformer(request):
                         'export_format': form.cleaned_data['export_format'],
                         'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
                         'transform_request': form.cleaned_data['transform_request'],
+                        'column_plan': column_plan,
                     }
                     request.session.modified = True
                     session_result = request.session['spreadsheet_transform_result']
@@ -118,11 +144,13 @@ def spreadsheet_transformer(request):
                 elif action == 'preview':
                     if not session_table:
                         raise SpreadsheetTransformError('No prepared prompt is available yet. Upload a file and prepare the prompt first.')
+                    column_plan = _read_column_plan_from_post(request) or session_result.get('column_plan') or []
                     plan, detected_fields, sanitized_samples, prompt_preview = plan_transform(
                         headers=session_table.get('headers') or [],
                         rows=session_table.get('rows') or [],
                         user_request=form.cleaned_data['transform_request'],
                         strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
+                        column_plan=column_plan,
                     )
                     headers, transformed_rows = apply_transform_plan(rows=session_table.get('rows') or [], plan=plan)
                     request.session['spreadsheet_transform_result'] = {
@@ -135,6 +163,7 @@ def spreadsheet_transformer(request):
                         'export_format': form.cleaned_data['export_format'],
                         'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
                         'transform_request': form.cleaned_data['transform_request'],
+                        'column_plan': column_plan,
                     }
                     request.session.modified = True
                     session_result = request.session['spreadsheet_transform_result']
@@ -174,6 +203,7 @@ def spreadsheet_transformer(request):
                     base['spreadsheet_transform_detected_fields'] = session_result.get('detected_fields', {})
                     base['spreadsheet_transform_sanitized_samples'] = session_result.get('sanitized_samples', [])
                     base['spreadsheet_transform_prompt_preview'] = session_result.get('prompt_preview')
+                    base['spreadsheet_transform_column_plan'] = session_result.get('column_plan', [])
                     base['spreadsheet_transform_preview_headers'] = session_result.get('headers', [])
                     base['spreadsheet_transform_preview_rows'] = (session_result.get('rows') or [])[:20]
             except SpreadsheetTransformError as exc:

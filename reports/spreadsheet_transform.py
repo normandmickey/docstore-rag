@@ -269,7 +269,28 @@ def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]], strict:
     return sanitized, detected
 
 
-def build_transform_prompt_payload(*, headers: list[str], rows: list[dict[str, Any]], user_request: str, strict_sanitization: bool = False) -> tuple[dict[str, Any], dict[str, list[str]], list[dict[str, Any]], str]:
+def build_column_planner(headers: list[str], rows: list[dict[str, Any]], detected: dict[str, list[str]] | None = None) -> list[dict[str, Any]]:
+    detected = detected or {}
+    sample_rows = _sample_rows(rows, limit=3)
+    planner = []
+    for header in headers:
+        samples = []
+        for row in sample_rows:
+            value = str((row or {}).get(header, '') or '').strip()
+            if value:
+                samples.append(value)
+        planner.append({
+            'source_column': header,
+            'samples': samples[:3],
+            'detected_sensitive_types': detected.get(header, []),
+            'action': 'keep',
+            'target_column': header,
+            'instructions': '',
+        })
+    return planner
+
+
+def build_transform_prompt_payload(*, headers: list[str], rows: list[dict[str, Any]], user_request: str, strict_sanitization: bool = False, column_plan: list[dict[str, Any]] | None = None) -> tuple[dict[str, Any], dict[str, list[str]], list[dict[str, Any]], str]:
     prompt = (
         'You are planning a spreadsheet transformation. '
         'Return valid JSON only. '
@@ -283,18 +304,20 @@ def build_transform_prompt_payload(*, headers: list[str], rows: list[dict[str, A
         'If the request is broad, still propose the most likely output columns. '
     )
     sanitized_rows, detected = sanitize_sample_rows(headers, _sample_rows(rows), strict=strict_sanitization)
+    planner = column_plan or build_column_planner(headers, sanitized_rows, detected)
     user_input = {
         'source_headers': headers,
         'sample_rows': sanitized_rows,
         'user_request': user_request,
+        'column_plan': planner,
         'sample_rows_are_sanitized': True,
         'strict_sanitization': strict_sanitization,
-        'instruction': 'Sample row values may be privacy-sanitized, but headers and structure reflect the real file. Build the transform plan against the real source headers.',
+        'instruction': 'Sample row values may be privacy-sanitized, but headers and structure reflect the real file. Build the transform plan against the real source headers. Use the column_plan as the preferred field-by-field instruction layer when present.',
     }
     return user_input, detected, sanitized_rows, prompt
 
 
-def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_request: str, strict_sanitization: bool = False) -> tuple[dict[str, Any], dict[str, list[str]], list[dict[str, Any]], dict[str, Any]]:
+def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_request: str, strict_sanitization: bool = False, column_plan: list[dict[str, Any]] | None = None) -> tuple[dict[str, Any], dict[str, list[str]], list[dict[str, Any]], dict[str, Any]]:
     if not settings.OPENAI_API_KEY:
         raise SpreadsheetTransformError('OPENAI_API_KEY is not configured.')
 
@@ -304,6 +327,7 @@ def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_reque
         rows=rows,
         user_request=user_request,
         strict_sanitization=strict_sanitization,
+        column_plan=column_plan,
     )
     response = client.responses.create(
         model=getattr(settings, 'SPREADSHEET_TRANSFORM_MODEL', 'gpt-4.1-mini'),
