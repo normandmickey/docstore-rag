@@ -401,6 +401,39 @@ def _extract_tracking_number(query: str) -> str:
 
 
 
+def _carrier_tracking_url(carrier: str, tracking_number: str) -> str:
+    carrier_key = (carrier or '').strip().lower()
+    if carrier_key == 'fedex':
+        return f'https://www.fedex.com/fedextrack/?trknbr={tracking_number}'
+    return ''
+
+
+
+def _build_shipping_detail_answer(row: dict, *, include_intro: bool = False) -> str:
+    tracking = row.get('tracking_number') or 'unknown'
+    carrier = (row.get('carrier') or 'carrier').upper()
+    status = row.get('status') or 'Unknown'
+    location = row.get('latest_location') or ''
+    estimated_delivery = row.get('estimated_delivery') or ''
+    delivered_at = row.get('delivered_at') or ''
+    tracking_url = _carrier_tracking_url(row.get('carrier') or '', tracking)
+
+    lines = []
+    if include_intro:
+        lines.append('I found a matching shipment.')
+    lines.append(f'{carrier} tracking {tracking}: {status}.')
+    if location:
+        lines.append(f'Latest location: {location}.')
+    if delivered_at:
+        lines.append(f'Delivered at: {delivered_at}.')
+    elif estimated_delivery:
+        lines.append(f'Delivery timing: {estimated_delivery}.')
+    if tracking_url:
+        lines.append(f'Track here: {tracking_url}')
+    return ' '.join(line.strip() for line in lines if line).strip()
+
+
+
 def shipping_answer_payload(*, tenant, query: str, limit: int = 3):
     normalized = (query or '').strip().lower()
     tracking_number = _extract_tracking_number(query)
@@ -424,21 +457,19 @@ def shipping_answer_payload(*, tenant, query: str, limit: int = 3):
             payload = client.get_latest_status(tracking_number)
             package = payload.get('package') or {}
             latest_event = payload.get('latest_event') or {}
-            status = package.get('status') or latest_event.get('status') or 'Unknown'
-            location = latest_event.get('location') or package.get('latest_location') or ''
             details = latest_event.get('details') or ''
-            pieces = [f'Tracking {tracking_number}: {status}.']
-            if location:
-                pieces.append(f'Location: {location}.')
+            answer_text = _build_shipping_detail_answer(package)
             if details:
-                pieces.append(details)
+                answer_text = f'{answer_text} {details}'.strip()
+            tracking_url = _carrier_tracking_url(package.get('carrier') or '', tracking_number)
             source.update({
                 'tracking_number': tracking_number,
-                'status': status,
-                'location': location,
+                'status': package.get('status') or latest_event.get('status') or 'Unknown',
+                'location': latest_event.get('location') or package.get('latest_location') or '',
+                'source_url': tracking_url,
             })
             return {
-                'answer': ' '.join(piece.strip() for piece in pieces if piece).strip(),
+                'answer': answer_text,
                 'sources': [source],
                 'shipping_lookup': True,
                 'tracking_number': tracking_number,
@@ -452,19 +483,26 @@ def shipping_answer_payload(*, tenant, query: str, limit: int = 3):
                 'sources': [source],
                 'shipping_lookup': True,
             }
-        lines = []
-        for row in results[:limit]:
-            tracking = row.get('tracking_number') or 'unknown'
-            status = row.get('status') or 'Unknown'
-            location = row.get('latest_location') or ''
-            snippet = f'{tracking}: {status}'
-            if location:
-                snippet += f' — {location}'
-            lines.append(snippet)
+        top_match = results[0]
+        tracking_url = _carrier_tracking_url(top_match.get('carrier') or '', top_match.get('tracking_number') or '')
+        source.update({
+            'tracking_number': top_match.get('tracking_number') or '',
+            'status': top_match.get('status') or 'Unknown',
+            'location': top_match.get('latest_location') or '',
+            'source_url': tracking_url,
+        })
+        answer_text = _build_shipping_detail_answer(top_match, include_intro=True)
+        if len(results) > 1:
+            extras = []
+            for row in results[1:limit]:
+                extras.append(_build_shipping_detail_answer(row))
+            if extras:
+                answer_text = f"{answer_text}\n\nOther matches:\n- " + '\n- '.join(extras)
         return {
-            'answer': 'Here are the closest shipping matches:\n- ' + '\n- '.join(lines),
-            'sources': [{**source, 'tracking_number': row.get('tracking_number') or ''} for row in results[:limit]],
+            'answer': answer_text,
+            'sources': [{**source, 'tracking_number': row.get('tracking_number') or '', 'source_url': _carrier_tracking_url(row.get('carrier') or '', row.get('tracking_number') or '')} for row in results[:limit]],
             'shipping_lookup': True,
+            'tracking_number': top_match.get('tracking_number') or '',
         }
     except ShippingManagerError:
         return {
