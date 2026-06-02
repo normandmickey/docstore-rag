@@ -506,7 +506,40 @@ def _generate_derived_value(column_name: str, instruction: str, row_index: int) 
     return instruction
 
 
+def _apply_structured_output_plan(rows: list[dict[str, Any]], output_plan: list[dict[str, Any]] | None) -> tuple[list[str], list[dict[str, Any]]] | None:
+    if not rows or not output_plan:
+        return None
+    output_headers = [item.get('name') or '' for item in output_plan if (item.get('name') or '').strip()]
+    if not output_headers:
+        return None
+    transformed_rows = _apply_output_plan_arithmetic(rows, output_plan)
+    built_rows: list[dict[str, Any]] = []
+    for row_index, row in enumerate(transformed_rows):
+        out: dict[str, Any] = {}
+        for item in output_plan:
+            name = (item.get('name') or '').strip()
+            if not name:
+                continue
+            operation = (item.get('operation') or 'keep').strip().lower()
+            source_a = _resolve_source_name(item.get('source_a') or '', row)
+            notes = (item.get('instructions') or '').strip()
+            if operation in {'keep', 'rename'} and source_a and source_a in row:
+                out[name] = row.get(source_a, '')
+            elif operation in {'multiply', 'divide', 'add', 'subtract'} and name in row:
+                out[name] = row.get(name, '')
+            elif source_a and source_a in row:
+                out[name] = row.get(source_a, '')
+            else:
+                out[name] = _generate_derived_value(name, notes, row_index)
+        built_rows.append(out)
+    return output_headers, built_rows
+
+
 def apply_transform_plan(*, rows: list[dict[str, Any]], plan: dict[str, Any], output_plan: list[dict[str, Any]] | None = None) -> tuple[list[str], list[dict[str, Any]]]:
+    structured_result = _apply_structured_output_plan(rows, output_plan)
+    if structured_result is not None:
+        return structured_result
+
     output_columns = plan.get('output_columns') or []
     filters = plan.get('filters') or []
     if not output_columns:
