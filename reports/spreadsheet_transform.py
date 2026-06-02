@@ -322,6 +322,39 @@ def plan_transform(*, headers: list[str], rows: list[dict[str, Any]], user_reque
         raise SpreadsheetTransformError(f'Could not parse transform plan JSON: {exc}') from exc
 
 
+def _generate_derived_value(column_name: str, instruction: str, row_index: int) -> str:
+    fake = Faker()
+    fake.seed_instance(1000 + row_index)
+    hint = f"{column_name} {instruction}".lower()
+    if 'social security' in hint or 'ssn' in hint:
+        return fake.ssn()
+    if 'email' in hint:
+        return fake.email()
+    if 'phone' in hint:
+        return fake.phone_number()
+    if 'address' in hint:
+        return fake.street_address()
+    if 'city' in hint:
+        return fake.city()
+    if 'state' in hint:
+        return fake.state_abbr()
+    if 'zip' in hint or 'postal' in hint:
+        return fake.postcode()
+    if 'first name' in hint:
+        return fake.first_name()
+    if 'last name' in hint:
+        return fake.last_name()
+    if 'full name' in hint or hint.strip().endswith('name'):
+        return fake.name()
+    if 'routing' in hint:
+        return ''.join(str(fake.random_digit()) for _ in range(9))
+    if 'account' in hint or 'member id' in hint or 'employee id' in hint or 'subscriber id' in hint:
+        return ''.join(str(fake.random_digit()) for _ in range(8))
+    if 'dob' in hint or 'date of birth' in hint or 'birth' in hint:
+        return fake.date_of_birth(minimum_age=21, maximum_age=70).strftime('%m/%d/%Y')
+    return instruction
+
+
 def apply_transform_plan(*, rows: list[dict[str, Any]], plan: dict[str, Any]) -> tuple[list[str], list[dict[str, Any]]]:
     output_columns = plan.get('output_columns') or []
     filters = plan.get('filters') or []
@@ -347,7 +380,7 @@ def apply_transform_plan(*, rows: list[dict[str, Any]], plan: dict[str, Any]) ->
 
     headers = [col.get('name') or 'Column' for col in output_columns]
     transformed = []
-    for row in filtered_rows:
+    for row_index, row in enumerate(filtered_rows):
         out = {}
         for col in output_columns:
             name = col.get('name') or 'Column'
@@ -356,7 +389,7 @@ def apply_transform_plan(*, rows: list[dict[str, Any]], plan: dict[str, Any]) ->
             if source:
                 out[name] = row.get(source, '')
             else:
-                out[name] = instruction
+                out[name] = _generate_derived_value(name, instruction, row_index)
         transformed.append(out)
     return headers, transformed
 

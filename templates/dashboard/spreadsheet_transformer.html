@@ -11,12 +11,16 @@
   <form method="post" enctype="multipart/form-data">
     {% csrf_token %}
     {% for field in spreadsheet_transform_form %}
+      {% if field.name == 'has_prepared_file' %}
+        {{ field }}
+      {% else %}
       <div class="row">
         <strong>{{ field.label }}</strong><br>
         {{ field }}
         {% if field.help_text %}<div class="meta" style="margin-top:6px;">{{ field.help_text }}</div>{% endif %}
         {% for error in field.errors %}<div class="meta" style="color:#fca5a5; margin-top:6px;">{{ error }}</div>{% endfor %}
       </div>
+      {% endif %}
     {% endfor %}
     <button type="submit" name="action" value="prepare">Prepare prompt</button>
     {% if spreadsheet_transform_prompt_preview %}

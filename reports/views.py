@@ -31,6 +31,7 @@ class SpreadsheetTransformForm(forms.Form):
     transform_request = forms.CharField(widget=forms.Textarea(attrs={'rows': 5}), help_text='Describe the columns and layout you want in the exported file.')
     export_format = forms.ChoiceField(choices=[('xlsx', 'XLSX'), ('csv', 'CSV')], initial='xlsx')
     strict_sanitization = forms.BooleanField(required=False, initial=False, help_text='Use more aggressive prompt-side masking for sample rows before AI planning.')
+    has_prepared_file = forms.BooleanField(required=False, widget=forms.HiddenInput())
 
 
 def _infer_support_source(conversation):
@@ -103,6 +104,7 @@ def spreadsheet_transformer(request):
                         'transform_request': session_result.get('transform_request', ''),
                         'export_format': session_result.get('export_format', 'xlsx'),
                         'strict_sanitization': session_result.get('strict_sanitization', False),
+                        'has_prepared_file': True,
                     })
 
                 elif action == 'preview':
@@ -132,6 +134,7 @@ def spreadsheet_transformer(request):
                         'transform_request': session_result.get('transform_request', ''),
                         'export_format': session_result.get('export_format', 'xlsx'),
                         'strict_sanitization': session_result.get('strict_sanitization', False),
+                        'has_prepared_file': True,
                     })
 
                 elif action == 'download':
