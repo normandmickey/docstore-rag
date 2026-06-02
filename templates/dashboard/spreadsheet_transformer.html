@@ -151,7 +151,11 @@
       {% for item in spreadsheet_transform_output_plan %}
         <div style="border:1px solid #243041; border-radius:10px; padding:14px; margin-top:12px;">
           <div class="meta" style="margin-bottom:10px;">Source column {% if item.letter %}{{ item.letter }} · {% endif %}{{ item.source_hint }}</div>
-          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr 2fr; gap:12px; align-items:start;">
+          <div style="display:grid; grid-template-columns: 100px 1fr 1fr 1fr 1fr 2fr; gap:12px; align-items:start;">
+            <label>
+              <div class="meta">Order</div>
+              <input type="number" name="output_plan_{{ forloop.counter0 }}_order" value="{{ item.order|default:forloop.counter }}" min="1">
+            </label>
             <label>
               <div class="meta">Output column name</div>
               <input type="text" name="output_plan_{{ forloop.counter0 }}_name" value="{{ item.name }}">
@@ -185,6 +189,9 @@
         </div>
       {% endfor %}
       <input type="hidden" name="output_plan_total" value="{{ spreadsheet_transform_output_plan|length }}">
+      <div style="margin-top:12px;">
+        <button type="submit" name="action" value="add_output_column" style="background:#334155;">Add output column</button>
+      </div>
     </div>
     {% endif %}
 

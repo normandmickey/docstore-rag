@@ -292,6 +292,7 @@ def build_output_column_planner(headers: list[str]) -> list[dict[str, Any]]:
     return [
         {
             'letter': _column_letter(idx),
+            'order': idx + 1,
             'name': header,
             'operation': 'keep',
             'source_a': header,

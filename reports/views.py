@@ -125,6 +125,7 @@ def _read_output_plan_from_post(request) -> list[dict]:
     items = []
     for idx in range(total):
         items.append({
+            'order': int((request.POST.get(f'output_plan_{idx}_order') or str(idx + 1)).strip() or (idx + 1)),
             'name': (request.POST.get(f'output_plan_{idx}_name') or '').strip(),
             'operation': (request.POST.get(f'output_plan_{idx}_operation') or 'keep').strip(),
             'source_a': (request.POST.get(f'output_plan_{idx}_source_a') or '').strip(),
@@ -132,7 +133,8 @@ def _read_output_plan_from_post(request) -> list[dict]:
             'source_hint': (request.POST.get(f'output_plan_{idx}_source_hint') or '').strip(),
             'instructions': (request.POST.get(f'output_plan_{idx}_instructions') or '').strip(),
         })
-    return [item for item in items if item.get('name') or item.get('source_hint') or item.get('instructions')]
+    items = [item for item in items if item.get('name') or item.get('source_hint') or item.get('instructions')]
+    return sorted(items, key=lambda item: item.get('order') or 0)
 
 
 def _read_column_plan_from_post(request) -> list[dict]:
@@ -303,6 +305,25 @@ def spreadsheet_transformer(request):
                     }
                     request.session.modified = True
                     messages.success(request, f"Inspected spreadsheet: {table.get('sheet_name') or 'Sheet1'} with {table.get('row_count') or 0} row(s). Step 2 is ready below.")
+                    return redirect('spreadsheet_transformer')
+
+                elif action == 'add_output_column':
+                    current = _read_output_plan_from_post(request) or session_result.get('output_plan') or []
+                    next_order = (max((item.get('order') or 0) for item in current) + 1) if current else 1
+                    current.append({
+                        'letter': '',
+                        'order': next_order,
+                        'name': f'New Column {next_order}',
+                        'operation': 'derive',
+                        'source_a': '',
+                        'source_b': '',
+                        'source_hint': '',
+                        'instructions': '',
+                    })
+                    session_result.update({'output_plan': current})
+                    request.session['spreadsheet_transform_result'] = session_result
+                    request.session.modified = True
+                    messages.success(request, 'Added a new output column to the transformation setup.')
                     return redirect('spreadsheet_transformer')
 
                 elif action == 'prepare':
