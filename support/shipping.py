@@ -3,6 +3,8 @@ from __future__ import annotations
 import requests
 from django.conf import settings
 
+from connectors.models import TenantShippingIntegration
+
 
 class ShippingManagerError(Exception):
     pass
@@ -21,6 +23,17 @@ class ShippingManagerClient:
             raise ShippingManagerNotConfigured('SHIPPING_MANAGER_BASE_URL is not configured.')
         if not self.api_key:
             raise ShippingManagerNotConfigured('SHIPPING_MANAGER_API_KEY is not configured.')
+
+    @classmethod
+    def for_tenant(cls, tenant, *, timeout: int = 20):
+        integration = TenantShippingIntegration.objects.filter(
+            tenant=tenant,
+            provider=TenantShippingIntegration.PROVIDER_FEDEXSUCKS,
+            status=TenantShippingIntegration.STATUS_ACTIVE,
+        ).first()
+        if integration and integration.base_url and integration.api_key:
+            return cls(base_url=integration.base_url, api_key=integration.api_key, timeout=timeout)
+        return cls(timeout=timeout)
 
     def _headers(self) -> dict:
         return {

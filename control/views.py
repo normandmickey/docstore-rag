@@ -22,8 +22,9 @@ from django.utils.text import slugify
 
 from chatbots.models import ChatbotIntegration
 from connectors.dropbox import DropboxClient
+from connectors.forms import TenantShippingIntegrationForm
 from connectors.google_drive import GoogleDriveClient
-from connectors.models import Connector, ExternalDocumentBinding
+from connectors.models import Connector, ExternalDocumentBinding, TenantShippingIntegration
 from documents.models import Chunk, Document, DocumentWorkspaceAssignment, ExtractedFact
 from documents.upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
 from ingestion.models import IngestionJob
@@ -53,6 +54,7 @@ from .oauth import (
 )
 from .pii import redact_pii
 from .email_flows import send_invite_email
+from support.shipping import ShippingManagerClient, ShippingManagerError, ShippingManagerNotConfigured
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -1325,6 +1327,18 @@ def dashboard_connectors(request):
     base['dropbox_connector'] = None
     base['dropbox_current_path'] = ''
     base['dropbox_parent_path'] = ''
+    shipping_integration = TenantShippingIntegration.objects.filter(
+        tenant=current_tenant,
+        provider=TenantShippingIntegration.PROVIDER_FEDEXSUCKS,
+    ).first() if current_tenant else None
+    shipping_initial = {
+        'label': shipping_integration.label if shipping_integration else 'Shipping Manager',
+        'base_url': shipping_integration.base_url if shipping_integration else getattr(settings, 'SHIPPING_MANAGER_BASE_URL', ''),
+        'api_key': shipping_integration.api_key if shipping_integration else '',
+        'status': shipping_integration.status if shipping_integration else TenantShippingIntegration.STATUS_ACTIVE,
+    }
+    base['shipping_integration'] = shipping_integration
+    base['shipping_form'] = TenantShippingIntegrationForm(instance=shipping_integration, initial=shipping_initial)
 
     if current_workspace and current_tenant:
         base['google_drive_connector'] = Connector.objects.filter(
@@ -1337,6 +1351,54 @@ def dashboard_connectors(request):
             workspace=current_workspace,
             provider=Connector.PROVIDER_DROPBOX,
         ).order_by('-updated_at').first()
+
+    if request.method == 'POST' and request.POST.get('action') == 'save_shipping_integration' and current_tenant:
+        if not base.get('can_manage_tenant'):
+            messages.error(request, 'Only tenant owners and admins can manage the shipping manager connection.')
+            return redirect('dashboard_connectors')
+        shipping_form = TenantShippingIntegrationForm(request.POST, instance=shipping_integration)
+        if shipping_form.is_valid():
+            integration = shipping_form.save(commit=False)
+            integration.tenant = current_tenant
+            integration.provider = TenantShippingIntegration.PROVIDER_FEDEXSUCKS
+            integration.save()
+            messages.success(request, 'Saved tenant shipping manager connection.')
+            return redirect('dashboard_connectors')
+        base['shipping_form'] = shipping_form
+
+    if request.method == 'POST' and request.POST.get('action') == 'test_shipping_integration' and current_tenant:
+        if not base.get('can_manage_tenant'):
+            messages.error(request, 'Only tenant owners and admins can test the shipping manager connection.')
+            return redirect('dashboard_connectors')
+        shipping_form = TenantShippingIntegrationForm(request.POST, instance=shipping_integration)
+        if shipping_form.is_valid():
+            integration = shipping_form.save(commit=False)
+            integration.tenant = current_tenant
+            integration.provider = TenantShippingIntegration.PROVIDER_FEDEXSUCKS
+            try:
+                client = ShippingManagerClient(base_url=integration.base_url, api_key=integration.api_key)
+                payload = client.health()
+                integration.last_tested_at = timezone.now()
+                integration.last_test_status = 'ok'
+                integration.last_test_message = str(payload)
+                integration.save()
+                messages.success(request, f'Shipping manager test succeeded: {payload}')
+                return redirect('dashboard_connectors')
+            except ShippingManagerNotConfigured as exc:
+                integration.last_tested_at = timezone.now()
+                integration.last_test_status = 'error'
+                integration.last_test_message = str(exc)
+                integration.save()
+                messages.error(request, str(exc))
+                return redirect('dashboard_connectors')
+            except ShippingManagerError as exc:
+                integration.last_tested_at = timezone.now()
+                integration.last_test_status = 'error'
+                integration.last_test_message = str(exc)
+                integration.save()
+                messages.error(request, f'Shipping manager test failed: {exc}')
+                return redirect('dashboard_connectors')
+        base['shipping_form'] = shipping_form
 
     if request.method == 'POST' and request.POST.get('action') == 'save_google_drive_connector' and current_workspace and current_tenant:
         if not google_account:

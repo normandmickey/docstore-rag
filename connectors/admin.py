@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Connector, ConnectorSyncRun, ExternalDocumentBinding
+from .models import Connector, ConnectorSyncRun, ExternalDocumentBinding, TenantShippingIntegration
 
 
 @admin.register(Connector)
@@ -22,3 +22,10 @@ class ExternalDocumentBindingAdmin(admin.ModelAdmin):
     list_display = ('connector', 'external_id', 'external_path', 'document', 'etag', 'updated_at')
     search_fields = ('external_id', 'external_path', 'document__filename', 'connector__label')
     list_filter = ('connector',)
+
+
+@admin.register(TenantShippingIntegration)
+class TenantShippingIntegrationAdmin(admin.ModelAdmin):
+    list_display = ('label', 'provider', 'tenant', 'status', 'base_url', 'last_tested_at', 'last_test_status')
+    search_fields = ('label', 'tenant__name', 'base_url')
+    list_filter = ('provider', 'status', 'tenant')

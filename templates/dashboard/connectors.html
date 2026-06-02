@@ -16,6 +16,58 @@
   {% endif %}
 </div>
 <div class="card">
+  <h2>Shipping Manager</h2>
+  <p class="meta">Connect a tenant-wide shipping manager for package lookup workflows. This is tenant-scoped, not workspace-specific.</p>
+  {% if can_manage_tenant %}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_shipping_integration">
+      <label for="shipping_label">Label</label>
+      <input id="shipping_label" type="text" name="label" value="{{ shipping_form.label.value|default:'' }}" placeholder="Shipping Manager">
+      <label for="shipping_base_url">Base URL</label>
+      <input id="shipping_base_url" type="url" name="base_url" value="{{ shipping_form.base_url.value|default:'' }}" placeholder="https://ship.example.com">
+      <label for="shipping_api_key">API key</label>
+      <input id="shipping_api_key" type="password" name="api_key" value="{{ shipping_form.api_key.value|default:'' }}" placeholder="Internal API key">
+      <label for="shipping_status">Status</label>
+      <select id="shipping_status" name="status">
+        <option value="active" {% if shipping_form.status.value == 'active' or not shipping_form.status.value %}selected{% endif %}>Active</option>
+        <option value="disabled" {% if shipping_form.status.value == 'disabled' %}selected{% endif %}>Disabled</option>
+      </select>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+        <button type="submit">Save shipping manager</button>
+      </div>
+    </form>
+    <form method="post" style="margin-top:12px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="test_shipping_integration">
+      <input type="hidden" name="label" value="{{ shipping_form.label.value|default:'' }}">
+      <input type="hidden" name="base_url" value="{{ shipping_form.base_url.value|default:'' }}">
+      <input type="hidden" name="api_key" value="{{ shipping_form.api_key.value|default:'' }}">
+      <input type="hidden" name="status" value="{{ shipping_form.status.value|default:'active' }}">
+      <button type="submit">Test connection</button>
+    </form>
+    {% if shipping_integration %}
+      <div class="row">
+        <strong>{{ shipping_integration.label }}</strong><br>
+        <span class="meta">{{ shipping_integration.base_url }} · {{ shipping_integration.status|title }}{% if shipping_integration.last_tested_at %} · Last tested {{ shipping_integration.last_tested_at }}{% endif %}{% if shipping_integration.last_test_status %} · {{ shipping_integration.last_test_status }}{% endif %}</span>
+        {% if shipping_integration.last_test_message %}
+          <div class="meta" style="margin-top:8px;">{{ shipping_integration.last_test_message }}</div>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% else %}
+    <p class="meta">Only tenant owners and admins can manage the shipping manager connection.</p>
+    {% if shipping_integration %}
+      <div class="row">
+        <strong>{{ shipping_integration.label }}</strong><br>
+        <span class="meta">{{ shipping_integration.base_url }} · {{ shipping_integration.status|title }}</span>
+      </div>
+    {% else %}
+      <p>No tenant shipping manager configured yet.</p>
+    {% endif %}
+  {% endif %}
+</div>
+<div class="card">
   <h2>Microsoft / SharePoint connections</h2>
   <p class="meta">Connect your own Microsoft account so this workspace can later sync SharePoint content.</p>
   <p><a href="/connect/microsoft/">Connect Microsoft account</a></p>

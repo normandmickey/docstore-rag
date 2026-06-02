@@ -69,7 +69,7 @@ class ShippingHealthView(TenantScopedSupportAPIView):
         if denied is not None:
             return denied
         try:
-            client = ShippingManagerClient()
+            client = ShippingManagerClient.for_tenant(_tenant)
             return Response({'ok': True, 'shipping_manager': client.health()})
         except ShippingManagerNotConfigured as exc:
             return Response({'detail': str(exc)}, status=503)
@@ -103,7 +103,7 @@ class ShippingPackageSearchView(TenantScopedSupportAPIView):
         if denied is not None:
             return denied
         try:
-            client = ShippingManagerClient()
+            client = ShippingManagerClient.for_tenant(_tenant)
             payload = client.search_packages(data['query'].strip(), limit=data.get('limit', 10))
             return Response(payload)
         except ShippingManagerNotConfigured as exc:
@@ -131,7 +131,7 @@ class ShippingPackageDetailView(TenantScopedSupportAPIView):
         if denied is not None:
             return denied
         try:
-            client = ShippingManagerClient()
+            client = ShippingManagerClient.for_tenant(_tenant)
             payload = client.get_package(data['tracking_number'].strip())
             return Response(payload)
         except ShippingManagerNotConfigured as exc:
@@ -159,7 +159,7 @@ class ShippingLatestStatusView(TenantScopedSupportAPIView):
         if denied is not None:
             return denied
         try:
-            client = ShippingManagerClient()
+            client = ShippingManagerClient.for_tenant(_tenant)
             payload = client.get_latest_status(data['tracking_number'].strip())
             return Response(payload)
         except ShippingManagerNotConfigured as exc:

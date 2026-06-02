@@ -82,3 +82,37 @@ class ExternalDocumentBinding(models.Model):
 
     def __str__(self):
         return f'{self.connector} :: {self.external_path or self.external_id}'
+
+
+class TenantShippingIntegration(models.Model):
+    PROVIDER_FEDEXSUCKS = 'fedexsucks'
+    PROVIDER_CHOICES = [
+        (PROVIDER_FEDEXSUCKS, 'FedExSucks'),
+    ]
+
+    STATUS_ACTIVE = 'active'
+    STATUS_DISABLED = 'disabled'
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, 'Active'),
+        (STATUS_DISABLED, 'Disabled'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='shipping_integrations')
+    provider = models.CharField(max_length=40, choices=PROVIDER_CHOICES, default=PROVIDER_FEDEXSUCKS)
+    label = models.CharField(max_length=200, default='Shipping Manager')
+    base_url = models.URLField(max_length=500)
+    api_key = models.CharField(max_length=255, blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
+    metadata_json = models.JSONField(default=dict, blank=True)
+    last_tested_at = models.DateTimeField(null=True, blank=True)
+    last_test_status = models.CharField(max_length=20, blank=True, default='')
+    last_test_message = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['tenant__name', 'label']
+        unique_together = [('tenant', 'provider')]
+
+    def __str__(self):
+        return f'{self.tenant.name} :: {self.label}'
