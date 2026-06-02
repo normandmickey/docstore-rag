@@ -215,13 +215,8 @@ def spreadsheet_transformer(request):
                         'source_row_count': session_result.get('source_row_count', table.get('row_count') or 0),
                     }
                     request.session.modified = True
-                    session_result = request.session['spreadsheet_transform_result']
-                    base['spreadsheet_transform_form'] = SpreadsheetTransformForm(initial={
-                        'transform_request': session_result.get('transform_request', ''),
-                        'export_format': session_result.get('export_format', 'xlsx'),
-                        'strict_sanitization': session_result.get('strict_sanitization', False),
-                        'has_prepared_file': True,
-                    })
+                    messages.success(request, 'Prepared the planner prompt. Review Step 3 below and then generate the transform preview.')
+                    return redirect('spreadsheet_transformer')
 
                 elif action == 'preview':
                     if not session_table:
