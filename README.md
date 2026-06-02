@@ -522,6 +522,16 @@ Current behavior:
 
 This is the missing bridge between Zoom webhook validation and actual outbound Zoom Chat reply delivery.
 
+### Support email via AgentMail
+Docstore now has a first-pass tenant-scoped AgentMail support email surface.
+
+Current pieces:
+- tenant-level AgentMail inbox config on the Connectors page
+- inbound webhook endpoint:
+  - `POST /api/v1/support/email/agentmail/inbound/`
+- inbound emails map into support conversations/messages
+- support email ownership stays tenant-scoped, with an optional default workspace context
+
 ### Shipping manager integration
 Docstore can now call a separate internal shipping manager service instead of querying carrier APIs directly.
 

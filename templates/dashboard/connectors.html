@@ -83,6 +83,92 @@
   {% endif %}
 </div>
 <div class="card">
+  <h2>Support Email</h2>
+  <p class="meta">Connect a tenant-wide AgentMail inbox for inbound and outbound support email. This is tenant-scoped, not workspace-specific, though you can set a default workspace context.</p>
+  {% if can_manage_tenant %}
+    <form method="post">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_email_integration">
+      <label for="email_label">Label</label>
+      <input id="email_label" type="text" name="label" value="{{ email_form.label.value|default:'' }}" placeholder="Support Email">
+      <label for="email_from_name">From name</label>
+      <input id="email_from_name" type="text" name="from_name" value="{{ email_form.from_name.value|default:'' }}" placeholder="Support Team">
+      <label for="email_from_email">From email</label>
+      <input id="email_from_email" type="email" name="from_email" value="{{ email_form.from_email.value|default:'' }}" placeholder="support@example.com">
+      <label for="email_inbox_id">AgentMail inbox id</label>
+      <input id="email_inbox_id" type="text" name="inbox_id" value="{{ email_form.inbox_id.value|default:'' }}" placeholder="agentmail inbox id">
+      <label for="email_api_key">AgentMail API key</label>
+      <input id="email_api_key" type="password" name="api_key" value="{{ email_form.api_key.value|default:'' }}" placeholder="AgentMail API key">
+      <label for="email_default_workspace">Default workspace context</label>
+      <select id="email_default_workspace" name="default_workspace">
+        <option value="">No default workspace</option>
+        {% for workspace in workspaces %}
+          <option value="{{ workspace.id }}" {% if email_form.default_workspace.value|stringformat:'s' == workspace.id|stringformat:'s' %}selected{% endif %}>{{ workspace.name }}</option>
+        {% endfor %}
+      </select>
+      <label for="email_status">Status</label>
+      <select id="email_status" name="status">
+        <option value="active" {% if email_form.status.value == 'active' or not email_form.status.value %}selected{% endif %}>Active</option>
+        <option value="disabled" {% if email_form.status.value == 'disabled' %}selected{% endif %}>Disabled</option>
+      </select>
+      <label style="display:flex; align-items:center; gap:8px; margin: 10px 0 16px;">
+        <input type="checkbox" name="auto_reply_enabled" value="1" {% if email_form.auto_reply_enabled.value %}checked{% endif %} style="width:auto; margin:0;">
+        <span>Enable automatic support replies later</span>
+      </label>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
+        <button type="submit">Save support email</button>
+      </div>
+    </form>
+    <form method="post" style="margin-top:12px;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="test_email_integration">
+      <input type="hidden" name="label" value="{{ email_form.label.value|default:'' }}">
+      <input type="hidden" name="from_name" value="{{ email_form.from_name.value|default:'' }}">
+      <input type="hidden" name="from_email" value="{{ email_form.from_email.value|default:'' }}">
+      <input type="hidden" name="inbox_id" value="{{ email_form.inbox_id.value|default:'' }}">
+      <input type="hidden" name="api_key" value="{{ email_form.api_key.value|default:'' }}">
+      <input type="hidden" name="default_workspace" value="{{ email_form.default_workspace.value|default:'' }}">
+      <input type="hidden" name="status" value="{{ email_form.status.value|default:'active' }}">
+      <input type="hidden" name="auto_reply_enabled" value="{% if email_form.auto_reply_enabled.value %}1{% endif %}">
+      <button type="submit">Test email connection</button>
+    </form>
+    {% if email_integration %}
+      <div class="row">
+        <strong>{{ email_integration.label }}</strong>
+        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          {% if email_integration.status == 'active' %}
+            <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:#153a22; color:#bbf7d0; border:1px solid #166534; font-size:12px; font-weight:600;">Active</span>
+          {% else %}
+            <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:#3b1724; color:#fecdd3; border:1px solid #9f1239; font-size:12px; font-weight:600;">Disabled</span>
+          {% endif %}
+          {% if email_integration.last_test_status == 'ok' %}
+            <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:#13203f; color:#bfdbfe; border:1px solid #2563eb; font-size:12px; font-weight:600;">Connection OK</span>
+          {% elif email_integration.last_test_status == 'error' %}
+            <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:#3f1d12; color:#fed7aa; border:1px solid #c2410c; font-size:12px; font-weight:600;">Last test failed</span>
+          {% else %}
+            <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:#1f2937; color:#d1d5db; border:1px solid #374151; font-size:12px; font-weight:600;">Not tested yet</span>
+          {% endif %}
+        </div>
+        <br>
+        <span class="meta">{{ email_integration.from_name }}{% if email_integration.from_email %} &lt;{{ email_integration.from_email }}&gt;{% endif %} · Inbox {{ email_integration.inbox_id }}{% if email_integration.default_workspace %} · Default workspace: {{ email_integration.default_workspace.name }}{% endif %}{% if email_integration.last_tested_at %} · Last tested {{ email_integration.last_tested_at }}{% endif %}</span>
+        {% if email_integration.last_test_message %}
+          <div class="meta" style="margin-top:8px;">{{ email_integration.last_test_message }}</div>
+        {% endif %}
+      </div>
+    {% endif %}
+  {% else %}
+    <p class="meta">Only tenant owners and admins can manage the support email connection.</p>
+    {% if email_integration %}
+      <div class="row">
+        <strong>{{ email_integration.label }}</strong><br>
+        <span class="meta">{{ email_integration.from_email }} · {{ email_integration.status|title }}</span>
+      </div>
+    {% else %}
+      <p>No tenant support email configured yet.</p>
+    {% endif %}
+  {% endif %}
+</div>
+<div class="card">
   <h2>Microsoft / SharePoint connections</h2>
   <p class="meta">Connect your own Microsoft account so this workspace can later sync SharePoint content.</p>
   <p><a href="/connect/microsoft/">Connect Microsoft account</a></p>

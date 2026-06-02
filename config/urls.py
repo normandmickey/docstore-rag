@@ -9,6 +9,7 @@ from control.views import AppLoginView, api_quickstart, atlassian_connect_callba
 from retrieval.api import ChatView, SearchView
 from support.api import SupportChannelLookupView
 from support.bot_shipping_api import BotShippingLookupView
+from support.email_api import AgentMailInboundWebhookView
 from support.shipping_api import ShippingHealthView, ShippingLatestStatusView, ShippingPackageDetailView, ShippingPackageSearchView
 
 
@@ -91,6 +92,7 @@ urlpatterns = [
     path('api/v1/search/', SearchView.as_view()),
     path('api/v1/chat/', ChatView.as_view()),
     path('api/v1/support/channel-lookup/', SupportChannelLookupView.as_view()),
+    path('api/v1/support/email/agentmail/inbound/', AgentMailInboundWebhookView.as_view()),
     path('api/v1/support/shipping/health/', ShippingHealthView.as_view()),
     path('api/v1/support/shipping/search/', ShippingPackageSearchView.as_view()),
     path('api/v1/support/shipping/package/', ShippingPackageDetailView.as_view()),

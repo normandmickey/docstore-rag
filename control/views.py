@@ -25,6 +25,7 @@ from connectors.dropbox import DropboxClient
 from connectors.forms import TenantShippingIntegrationForm
 from connectors.google_drive import GoogleDriveClient
 from connectors.models import Connector, ExternalDocumentBinding, TenantShippingIntegration
+from support.models import TenantEmailIntegration
 from documents.models import Chunk, Document, DocumentWorkspaceAssignment, ExtractedFact
 from documents.upload_service import collect_urls_for_ingest, create_or_reuse_document, create_or_reuse_url_document
 from ingestion.models import IngestionJob
@@ -54,6 +55,8 @@ from .oauth import (
 )
 from .pii import redact_pii
 from .email_flows import send_invite_email
+from support.email_forms import TenantEmailIntegrationForm
+from support.email_services import TenantEmailClient, TenantEmailIntegrationError
 from support.shipping import ShippingManagerClient, ShippingManagerError, ShippingManagerNotConfigured
 
 logger = logging.getLogger(__name__)
@@ -1339,6 +1342,22 @@ def dashboard_connectors(request):
     }
     base['shipping_integration'] = shipping_integration
     base['shipping_form'] = TenantShippingIntegrationForm(instance=shipping_integration, initial=shipping_initial)
+    email_integration = TenantEmailIntegration.objects.filter(
+        tenant=current_tenant,
+        provider=TenantEmailIntegration.PROVIDER_AGENTMAIL,
+    ).first() if current_tenant else None
+    email_initial = {
+        'label': email_integration.label if email_integration else 'Support Email',
+        'from_name': email_integration.from_name if email_integration else '',
+        'from_email': email_integration.from_email if email_integration else '',
+        'inbox_id': email_integration.inbox_id if email_integration else getattr(settings, 'AGENTMAIL_INBOX_ID', ''),
+        'api_key': email_integration.api_key if email_integration else '',
+        'default_workspace': email_integration.default_workspace_id if email_integration else (current_workspace.id if current_workspace else None),
+        'status': email_integration.status if email_integration else TenantEmailIntegration.STATUS_ACTIVE,
+        'auto_reply_enabled': email_integration.auto_reply_enabled if email_integration else False,
+    }
+    base['email_integration'] = email_integration
+    base['email_form'] = TenantEmailIntegrationForm(instance=email_integration, initial=email_initial, tenant=current_tenant)
 
     if current_workspace and current_tenant:
         base['google_drive_connector'] = Connector.objects.filter(
@@ -1399,6 +1418,46 @@ def dashboard_connectors(request):
                 messages.error(request, f'Shipping manager test failed: {exc}')
                 return redirect('dashboard_connectors')
         base['shipping_form'] = shipping_form
+
+    if request.method == 'POST' and request.POST.get('action') == 'save_email_integration' and current_tenant:
+        if not base.get('can_manage_tenant'):
+            messages.error(request, 'Only tenant owners and admins can manage the support email connection.')
+            return redirect('dashboard_connectors')
+        email_form = TenantEmailIntegrationForm(request.POST, instance=email_integration, tenant=current_tenant)
+        if email_form.is_valid():
+            integration = email_form.save(commit=False)
+            integration.tenant = current_tenant
+            integration.provider = TenantEmailIntegration.PROVIDER_AGENTMAIL
+            integration.save()
+            messages.success(request, 'Saved tenant support email connection.')
+            return redirect('dashboard_connectors')
+        base['email_form'] = email_form
+
+    if request.method == 'POST' and request.POST.get('action') == 'test_email_integration' and current_tenant:
+        if not base.get('can_manage_tenant'):
+            messages.error(request, 'Only tenant owners and admins can test the support email connection.')
+            return redirect('dashboard_connectors')
+        email_form = TenantEmailIntegrationForm(request.POST, instance=email_integration, tenant=current_tenant)
+        if email_form.is_valid():
+            integration = email_form.save(commit=False)
+            integration.tenant = current_tenant
+            integration.provider = TenantEmailIntegration.PROVIDER_AGENTMAIL
+            try:
+                client = TenantEmailClient(integration)
+                integration.last_tested_at = timezone.now()
+                integration.last_test_status = 'ok'
+                integration.last_test_message = 'AgentMail credentials look configured.'
+                integration.save()
+                messages.success(request, 'Support email connection looks configured.')
+                return redirect('dashboard_connectors')
+            except TenantEmailIntegrationError as exc:
+                integration.last_tested_at = timezone.now()
+                integration.last_test_status = 'error'
+                integration.last_test_message = str(exc)
+                integration.save()
+                messages.error(request, f'Support email test failed: {exc}')
+                return redirect('dashboard_connectors')
+        base['email_form'] = email_form
 
     if request.method == 'POST' and request.POST.get('action') == 'save_google_drive_connector' and current_workspace and current_tenant:
         if not google_account:

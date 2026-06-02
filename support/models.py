@@ -10,10 +10,12 @@ class SupportChannel(models.Model):
     TYPE_SMS = 'sms'
     TYPE_VOICE = 'voice'
     TYPE_BOTH = 'both'
+    TYPE_EMAIL = 'email'
     TYPE_CHOICES = [
         (TYPE_SMS, 'SMS'),
         (TYPE_VOICE, 'Voice'),
         (TYPE_BOTH, 'SMS + Voice'),
+        (TYPE_EMAIL, 'Email'),
     ]
 
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='support_channels')
@@ -38,7 +40,8 @@ class SupportChannel(models.Model):
 
 class SupportContact(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='support_contacts')
-    phone_number = models.CharField(max_length=32, db_index=True)
+    phone_number = models.CharField(max_length=32, db_index=True, blank=True, default='')
+    email = models.EmailField(blank=True, default='', db_index=True)
     name = models.CharField(max_length=255, blank=True, default='')
     external_ref = models.CharField(max_length=255, blank=True, default='')
     metadata_json = models.JSONField(default=dict, blank=True)
@@ -46,11 +49,10 @@ class SupportContact(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['tenant__name', 'phone_number']
-        unique_together = [('tenant', 'phone_number')]
+        ordering = ['tenant__name', 'email', 'phone_number']
 
     def __str__(self):
-        return self.name or self.phone_number
+        return self.name or self.email or self.phone_number
 
 
 class SupportConversation(models.Model):
@@ -92,11 +94,13 @@ class SupportMessage(models.Model):
     ]
 
     KIND_SMS = 'sms'
+    KIND_EMAIL = 'email'
     KIND_CALL_NOTE = 'call_note'
     KIND_VOICEMAIL = 'voicemail'
     KIND_SYSTEM = 'system'
     KIND_CHOICES = [
         (KIND_SMS, 'SMS'),
+        (KIND_EMAIL, 'Email'),
         (KIND_CALL_NOTE, 'Call Note'),
         (KIND_VOICEMAIL, 'Voicemail'),
         (KIND_SYSTEM, 'System'),
@@ -142,3 +146,41 @@ class SupportCall(models.Model):
 
     def __str__(self):
         return f'{self.call_sid} :: {self.from_number} -> {self.to_number}'
+
+
+class TenantEmailIntegration(models.Model):
+    PROVIDER_AGENTMAIL = 'agentmail'
+    PROVIDER_CHOICES = [
+        (PROVIDER_AGENTMAIL, 'AgentMail'),
+    ]
+
+    STATUS_ACTIVE = 'active'
+    STATUS_DISABLED = 'disabled'
+    STATUS_CHOICES = [
+        (STATUS_ACTIVE, 'Active'),
+        (STATUS_DISABLED, 'Disabled'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='email_integrations')
+    default_workspace = models.ForeignKey(Workspace, on_delete=models.SET_NULL, null=True, blank=True, related_name='tenant_email_integrations')
+    provider = models.CharField(max_length=40, choices=PROVIDER_CHOICES, default=PROVIDER_AGENTMAIL)
+    label = models.CharField(max_length=200, default='Support Email')
+    from_name = models.CharField(max_length=200, blank=True, default='')
+    from_email = models.EmailField(blank=True, default='')
+    inbox_id = models.CharField(max_length=255, blank=True, default='')
+    api_key = models.CharField(max_length=255, blank=True, default='')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_ACTIVE)
+    auto_reply_enabled = models.BooleanField(default=False)
+    metadata_json = models.JSONField(default=dict, blank=True)
+    last_tested_at = models.DateTimeField(null=True, blank=True)
+    last_test_status = models.CharField(max_length=20, blank=True, default='')
+    last_test_message = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['tenant__name', 'label']
+        unique_together = [('tenant', 'provider')]
+
+    def __str__(self):
+        return f'{self.tenant.name} :: {self.label}'

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import SupportChannel, SupportContact, SupportConversation, SupportMessage
+from .models import SupportChannel, SupportContact, SupportConversation, SupportMessage, TenantEmailIntegration
 
 
 @admin.register(SupportChannel)
@@ -27,5 +27,12 @@ class SupportConversationAdmin(admin.ModelAdmin):
 @admin.register(SupportMessage)
 class SupportMessageAdmin(admin.ModelAdmin):
     list_display = ('id', 'conversation', 'direction', 'kind', 'provider_message_sid', 'delivery_status', 'sent_by_user', 'created_at')
-    search_fields = ('body', 'provider_message_sid', 'conversation__contact__phone_number', 'conversation__tenant__name')
+    search_fields = ('body', 'provider_message_sid', 'conversation__contact__phone_number', 'conversation__contact__email', 'conversation__tenant__name')
     list_filter = ('direction', 'kind', 'delivery_status')
+
+
+@admin.register(TenantEmailIntegration)
+class TenantEmailIntegrationAdmin(admin.ModelAdmin):
+    list_display = ('label', 'provider', 'tenant', 'status', 'from_email', 'inbox_id', 'last_tested_at', 'last_test_status')
+    search_fields = ('label', 'tenant__name', 'from_email', 'inbox_id')
+    list_filter = ('provider', 'status', 'tenant')
