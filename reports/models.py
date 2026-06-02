@@ -26,6 +26,8 @@ class SpreadsheetTransformTemplate(models.Model):
     transform_request = models.TextField(blank=True, default='')
     export_format = models.CharField(max_length=10, choices=SpreadsheetTransformJob.EXPORT_CHOICES if 'SpreadsheetTransformJob' in globals() else [('xlsx', 'XLSX'), ('csv', 'CSV')], default='xlsx')
     strict_sanitization = models.BooleanField(default=False)
+    ignore_hidden_rows = models.BooleanField(default=False)
+    ignore_hidden_columns = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -66,6 +68,8 @@ class SpreadsheetTransformJob(models.Model):
     source_name = models.CharField(max_length=255, blank=True, default='')
     transform_request = models.TextField(blank=True, default='')
     strict_sanitization = models.BooleanField(default=False)
+    ignore_hidden_rows = models.BooleanField(default=False)
+    ignore_hidden_columns = models.BooleanField(default=False)
     plan_json = models.JSONField(default=dict, blank=True)
     headers_json = models.JSONField(default=list, blank=True)
     rows_json = models.JSONField(default=list, blank=True)

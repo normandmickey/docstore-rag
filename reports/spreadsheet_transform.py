@@ -80,12 +80,20 @@ def load_tabular_file(uploaded_file) -> dict[str, Any]:
                 row[key] = '' if cell is None else str(cell)
             if any(str(v).strip() for v in row.values()):
                 rows.append(row)
+        hidden_row_indexes = [idx - 2 for idx in range(2, ws.max_row + 1) if ws.row_dimensions[idx].hidden]
+        hidden_columns = []
+        for idx, header in enumerate(headers, start=1):
+            column_letter = ws.cell(row=1, column=idx).column_letter
+            if ws.column_dimensions[column_letter].hidden:
+                hidden_columns.append(header)
         return {
             'sheet_name': ws.title,
             'headers': headers,
             'rows': rows,
             'row_count': len(rows),
             'source_type': 'xlsx',
+            'hidden_row_indexes': hidden_row_indexes,
+            'hidden_columns': hidden_columns,
         }
 
     raise SpreadsheetTransformError('Unsupported file type. Please upload a CSV or XLSX file.')
@@ -585,7 +593,22 @@ def _apply_structured_output_plan(rows: list[dict[str, Any]], output_plan: list[
     return output_headers, built_rows
 
 
-def apply_transform_plan(*, rows: list[dict[str, Any]], plan: dict[str, Any], output_plan: list[dict[str, Any]] | None = None) -> tuple[list[str], list[dict[str, Any]]]:
+def _apply_hidden_options(rows: list[dict[str, Any]], source_headers: list[str] | None = None, hidden_row_indexes: list[int] | None = None, hidden_columns: list[str] | None = None, ignore_hidden_rows: bool = False, ignore_hidden_columns: bool = False) -> tuple[list[str] | None, list[dict[str, Any]]]:
+    filtered_rows = list(rows)
+    filtered_headers = list(source_headers) if source_headers is not None else None
+    if ignore_hidden_rows and hidden_row_indexes:
+        hidden_set = set(hidden_row_indexes)
+        filtered_rows = [row for idx, row in enumerate(filtered_rows) if idx not in hidden_set]
+    if ignore_hidden_columns and hidden_columns:
+        hidden_set = set(hidden_columns)
+        if filtered_headers is not None:
+            filtered_headers = [header for header in filtered_headers if header not in hidden_set]
+        filtered_rows = [{k: v for k, v in row.items() if k not in hidden_set} for row in filtered_rows]
+    return filtered_headers, filtered_rows
+
+
+def apply_transform_plan(*, rows: list[dict[str, Any]], plan: dict[str, Any], output_plan: list[dict[str, Any]] | None = None, source_headers: list[str] | None = None, hidden_row_indexes: list[int] | None = None, hidden_columns: list[str] | None = None, ignore_hidden_rows: bool = False, ignore_hidden_columns: bool = False) -> tuple[list[str], list[dict[str, Any]]]:
+    _, rows = _apply_hidden_options(rows, source_headers=source_headers, hidden_row_indexes=hidden_row_indexes, hidden_columns=hidden_columns, ignore_hidden_rows=ignore_hidden_rows, ignore_hidden_columns=ignore_hidden_columns)
     structured_result = _apply_structured_output_plan(rows, output_plan)
     if structured_result is not None:
         return structured_result

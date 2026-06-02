@@ -134,7 +134,7 @@
     {% for field in spreadsheet_transform_form %}
       {% if field.name == 'has_prepared_file' %}
         {{ field }}
-      {% elif field.name == 'strict_sanitization' or field.name == 'export_format' %}
+      {% elif field.name == 'strict_sanitization' or field.name == 'export_format' or field.name == 'ignore_hidden_rows' or field.name == 'ignore_hidden_columns' %}
         <div class="row">
           <strong>{{ field.label }}</strong><br>
           {{ field }}

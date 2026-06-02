@@ -39,6 +39,8 @@ class SpreadsheetTransformForm(forms.Form):
     transform_request = forms.CharField(required=False, label='Optional overall notes', widget=forms.Textarea(attrs={'rows': 4}), help_text='Optional extra context for the planner after you define the desired output columns.')
     export_format = forms.ChoiceField(required=False, choices=[('xlsx', 'XLSX'), ('csv', 'CSV')], initial='xlsx')
     strict_sanitization = forms.BooleanField(required=False, initial=False, help_text='Use more aggressive prompt-side masking for sample rows before AI planning.')
+    ignore_hidden_rows = forms.BooleanField(required=False, initial=False, help_text='For XLSX files, skip hidden rows during preview and export.')
+    ignore_hidden_columns = forms.BooleanField(required=False, initial=False, help_text='For XLSX files, skip hidden columns during preview and export.')
     has_prepared_file = forms.BooleanField(required=False, widget=forms.HiddenInput())
 
 
@@ -194,6 +196,8 @@ def spreadsheet_transformer(request):
             'transform_request': session_result.get('transform_request', ''),
             'export_format': session_result.get('export_format', 'xlsx'),
             'strict_sanitization': session_result.get('strict_sanitization', False),
+            'ignore_hidden_rows': session_result.get('ignore_hidden_rows', False),
+            'ignore_hidden_columns': session_result.get('ignore_hidden_columns', False),
             'has_prepared_file': True,
         })
         base['spreadsheet_transform_plan'] = session_result.get('plan')
@@ -243,6 +247,8 @@ def spreadsheet_transformer(request):
                         'rows': existing_result.get('rows', []),
                         'export_format': template.export_format or 'xlsx',
                         'strict_sanitization': bool(template.strict_sanitization),
+                        'ignore_hidden_rows': bool(template.ignore_hidden_rows),
+                        'ignore_hidden_columns': bool(template.ignore_hidden_columns),
                         'transform_request': template.transform_request or '',
                         'column_plan': template.column_plan_json or [],
                         'output_plan': template.output_plan_json or [],
@@ -294,6 +300,8 @@ def spreadsheet_transformer(request):
                         'rows': [],
                         'export_format': form.cleaned_data.get('export_format') or existing_result.get('export_format') or 'xlsx',
                         'strict_sanitization': form.cleaned_data.get('strict_sanitization') or existing_result.get('strict_sanitization') or False,
+                        'ignore_hidden_rows': bool(form.cleaned_data.get('ignore_hidden_rows') or existing_result.get('ignore_hidden_rows')),
+                        'ignore_hidden_columns': bool(form.cleaned_data.get('ignore_hidden_columns') or existing_result.get('ignore_hidden_columns')),
                         'transform_request': transform_request,
                         'column_plan': column_plan,
                         'output_plan': output_plan,
@@ -360,6 +368,8 @@ def spreadsheet_transformer(request):
                         'rows': [],
                         'export_format': form.cleaned_data.get('export_format') or session_result.get('export_format') or 'xlsx',
                         'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
+                        'ignore_hidden_rows': bool(form.cleaned_data.get('ignore_hidden_rows') or session_result.get('ignore_hidden_rows')),
+                        'ignore_hidden_columns': bool(form.cleaned_data.get('ignore_hidden_columns') or session_result.get('ignore_hidden_columns')),
                         'transform_request': form.cleaned_data['transform_request'],
                         'column_plan': column_plan,
                         'output_plan': output_plan,
@@ -385,7 +395,16 @@ def spreadsheet_transformer(request):
                         column_plan=column_plan,
                         output_plan=output_plan,
                     )
-                    headers, transformed_rows = apply_transform_plan(rows=session_table.get('rows') or [], plan=plan, output_plan=output_plan)
+                    headers, transformed_rows = apply_transform_plan(
+                        rows=session_table.get('rows') or [],
+                        plan=plan,
+                        output_plan=output_plan,
+                        source_headers=session_table.get('headers') or [],
+                        hidden_row_indexes=session_table.get('hidden_row_indexes') or [],
+                        hidden_columns=session_table.get('hidden_columns') or [],
+                        ignore_hidden_rows=bool(form.cleaned_data.get('ignore_hidden_rows') or session_result.get('ignore_hidden_rows')),
+                        ignore_hidden_columns=bool(form.cleaned_data.get('ignore_hidden_columns') or session_result.get('ignore_hidden_columns')),
+                    )
                     request.session['spreadsheet_transform_result'] = {
                         'plan': plan,
                         'detected_fields': detected_fields,
@@ -395,6 +414,8 @@ def spreadsheet_transformer(request):
                         'rows': transformed_rows,
                         'export_format': form.cleaned_data.get('export_format') or session_result.get('export_format') or 'xlsx',
                         'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
+                        'ignore_hidden_rows': bool(form.cleaned_data.get('ignore_hidden_rows') or session_result.get('ignore_hidden_rows')),
+                        'ignore_hidden_columns': bool(form.cleaned_data.get('ignore_hidden_columns') or session_result.get('ignore_hidden_columns')),
                         'transform_request': form.cleaned_data['transform_request'],
                         'column_plan': column_plan,
                         'output_plan': output_plan,
@@ -439,6 +460,8 @@ def spreadsheet_transformer(request):
                         transform_request=session_result.get('transform_request', ''),
                         export_format=session_result.get('export_format') or 'xlsx',
                         strict_sanitization=bool(session_result.get('strict_sanitization')),
+                        ignore_hidden_rows=bool(session_result.get('ignore_hidden_rows')),
+                        ignore_hidden_columns=bool(session_result.get('ignore_hidden_columns')),
                     )
                     messages.success(request, f'Saved template "{template_name}".')
                     return redirect('spreadsheet_transformer')
@@ -463,6 +486,8 @@ def spreadsheet_transformer(request):
                         plan_json={**(session_result.get('plan') or {}), 'output_plan': session_result.get('output_plan') or []},
                         headers_json=session_result.get('headers') or [],
                         rows_json=session_result.get('rows') or [],
+                        ignore_hidden_rows=bool(session_result.get('ignore_hidden_rows')),
+                        ignore_hidden_columns=bool(session_result.get('ignore_hidden_columns')),
                     )
                     build_spreadsheet_transform_export.delay(job.id)
                     messages.success(request, f'Queued export job #{job.id}. Refresh to download when ready.')
