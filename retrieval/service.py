@@ -562,9 +562,9 @@ def build_context_blocks(results, facts=None):
 
 
 def answer_question(*, tenant, workspace, query, top_k=5, document_id=None, temperature=None):
-    shipping_answer = maybe_answer_shipping_question(tenant=tenant, workspace=workspace, query=query)
-    if shipping_answer is not None:
-        return shipping_answer
+    shipping_payload = shipping_answer_payload(tenant=tenant, query=query, limit=3)
+    if shipping_payload is not None:
+        return shipping_payload, []
 
     facts = retrieve_facts(
         tenant=tenant,
