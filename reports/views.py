@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 class SpreadsheetTransformForm(forms.Form):
     file = forms.FileField(required=False)
     transform_request = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 5}), help_text='Describe the columns and layout you want in the exported file.')
-    export_format = forms.ChoiceField(choices=[('xlsx', 'XLSX'), ('csv', 'CSV')], initial='xlsx')
+    export_format = forms.ChoiceField(required=False, choices=[('xlsx', 'XLSX'), ('csv', 'CSV')], initial='xlsx')
     strict_sanitization = forms.BooleanField(required=False, initial=False, help_text='Use more aggressive prompt-side masking for sample rows before AI planning.')
     has_prepared_file = forms.BooleanField(required=False, widget=forms.HiddenInput())
 
@@ -143,7 +143,7 @@ def spreadsheet_transformer(request):
                         'prompt_preview': None,
                         'headers': [],
                         'rows': [],
-                        'export_format': form.cleaned_data['export_format'],
+                        'export_format': form.cleaned_data.get('export_format') or 'xlsx',
                         'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
                         'transform_request': form.cleaned_data['transform_request'],
                         'column_plan': [],
@@ -184,7 +184,7 @@ def spreadsheet_transformer(request):
                         'prompt_preview': {'system_prompt': system_prompt, 'user_payload': user_payload},
                         'headers': [],
                         'rows': [],
-                        'export_format': form.cleaned_data['export_format'],
+                        'export_format': form.cleaned_data.get('export_format') or session_result.get('export_format') or 'xlsx',
                         'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
                         'transform_request': form.cleaned_data['transform_request'],
                         'column_plan': column_plan,
@@ -223,7 +223,7 @@ def spreadsheet_transformer(request):
                         'prompt_preview': prompt_preview,
                         'headers': headers,
                         'rows': transformed_rows,
-                        'export_format': form.cleaned_data['export_format'],
+                        'export_format': form.cleaned_data.get('export_format') or session_result.get('export_format') or 'xlsx',
                         'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
                         'transform_request': form.cleaned_data['transform_request'],
                         'column_plan': column_plan,
