@@ -58,6 +58,18 @@ def _infer_support_source(conversation):
 
 
 @login_required
+def _column_legend(headers: list[str]) -> list[dict]:
+    legend = []
+    for idx, header in enumerate(headers or []):
+        current = idx + 1
+        letter = ''
+        while current > 0:
+            current, remainder = divmod(current - 1, 26)
+            letter = chr(65 + remainder) + letter
+        legend.append({'letter': letter, 'name': header})
+    return legend
+
+
 def _read_column_plan_from_post(request) -> list[dict]:
     total = int((request.POST.get('column_plan_total') or '0').strip() or 0)
     items = []
@@ -94,6 +106,7 @@ def spreadsheet_transformer(request):
     base['spreadsheet_transform_source_sheet_name'] = ''
     base['spreadsheet_transform_source_row_count'] = 0
     base['spreadsheet_transform_output_plan'] = []
+    base['spreadsheet_transform_source_legend'] = []
     current_tenant = base.get('current_tenant')
     current_workspace = base.get('current_workspace')
     base['spreadsheet_transform_jobs'] = SpreadsheetTransformJob.objects.filter(
@@ -121,6 +134,7 @@ def spreadsheet_transformer(request):
         base['spreadsheet_transform_source_sheet_name'] = session_result.get('source_sheet_name', '')
         base['spreadsheet_transform_source_row_count'] = session_result.get('source_row_count', 0)
         base['spreadsheet_transform_output_plan'] = session_result.get('output_plan', [])
+        base['spreadsheet_transform_source_legend'] = _column_legend(session_result.get('source_headers', []))
 
     if request.method == 'POST':
         action = (request.POST.get('action') or 'inspect').strip()
