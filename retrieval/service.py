@@ -1,5 +1,7 @@
 import re
 from collections import defaultdict
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from django.contrib.postgres.search import SearchQuery, SearchRank, SearchVector
 from pgvector.django import CosineDistance
@@ -409,27 +411,44 @@ def _carrier_tracking_url(carrier: str, tracking_number: str) -> str:
 
 
 
+def _format_shipping_datetime(value: str) -> str:
+    raw = (value or '').strip()
+    if not raw:
+        return ''
+    try:
+        normalized = raw.replace('Z', '+00:00')
+        dt = datetime.fromisoformat(normalized)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=ZoneInfo('UTC'))
+        local_dt = dt.astimezone(ZoneInfo('America/New_York'))
+        pretty = local_dt.strftime('%b %d, %Y at %I:%M %p %Z')
+        return pretty.replace(' 0', ' ')
+    except Exception:
+        return raw
+
+
+
 def _build_shipping_detail_answer(row: dict, *, include_intro: bool = False) -> str:
     tracking = row.get('tracking_number') or 'unknown'
     carrier = (row.get('carrier') or 'carrier').upper()
     status = row.get('status') or 'Unknown'
     location = row.get('latest_location') or ''
-    estimated_delivery = row.get('estimated_delivery') or ''
-    delivered_at = row.get('delivered_at') or ''
+    estimated_delivery = _format_shipping_datetime(row.get('estimated_delivery') or '')
+    delivered_at = _format_shipping_datetime(row.get('delivered_at') or '')
     tracking_url = _carrier_tracking_url(row.get('carrier') or '', tracking)
 
     lines = []
     if include_intro:
-        lines.append('I found a matching shipment.')
-    lines.append(f'{carrier} tracking {tracking}: {status}.')
+        lines.append('I found a matching shipment for your request.')
+    lines.append(f'{carrier} tracking {tracking} is currently marked {status.lower()}.')
     if location:
         lines.append(f'Latest location: {location}.')
     if delivered_at:
-        lines.append(f'Delivered at: {delivered_at}.')
+        lines.append(f'Delivered on {delivered_at}.')
     elif estimated_delivery:
-        lines.append(f'Delivery timing: {estimated_delivery}.')
+        lines.append(f'Current delivery timing: {estimated_delivery}.')
     if tracking_url:
-        lines.append(f'Track here: {tracking_url}')
+        lines.append(f'Track it here: {tracking_url}')
     return ' '.join(line.strip() for line in lines if line).strip()
 
 
