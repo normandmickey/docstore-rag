@@ -15,6 +15,24 @@
   <p class="meta">Start by uploading a CSV or XLSX file and then submitting it for inspection. Step 2 will appear below after the file is uploaded and inspected.</p>
   <form method="post" enctype="multipart/form-data" id="spreadsheet-transform-form">
     {% csrf_token %}
+    {% if spreadsheet_transform_templates %}
+      <div class="row">
+        <strong>Load a saved template</strong><br>
+        <div class="meta" style="margin:6px 0 10px;">Optional: choose a saved template first, then inspect a file to confirm the input matches.</div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
+          <label style="flex:1 1 320px;">
+            <div class="meta">Template</div>
+            <select name="template_id">
+              <option value="">Choose template…</option>
+              {% for template in spreadsheet_transform_templates %}
+                <option value="{{ template.id }}" {% if spreadsheet_transform_selected_template_id == template.id %}selected{% endif %}>{{ template.name }} ({{ template.visibility }})</option>
+              {% endfor %}
+            </select>
+          </label>
+          <button type="submit" name="action" value="load_template" style="background:#334155;">Load template</button>
+        </div>
+      </div>
+    {% endif %}
     {% for field in spreadsheet_transform_form %}
       {% if field.name == 'has_prepared_file' %}
         {{ field }}
@@ -41,6 +59,22 @@
 <div class="card" style="opacity:0.75; border-style:dashed;">
   <h2>Step 2 · Describe the target output</h2>
   <p class="meta">Complete Step 1 first. After you upload and inspect a file, this step will appear here.</p>
+</div>
+{% endif %}
+
+{% if spreadsheet_transform_template_match %}
+<div class="card">
+  <h2>Template match check</h2>
+  <p class="meta">Status: <strong>{{ spreadsheet_transform_template_match.status|title }}</strong> · Expected {{ spreadsheet_transform_template_match.expected_count }} columns · Uploaded {{ spreadsheet_transform_template_match.actual_count }} columns</p>
+  {% if spreadsheet_transform_template_match.missing %}
+    <div class="row"><strong>Missing columns</strong><div class="meta">{{ spreadsheet_transform_template_match.missing|join:", " }}</div></div>
+  {% endif %}
+  {% if spreadsheet_transform_template_match.extra %}
+    <div class="row"><strong>Extra columns</strong><div class="meta">{{ spreadsheet_transform_template_match.extra|join:", " }}</div></div>
+  {% endif %}
+  {% if spreadsheet_transform_template_match.matched %}
+    <div class="row"><strong>Matched columns</strong><div class="meta">{% for item in spreadsheet_transform_template_match.matched %}{{ item.expected }}{% if item.expected != item.actual %} → {{ item.actual }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</div></div>
+  {% endif %}
 </div>
 {% endif %}
 

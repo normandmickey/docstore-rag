@@ -1,4 +1,5 @@
 import logging
+import re
 from datetime import timedelta
 from io import BytesIO
 
@@ -69,6 +70,42 @@ def _column_legend(headers: list[str]) -> list[dict]:
     return legend
 
 
+def _normalize_header(value: str) -> str:
+    return re.sub(r'[^a-z0-9]+', '', (value or '').strip().lower())
+
+
+def _template_match_report(expected_headers: list[str], actual_headers: list[str]) -> dict:
+    expected = [header for header in expected_headers or [] if header]
+    actual = [header for header in actual_headers or [] if header]
+    actual_map = {_normalize_header(header): header for header in actual}
+    matched = []
+    missing = []
+    for header in expected:
+        normalized = _normalize_header(header)
+        if normalized and normalized in actual_map:
+            matched.append({'expected': header, 'actual': actual_map[normalized]})
+        else:
+            missing.append(header)
+    expected_norms = {_normalize_header(header) for header in expected if _normalize_header(header)}
+    extra = [header for header in actual if _normalize_header(header) not in expected_norms]
+    if expected and not missing and not extra:
+        status = 'exact'
+    elif matched and len(matched) >= max(1, len(expected) // 2):
+        status = 'close'
+    elif matched:
+        status = 'partial'
+    else:
+        status = 'mismatch'
+    return {
+        'status': status,
+        'matched': matched,
+        'missing': missing,
+        'extra': extra,
+        'expected_count': len(expected),
+        'actual_count': len(actual),
+    }
+
+
 def _read_output_plan_from_post(request) -> list[dict]:
     total = int((request.POST.get('output_plan_total') or '0').strip() or 0)
     items = []
@@ -131,6 +168,8 @@ def spreadsheet_transformer(request):
         tenant=current_tenant,
         workspace=current_workspace,
     )[:10] if current_tenant and current_workspace else []
+    base['spreadsheet_transform_selected_template_id'] = None
+    base['spreadsheet_transform_template_match'] = None
 
     session_result = request.session.get('spreadsheet_transform_result') or {}
     if session_result:
@@ -153,6 +192,8 @@ def spreadsheet_transformer(request):
         base['spreadsheet_transform_source_row_count'] = session_result.get('source_row_count', 0)
         base['spreadsheet_transform_output_plan'] = session_result.get('output_plan', [])
         base['spreadsheet_transform_source_legend'] = _column_legend(session_result.get('source_headers', []))
+        base['spreadsheet_transform_selected_template_id'] = session_result.get('selected_template_id')
+        base['spreadsheet_transform_template_match'] = session_result.get('template_match')
 
     if request.method == 'POST':
         action = (request.POST.get('action') or 'inspect').strip()
@@ -164,6 +205,41 @@ def spreadsheet_transformer(request):
                 session_table = request.session.get('spreadsheet_transform_table') or {}
                 session_result = request.session.get('spreadsheet_transform_result') or {}
 
+                if action == 'load_template':
+                    template_id = (request.POST.get('template_id') or '').strip()
+                    current_tenant = base.get('current_tenant')
+                    current_workspace = base.get('current_workspace')
+                    template = SpreadsheetTransformTemplate.objects.filter(
+                        id=template_id,
+                        tenant=current_tenant,
+                        workspace=current_workspace,
+                    ).first()
+                    if not template:
+                        raise SpreadsheetTransformError('Template not found in this workspace.')
+                    existing_result = request.session.get('spreadsheet_transform_result') or {}
+                    request.session['spreadsheet_transform_result'] = {
+                        'plan': existing_result.get('plan'),
+                        'detected_fields': existing_result.get('detected_fields', {}),
+                        'sanitized_samples': existing_result.get('sanitized_samples', []),
+                        'prompt_preview': existing_result.get('prompt_preview'),
+                        'headers': existing_result.get('headers', []),
+                        'rows': existing_result.get('rows', []),
+                        'export_format': template.export_format or 'xlsx',
+                        'strict_sanitization': bool(template.strict_sanitization),
+                        'transform_request': template.transform_request or '',
+                        'column_plan': template.column_plan_json or [],
+                        'output_plan': template.output_plan_json or [],
+                        'source_headers': existing_result.get('source_headers', template.source_headers_json or []),
+                        'source_rows': existing_result.get('source_rows', []),
+                        'source_sheet_name': existing_result.get('source_sheet_name', ''),
+                        'source_row_count': existing_result.get('source_row_count', 0),
+                        'selected_template_id': template.id,
+                        'template_match': existing_result.get('template_match'),
+                    }
+                    request.session.modified = True
+                    messages.success(request, f'Loaded template "{template.name}". Now upload a file and inspect it to confirm the input matches.')
+                    return redirect('spreadsheet_transformer')
+
                 if action == 'inspect':
                     logger.info('spreadsheet_transformer inspect valid cleaned_has_file=%s', bool(form.cleaned_data.get('file')))
                     if not form.cleaned_data.get('file'):
@@ -171,6 +247,23 @@ def spreadsheet_transformer(request):
                     table = load_tabular_file(form.cleaned_data['file'])
                     logger.info('spreadsheet_transformer inspect parsed sheet=%s rows=%s headers=%s', table.get('sheet_name'), table.get('row_count'), len(table.get('headers') or []))
                     request.session['spreadsheet_transform_table'] = table
+                    existing_result = request.session.get('spreadsheet_transform_result') or {}
+                    selected_template_id = existing_result.get('selected_template_id')
+                    template_match = None
+                    output_plan = existing_result.get('output_plan') or build_output_column_planner(table.get('headers') or [])
+                    column_plan = existing_result.get('column_plan') or []
+                    transform_request = existing_result.get('transform_request', form.cleaned_data['transform_request'])
+                    if selected_template_id and current_tenant and current_workspace:
+                        template = SpreadsheetTransformTemplate.objects.filter(
+                            id=selected_template_id,
+                            tenant=current_tenant,
+                            workspace=current_workspace,
+                        ).first()
+                        if template:
+                            template_match = _template_match_report(template.source_headers_json or [], table.get('headers') or [])
+                            output_plan = template.output_plan_json or output_plan
+                            column_plan = template.column_plan_json or column_plan
+                            transform_request = template.transform_request or transform_request
                     request.session['spreadsheet_transform_result'] = {
                         'plan': None,
                         'detected_fields': {},
@@ -178,15 +271,17 @@ def spreadsheet_transformer(request):
                         'prompt_preview': None,
                         'headers': [],
                         'rows': [],
-                        'export_format': form.cleaned_data.get('export_format') or 'xlsx',
-                        'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
-                        'transform_request': form.cleaned_data['transform_request'],
-                        'column_plan': [],
-                        'output_plan': build_output_column_planner(table.get('headers') or []),
+                        'export_format': form.cleaned_data.get('export_format') or existing_result.get('export_format') or 'xlsx',
+                        'strict_sanitization': form.cleaned_data.get('strict_sanitization') or existing_result.get('strict_sanitization') or False,
+                        'transform_request': transform_request,
+                        'column_plan': column_plan,
+                        'output_plan': output_plan,
                         'source_headers': table.get('headers') or [],
                         'source_rows': (table.get('rows') or [])[:20],
                         'source_sheet_name': table.get('sheet_name') or '',
                         'source_row_count': table.get('row_count') or 0,
+                        'selected_template_id': selected_template_id,
+                        'template_match': template_match,
                     }
                     request.session.modified = True
                     messages.success(request, f"Inspected spreadsheet: {table.get('sheet_name') or 'Sheet1'} with {table.get('row_count') or 0} row(s). Step 2 is ready below.")
