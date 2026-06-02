@@ -4,6 +4,41 @@ from django.db import models
 from control.models import Tenant, Workspace
 
 
+class SpreadsheetTransformTemplate(models.Model):
+    VISIBILITY_PRIVATE = 'private'
+    VISIBILITY_WORKSPACE = 'workspace'
+    VISIBILITY_TENANT = 'tenant'
+    VISIBILITY_CHOICES = [
+        (VISIBILITY_PRIVATE, 'Private'),
+        (VISIBILITY_WORKSPACE, 'Workspace'),
+        (VISIBILITY_TENANT, 'Tenant'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='spreadsheet_transform_templates')
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='spreadsheet_transform_templates')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='spreadsheet_transform_templates')
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default='')
+    visibility = models.CharField(max_length=20, choices=VISIBILITY_CHOICES, default=VISIBILITY_PRIVATE)
+    source_headers_json = models.JSONField(default=list, blank=True)
+    output_plan_json = models.JSONField(default=list, blank=True)
+    column_plan_json = models.JSONField(default=list, blank=True)
+    transform_request = models.TextField(blank=True, default='')
+    export_format = models.CharField(max_length=10, choices=SpreadsheetTransformJob.EXPORT_CHOICES if 'SpreadsheetTransformJob' in globals() else [('xlsx', 'XLSX'), ('csv', 'CSV')], default='xlsx')
+    strict_sanitization = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at', '-created_at']
+        indexes = [
+            models.Index(fields=['tenant', 'workspace', 'visibility']),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
 class SpreadsheetTransformJob(models.Model):
     STATUS_QUEUED = 'queued'
     STATUS_RUNNING = 'running'

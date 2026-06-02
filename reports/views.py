@@ -16,7 +16,7 @@ from control.views import _dashboard_base, _handle_workspace_actions
 from support.models import SupportChannel, SupportConversation, SupportMessage
 from integrations.voice.models import VoiceCallRecord
 from chatbots.models import ChatbotConversation, ChatbotIntegration
-from .models import SpreadsheetTransformJob
+from .models import SpreadsheetTransformJob, SpreadsheetTransformTemplate
 from .tasks import build_spreadsheet_transform_export
 from .spreadsheet_transform import (
     SpreadsheetTransformError,
@@ -124,6 +124,10 @@ def spreadsheet_transformer(request):
     current_tenant = base.get('current_tenant')
     current_workspace = base.get('current_workspace')
     base['spreadsheet_transform_jobs'] = SpreadsheetTransformJob.objects.filter(
+        tenant=current_tenant,
+        workspace=current_workspace,
+    )[:10] if current_tenant and current_workspace else []
+    base['spreadsheet_transform_templates'] = SpreadsheetTransformTemplate.objects.filter(
         tenant=current_tenant,
         workspace=current_workspace,
     )[:10] if current_tenant and current_workspace else []
@@ -277,6 +281,35 @@ def spreadsheet_transformer(request):
                     request.session.pop('spreadsheet_transform_result', None)
                     request.session.modified = True
                     messages.success(request, 'Cleared the spreadsheet transformer state. You can upload a new file and start over.')
+                    return redirect('spreadsheet_transformer')
+
+                elif action == 'save_template':
+                    if not session_result:
+                        raise SpreadsheetTransformError('No transform setup is available yet. Build a spreadsheet transformation first.')
+                    current_tenant = base.get('current_tenant')
+                    current_workspace = base.get('current_workspace')
+                    if not current_tenant or not current_workspace:
+                        raise SpreadsheetTransformError('A tenant and workspace are required to save a template.')
+                    template_name = (request.POST.get('template_name') or '').strip() or 'Untitled spreadsheet template'
+                    template_description = (request.POST.get('template_description') or '').strip()
+                    template_visibility = (request.POST.get('template_visibility') or SpreadsheetTransformTemplate.VISIBILITY_PRIVATE).strip()
+                    if template_visibility not in {choice[0] for choice in SpreadsheetTransformTemplate.VISIBILITY_CHOICES}:
+                        template_visibility = SpreadsheetTransformTemplate.VISIBILITY_PRIVATE
+                    SpreadsheetTransformTemplate.objects.create(
+                        tenant=current_tenant,
+                        workspace=current_workspace,
+                        created_by=request.user,
+                        name=template_name,
+                        description=template_description,
+                        visibility=template_visibility,
+                        source_headers_json=session_result.get('source_headers') or [],
+                        output_plan_json=session_result.get('output_plan') or [],
+                        column_plan_json=session_result.get('column_plan') or [],
+                        transform_request=session_result.get('transform_request', ''),
+                        export_format=session_result.get('export_format') or 'xlsx',
+                        strict_sanitization=bool(session_result.get('strict_sanitization')),
+                    )
+                    messages.success(request, f'Saved template "{template_name}".')
                     return redirect('spreadsheet_transformer')
 
                 elif action == 'download':

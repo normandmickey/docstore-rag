@@ -343,7 +343,7 @@
       </tbody>
     </table>
   </div>
-  <form method="post" style="margin-top:14px;">
+  <form method="post" style="margin-top:14px; display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
     {% csrf_token %}
     {% for field in spreadsheet_transform_form %}
       {% if field.name == 'has_prepared_file' %}
@@ -354,6 +354,44 @@
     {% endfor %}
     <button type="submit" name="action" value="download">Download transformed file</button>
   </form>
+
+  <div style="margin-top:18px; padding-top:14px; border-top:1px solid #243055;">
+    <strong>Save this transformation as a template</strong>
+    <form method="post" style="margin-top:12px; display:grid; grid-template-columns: 1.2fr 1.5fr 180px auto; gap:12px; align-items:end;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="save_template">
+      <label>
+        <div class="meta">Template name</div>
+        <input type="text" name="template_name" placeholder="Example: ACA affordability transform">
+      </label>
+      <label>
+        <div class="meta">Description</div>
+        <input type="text" name="template_description" placeholder="Optional notes about when to reuse this setup">
+      </label>
+      <label>
+        <div class="meta">Visibility</div>
+        <select name="template_visibility">
+          <option value="private">Private</option>
+          <option value="workspace">Workspace</option>
+          <option value="tenant">Tenant</option>
+        </select>
+      </label>
+      <button type="submit">Save as template</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if spreadsheet_transform_templates %}
+<div class="card">
+  <h2>Saved templates</h2>
+  {% for template in spreadsheet_transform_templates %}
+    <div class="row">
+      <strong>{{ template.name }}</strong> · <span class="meta">{{ template.visibility }}</span><br>
+      {% if template.description %}<div class="meta">{{ template.description }}</div>{% endif %}
+      <div class="meta">Updated {{ template.updated_at }}</div>
+    </div>
+  {% endfor %}
 </div>
 {% endif %}
 
