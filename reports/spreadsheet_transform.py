@@ -60,12 +60,22 @@ def load_tabular_file(uploaded_file) -> dict[str, Any]:
                 'row_count': 0,
                 'source_type': 'xlsx',
             }
-        headers = [str(value).strip() if value is not None else '' for value in values[0]]
+        raw_headers = [str(value).strip() if value is not None else '' for value in values[0]]
+        headers = []
+        seen = {}
+        for idx, header in enumerate(raw_headers):
+            key = header or f'column_{idx + 1}'
+            if key in seen:
+                seen[key] += 1
+                key = f'{key}_{seen[key]}'
+            else:
+                seen[key] = 1
+            headers.append(key)
         rows = []
         for value_row in values[1:]:
             row = {}
             for idx, header in enumerate(headers):
-                key = header or f'column_{idx + 1}'
+                key = header
                 cell = value_row[idx] if idx < len(value_row) else None
                 row[key] = '' if cell is None else str(cell)
             if any(str(v).strip() for v in row.values()):
