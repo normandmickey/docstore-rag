@@ -110,7 +110,7 @@ class SupportMessage(models.Model):
     direction = models.CharField(max_length=20, choices=DIR_CHOICES)
     kind = models.CharField(max_length=20, choices=KIND_CHOICES, default=KIND_SMS)
     body = models.TextField(blank=True, default='')
-    provider_message_sid = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    provider_message_sid = models.CharField(max_length=255, blank=True, default='', db_index=True)
     delivery_status = models.CharField(max_length=40, blank=True, default='')
     sent_by_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='support_messages_sent')
     retrieval_metadata_json = models.JSONField(default=dict, blank=True)

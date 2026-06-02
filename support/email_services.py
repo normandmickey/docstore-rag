@@ -46,7 +46,7 @@ def ingest_inbound_email(*, integration: TenantEmailIntegration, from_email: str
     from_name = (from_name or '').strip()
     subject = (subject or '').strip()
     body_text = (body_text or '').strip()
-    provider_message_id = (provider_message_id or '').strip()
+    provider_message_id = (provider_message_id or '').strip()[:255]
     provider_thread_id = (provider_thread_id or '').strip()
     raw_payload = raw_payload or {}
 
@@ -176,7 +176,7 @@ def send_support_email_reply(*, conversation: SupportConversation, body: str, se
 
     html = linebreaks(body)
     send_result = client.send_message(to_email=to_email, subject=subject, text=body, html=html)
-    provider_message_id = str((send_result or {}).get('id') or (send_result or {}).get('message_id') or '')
+    provider_message_id = str((send_result or {}).get('id') or (send_result or {}).get('message_id') or '')[:255]
 
     thread_id = (conversation.metadata_json or {}).get('email_thread_id', '')
     message = SupportMessage.objects.create(
