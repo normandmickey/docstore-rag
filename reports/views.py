@@ -357,11 +357,14 @@ def spreadsheet_transformer(request):
                     if not session_table:
                         raise SpreadsheetTransformError('No inspected file is available yet. Upload and inspect a CSV or XLSX file first.')
                     table = session_table
+                    lookup_table = request.session.get('spreadsheet_transform_lookup_table') or {}
                     preliminary_payload, detected_fields, sanitized_samples, _ = build_transform_prompt_payload(
                         headers=table['headers'],
                         rows=table['rows'],
                         user_request=form.cleaned_data['transform_request'],
                         strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
+                        lookup_headers=lookup_table.get('headers') or [],
+                        lookup_rows=lookup_table.get('rows') or [],
                     )
                     existing_column_plan = session_result.get('column_plan') or []
                     posted_output_plan = _read_output_plan_from_post(request)
@@ -375,6 +378,8 @@ def spreadsheet_transformer(request):
                         strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
                         column_plan=column_plan,
                         output_plan=output_plan,
+                        lookup_headers=lookup_table.get('headers') or [],
+                        lookup_rows=lookup_table.get('rows') or [],
                     )
                     request.session['spreadsheet_transform_result'] = {
                         'plan': None,
@@ -404,6 +409,7 @@ def spreadsheet_transformer(request):
                         raise SpreadsheetTransformError('No prepared prompt is available yet. Upload a file and prepare the prompt first.')
                     column_plan = _read_column_plan_from_post(request) or session_result.get('column_plan') or []
                     output_plan = _read_output_plan_from_post(request) or session_result.get('output_plan') or []
+                    lookup_table = request.session.get('spreadsheet_transform_lookup_table') or {}
                     plan, detected_fields, sanitized_samples, prompt_preview = plan_transform(
                         headers=session_table.get('headers') or [],
                         rows=session_table.get('rows') or [],
@@ -411,6 +417,8 @@ def spreadsheet_transformer(request):
                         strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
                         column_plan=column_plan,
                         output_plan=output_plan,
+                        lookup_headers=lookup_table.get('headers') or [],
+                        lookup_rows=lookup_table.get('rows') or [],
                     )
                     lookup_table = request.session.get('spreadsheet_transform_lookup_table') or {}
                     headers, transformed_rows = apply_transform_plan(
