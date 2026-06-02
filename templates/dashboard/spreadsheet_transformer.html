@@ -167,6 +167,14 @@
         <input type="hidden" name="{{ field.name }}" value="{{ field.value|default_if_none:'' }}">
       {% endif %}
     {% endfor %}
+    {% if spreadsheet_transform_output_plan %}
+      <input type="hidden" name="output_plan_total" value="{{ spreadsheet_transform_output_plan|length }}">
+      {% for item in spreadsheet_transform_output_plan %}
+        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_name" value="{{ item.name }}">
+        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_source_hint" value="{{ item.source_hint }}">
+        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}">
+      {% endfor %}
+    {% endif %}
     <input type="hidden" name="column_plan_total" value="{{ spreadsheet_transform_column_plan|length }}">
     {% for item in spreadsheet_transform_column_plan %}
       <div class="row" style="border:1px solid #243041; border-radius:10px; padding:14px; margin-bottom:12px;">

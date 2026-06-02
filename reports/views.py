@@ -69,6 +69,18 @@ def _column_legend(headers: list[str]) -> list[dict]:
     return legend
 
 
+def _read_output_plan_from_post(request) -> list[dict]:
+    total = int((request.POST.get('output_plan_total') or '0').strip() or 0)
+    items = []
+    for idx in range(total):
+        items.append({
+            'name': (request.POST.get(f'output_plan_{idx}_name') or '').strip(),
+            'source_hint': (request.POST.get(f'output_plan_{idx}_source_hint') or '').strip(),
+            'instructions': (request.POST.get(f'output_plan_{idx}_instructions') or '').strip(),
+        })
+    return [item for item in items if item.get('name') or item.get('source_hint') or item.get('instructions')]
+
+
 def _read_column_plan_from_post(request) -> list[dict]:
     total = int((request.POST.get('column_plan_total') or '0').strip() or 0)
     items = []
@@ -184,9 +196,10 @@ def spreadsheet_transformer(request):
                         strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
                     )
                     existing_column_plan = session_result.get('column_plan') or []
+                    posted_output_plan = _read_output_plan_from_post(request)
                     existing_output_plan = session_result.get('output_plan') or []
                     column_plan = existing_column_plan or build_column_planner(table['headers'], sanitized_samples, detected_fields)
-                    output_plan = existing_output_plan or build_output_column_planner(table['headers'])
+                    output_plan = posted_output_plan or existing_output_plan or build_output_column_planner(table['headers'])
                     user_payload, detected_fields, sanitized_samples, system_prompt = build_transform_prompt_payload(
                         headers=table['headers'],
                         rows=table['rows'],
@@ -220,7 +233,7 @@ def spreadsheet_transformer(request):
                     if not session_table:
                         raise SpreadsheetTransformError('No prepared prompt is available yet. Upload a file and prepare the prompt first.')
                     column_plan = _read_column_plan_from_post(request) or session_result.get('column_plan') or []
-                    output_plan = session_result.get('output_plan') or []
+                    output_plan = _read_output_plan_from_post(request) or session_result.get('output_plan') or []
                     plan, detected_fields, sanitized_samples, prompt_preview = plan_transform(
                         headers=session_table.get('headers') or [],
                         rows=session_table.get('rows') or [],
@@ -229,7 +242,7 @@ def spreadsheet_transformer(request):
                         column_plan=column_plan,
                         output_plan=output_plan,
                     )
-                    headers, transformed_rows = apply_transform_plan(rows=session_table.get('rows') or [], plan=plan)
+                    headers, transformed_rows = apply_transform_plan(rows=session_table.get('rows') or [], plan=plan, output_plan=output_plan)
                     request.session['spreadsheet_transform_result'] = {
                         'plan': plan,
                         'detected_fields': detected_fields,
