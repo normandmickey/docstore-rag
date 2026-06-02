@@ -13,6 +13,7 @@ from integrations.voice.models import VoiceCallRecord
 
 from .forms import SupportChannelForm, SupportConversationUpdateForm, SupportReplyForm
 from .models import SupportChannel, SupportContact, SupportConversation, SupportMessage
+from .email_services import TenantEmailIntegrationError, send_support_email_reply
 from .services import attach_voicemail_to_call, ingest_inbound_call, ingest_inbound_sms, update_message_delivery_status
 from .twilio import TwilioRestException, build_ivr_menu_twiml, build_voicemail_twiml, send_sms, twilio_enabled, validate_twilio_request
 
@@ -171,51 +172,65 @@ def support_conversation_detail(request, conversation_id):
         if reply_form.is_valid():
             body = (reply_form.cleaned_data.get('body') or '').strip()
             if body:
-                if not twilio_enabled():
-                    SupportMessage.objects.create(
-                        conversation=conversation,
-                        direction=SupportMessage.DIR_OUTBOUND,
-                        kind=SupportMessage.KIND_SYSTEM,
-                        body=body,
-                        sent_by_user=request.user,
-                        delivery_status='draft',
-                    )
-                    conversation.last_message_at = timezone.now()
-                    if conversation.status == SupportConversation.STATUS_CLOSED:
-                        conversation.status = SupportConversation.STATUS_OPEN
-                    conversation.save(update_fields=['last_message_at', 'status', 'updated_at'])
-                    messages.warning(request, 'Twilio is not configured yet, so this reply was saved as a local draft only.')
-                    return redirect('support_conversation_detail', conversation_id=conversation.id)
+                if conversation.channel.channel_type == SupportChannel.TYPE_EMAIL:
+                    try:
+                        _message, _send_result = send_support_email_reply(
+                            conversation=conversation,
+                            body=body,
+                            sent_by_user=request.user,
+                        )
+                        messages.success(request, 'Reply sent via AgentMail.')
+                        return redirect('support_conversation_detail', conversation_id=conversation.id)
+                    except TenantEmailIntegrationError as exc:
+                        messages.error(request, f'AgentMail send failed: {exc}')
+                    except Exception as exc:
+                        messages.error(request, f'Unexpected email send error: {exc}')
+                else:
+                    if not twilio_enabled():
+                        SupportMessage.objects.create(
+                            conversation=conversation,
+                            direction=SupportMessage.DIR_OUTBOUND,
+                            kind=SupportMessage.KIND_SYSTEM,
+                            body=body,
+                            sent_by_user=request.user,
+                            delivery_status='draft',
+                        )
+                        conversation.last_message_at = timezone.now()
+                        if conversation.status == SupportConversation.STATUS_CLOSED:
+                            conversation.status = SupportConversation.STATUS_OPEN
+                        conversation.save(update_fields=['last_message_at', 'status', 'updated_at'])
+                        messages.warning(request, 'Twilio is not configured yet, so this reply was saved as a local draft only.')
+                        return redirect('support_conversation_detail', conversation_id=conversation.id)
 
-                try:
-                    provider_message = send_sms(
-                        from_number=conversation.channel.twilio_phone_number,
-                        to_number=conversation.contact.phone_number,
-                        body=body,
-                    )
-                    SupportMessage.objects.create(
-                        conversation=conversation,
-                        direction=SupportMessage.DIR_OUTBOUND,
-                        kind=SupportMessage.KIND_SMS,
-                        body=body,
-                        sent_by_user=request.user,
-                        provider_message_sid=getattr(provider_message, 'sid', '') or '',
-                        delivery_status=getattr(provider_message, 'status', '') or 'queued',
-                        metadata_json={
-                            'twilio_from': conversation.channel.twilio_phone_number,
-                            'twilio_to': conversation.contact.phone_number,
-                        },
-                    )
-                    conversation.last_message_at = timezone.now()
-                    if conversation.status == SupportConversation.STATUS_CLOSED:
-                        conversation.status = SupportConversation.STATUS_OPEN
-                    conversation.save(update_fields=['last_message_at', 'status', 'updated_at'])
-                    messages.success(request, 'Reply sent via Twilio.')
-                    return redirect('support_conversation_detail', conversation_id=conversation.id)
-                except TwilioRestException as exc:
-                    messages.error(request, f'Twilio send failed: {exc}')
-                except Exception as exc:
-                    messages.error(request, f'Unexpected send error: {exc}')
+                    try:
+                        provider_message = send_sms(
+                            from_number=conversation.channel.twilio_phone_number,
+                            to_number=conversation.contact.phone_number,
+                            body=body,
+                        )
+                        SupportMessage.objects.create(
+                            conversation=conversation,
+                            direction=SupportMessage.DIR_OUTBOUND,
+                            kind=SupportMessage.KIND_SMS,
+                            body=body,
+                            sent_by_user=request.user,
+                            provider_message_sid=getattr(provider_message, 'sid', '') or '',
+                            delivery_status=getattr(provider_message, 'status', '') or 'queued',
+                            metadata_json={
+                                'twilio_from': conversation.channel.twilio_phone_number,
+                                'twilio_to': conversation.contact.phone_number,
+                            },
+                        )
+                        conversation.last_message_at = timezone.now()
+                        if conversation.status == SupportConversation.STATUS_CLOSED:
+                            conversation.status = SupportConversation.STATUS_OPEN
+                        conversation.save(update_fields=['last_message_at', 'status', 'updated_at'])
+                        messages.success(request, 'Reply sent via Twilio.')
+                        return redirect('support_conversation_detail', conversation_id=conversation.id)
+                    except TwilioRestException as exc:
+                        messages.error(request, f'Twilio send failed: {exc}')
+                    except Exception as exc:
+                        messages.error(request, f'Unexpected send error: {exc}')
     elif request.method == 'POST' and request.POST.get('action') == 'update_conversation':
         update_form = SupportConversationUpdateForm(request.POST, instance=conversation, tenant=tenant)
         reply_form = SupportReplyForm()

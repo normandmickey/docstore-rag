@@ -3,7 +3,7 @@
 {% block content %}
 <div class="card">
   <h2>Conversation</h2>
-  <p class="meta">{{ support_conversation.contact.name|default:support_conversation.contact.phone_number }} · {{ support_conversation.contact.phone_number }}</p>
+  <p class="meta">{{ support_conversation.contact.name|default:support_conversation.contact.email|default:support_conversation.contact.phone_number }} · {% if support_conversation.channel.channel_type == 'email' %}{{ support_conversation.contact.email }}{% else %}{{ support_conversation.contact.phone_number }}{% endif %}</p>
   <p class="meta">Channel: {{ support_conversation.channel.name }}{% if support_conversation.workspace_context %} · Workspace context: {{ support_conversation.workspace_context.name }}{% endif %}</p>
 </div>
 
@@ -24,7 +24,7 @@
 
 <div class="card">
   <h2>Reply</h2>
-  <p class="meta">If Twilio is configured, replies send as real SMS from this channel number. Otherwise they are saved as local drafts.</p>
+  <p class="meta">{% if support_conversation.channel.channel_type == 'email' %}Replies send through the tenant's AgentMail inbox to this contact's email address.{% else %}If Twilio is configured, replies send as real SMS from this channel number. Otherwise they are saved as local drafts.{% endif %}</p>
   <form method="post">
     {% csrf_token %}
     <input type="hidden" name="action" value="reply">
@@ -33,7 +33,7 @@
       {{ field }}
       {% for error in field.errors %}<div class="msg" style="background:#4a1d1d;border-color:#7f1d1d;color:#fee2e2;">{{ error }}</div>{% endfor %}
     {% endfor %}
-    <button type="submit">Save reply draft</button>
+    <button type="submit">{% if support_conversation.channel.channel_type == 'email' %}Send email reply{% else %}Save reply draft{% endif %}</button>
   </form>
 </div>
 

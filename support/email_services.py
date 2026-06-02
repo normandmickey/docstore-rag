@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from django.db import transaction
 from django.utils import timezone
+from django.utils.html import linebreaks
 
 from control.agentmail import AgentMailClient, AgentMailError
 
@@ -132,3 +133,48 @@ def ingest_inbound_email(*, integration: TenantEmailIntegration, from_email: str
         conversation.workspace_context = integration.default_workspace
     conversation.save(update_fields=['last_message_at', 'status', 'workspace_context', 'updated_at'])
     return conversation, message
+
+
+@transaction.atomic
+def send_support_email_reply(*, conversation: SupportConversation, body: str, sent_by_user=None):
+    tenant = conversation.tenant
+    body = (body or '').strip()
+    if not body:
+        raise TenantEmailIntegrationError('Email reply body is required.')
+
+    client = TenantEmailClient.for_tenant(tenant)
+    integration = client.integration
+    to_email = (conversation.contact.email or '').strip().lower()
+    if not to_email:
+        raise TenantEmailIntegrationError('This support contact does not have an email address.')
+
+    subject = (conversation.subject or '').strip() or 'Support reply'
+    if not subject.lower().startswith('re:'):
+        subject = f'Re: {subject}'
+
+    html = linebreaks(body)
+    send_result = client.send_message(to_email=to_email, subject=subject, text=body, html=html)
+    provider_message_id = str((send_result or {}).get('id') or (send_result or {}).get('message_id') or '')
+
+    message = SupportMessage.objects.create(
+        conversation=conversation,
+        direction=SupportMessage.DIR_OUTBOUND,
+        kind=SupportMessage.KIND_EMAIL,
+        body=body,
+        sent_by_user=sent_by_user,
+        provider_message_sid=provider_message_id,
+        delivery_status='sent' if provider_message_id else 'queued',
+        metadata_json={
+            'provider': integration.provider,
+            'integration_id': integration.id,
+            'to_email': to_email,
+            'from_email': integration.from_email,
+            'subject': subject,
+            'send_result': send_result,
+        },
+    )
+    conversation.last_message_at = message.created_at
+    if conversation.status == SupportConversation.STATUS_CLOSED:
+        conversation.status = SupportConversation.STATUS_OPEN
+    conversation.save(update_fields=['last_message_at', 'status', 'updated_at'])
+    return message, send_result
