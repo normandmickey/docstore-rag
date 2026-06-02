@@ -612,9 +612,11 @@ def _apply_structured_output_plan(rows: list[dict[str, Any]], output_plan: list[
             operation = (item.get('operation') or 'keep').strip().lower()
             source_a = _resolve_source_name(item.get('source_a') or '', row)
             notes = (item.get('instructions') or '').strip()
-            if operation in {'keep', 'rename'} and source_a and source_a in row:
+            if operation == 'lookup' and name in row:
+                out[name] = row.get(name, '')
+            elif operation in {'keep', 'rename'} and source_a and source_a in row:
                 out[name] = row.get(source_a, '')
-            elif operation in {'multiply', 'divide', 'add', 'subtract'} and name in row:
+            elif operation in {'multiply', 'divide', 'add', 'subtract', 'time_to_decimal_hours'} and name in row:
                 out[name] = row.get(name, '')
             elif source_a and source_a in row:
                 out[name] = row.get(source_a, '')
