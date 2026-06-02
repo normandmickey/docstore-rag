@@ -8,6 +8,13 @@ from audit.models import RetrievalLog
 from documents.models import Chunk, Document, DocumentWorkspaceAssignment, DocumentVersion, ExtractedFact
 from providers import answer_with_context, embed_texts, rewrite_question
 from control.pii import redact_pii
+from support.shipping import ShippingManagerClient, ShippingManagerError, ShippingManagerNotConfigured
+
+
+SHIPPING_QUERY_HINTS = [
+    'tracking', 'shipment', 'package', 'fedex', 'delivered', 'delivery status', 'where is my package',
+    'where is the package', 'where is my shipment', 'latest status', 'tracking number'
+]
 
 
 TERM_EQUIVALENTS = {
@@ -387,6 +394,74 @@ def extract_code_lookup_answer(query, results, document=None):
     return None
 
 
+def _extract_tracking_number(query: str) -> str:
+    compact = re.sub(r'[^0-9]', '', query or '')
+    return compact if len(compact) >= 10 else ''
+
+
+
+def maybe_answer_shipping_question(*, tenant, workspace, query: str):
+    normalized = (query or '').strip().lower()
+    tracking_number = _extract_tracking_number(query)
+    if not tracking_number and not any(hint in normalized for hint in SHIPPING_QUERY_HINTS):
+        return None
+
+    try:
+        client = ShippingManagerClient.for_tenant(tenant)
+    except ShippingManagerNotConfigured:
+        return None
+
+    try:
+        if tracking_number:
+            payload = client.get_latest_status(tracking_number)
+            package = payload.get('package') or {}
+            latest_event = payload.get('latest_event') or {}
+            status = package.get('status') or latest_event.get('status') or 'Unknown'
+            location = latest_event.get('location') or package.get('latest_location') or ''
+            details = latest_event.get('details') or ''
+            pieces = [f'Tracking {tracking_number}: {status}.']
+            if location:
+                pieces.append(f'Location: {location}.')
+            if details:
+                pieces.append(details)
+            return {
+                'answer': ' '.join(piece.strip() for piece in pieces if piece).strip(),
+                'sources': [],
+                'shipping_lookup': True,
+                'tracking_number': tracking_number,
+            }, []
+
+        payload = client.search_packages(query.strip(), limit=3)
+        results = payload.get('results') or []
+        if not results:
+            return {
+                'answer': 'I could not find a matching package in the tenant shipping manager.',
+                'sources': [],
+                'shipping_lookup': True,
+            }, []
+        lines = []
+        for row in results[:3]:
+            tracking = row.get('tracking_number') or 'unknown'
+            status = row.get('status') or 'Unknown'
+            location = row.get('latest_location') or ''
+            snippet = f'{tracking}: {status}'
+            if location:
+                snippet += f' — {location}'
+            lines.append(snippet)
+        return {
+            'answer': 'Here are the closest shipping matches:\n- ' + '\n- '.join(lines),
+            'sources': [],
+            'shipping_lookup': True,
+        }, []
+    except ShippingManagerError:
+        return {
+            'answer': 'I had trouble reaching the tenant shipping manager just now.',
+            'sources': [],
+            'shipping_lookup': True,
+        }, []
+
+
+
 def build_context_blocks(results, facts=None):
     blocks = []
     for idx, fact in enumerate(facts or [], start=1):
@@ -405,6 +480,10 @@ def build_context_blocks(results, facts=None):
 
 
 def answer_question(*, tenant, workspace, query, top_k=5, document_id=None, temperature=None):
+    shipping_answer = maybe_answer_shipping_question(tenant=tenant, workspace=workspace, query=query)
+    if shipping_answer is not None:
+        return shipping_answer
+
     facts = retrieve_facts(
         tenant=tenant,
         workspace=workspace,

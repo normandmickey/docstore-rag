@@ -48,8 +48,23 @@
     </form>
     {% if shipping_integration %}
       <div class="row">
-        <strong>{{ shipping_integration.label }}</strong><br>
-        <span class="meta">{{ shipping_integration.base_url }} · {{ shipping_integration.status|title }}{% if shipping_integration.last_tested_at %} · Last tested {{ shipping_integration.last_tested_at }}{% endif %}{% if shipping_integration.last_test_status %} · {{ shipping_integration.last_test_status }}{% endif %}</span>
+        <strong>{{ shipping_integration.label }}</strong>
+        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          {% if shipping_integration.status == 'active' %}
+            <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:#153a22; color:#bbf7d0; border:1px solid #166534; font-size:12px; font-weight:600;">Active</span>
+          {% else %}
+            <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:#3b1724; color:#fecdd3; border:1px solid #9f1239; font-size:12px; font-weight:600;">Disabled</span>
+          {% endif %}
+          {% if shipping_integration.last_test_status == 'ok' %}
+            <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:#13203f; color:#bfdbfe; border:1px solid #2563eb; font-size:12px; font-weight:600;">Connection OK</span>
+          {% elif shipping_integration.last_test_status == 'error' %}
+            <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:#3f1d12; color:#fed7aa; border:1px solid #c2410c; font-size:12px; font-weight:600;">Last test failed</span>
+          {% else %}
+            <span style="display:inline-block; padding:4px 10px; border-radius:999px; background:#1f2937; color:#d1d5db; border:1px solid #374151; font-size:12px; font-weight:600;">Not tested yet</span>
+          {% endif %}
+        </div>
+        <br>
+        <span class="meta">{{ shipping_integration.base_url }}{% if shipping_integration.last_tested_at %} · Last tested {{ shipping_integration.last_tested_at }}{% endif %}</span>
         {% if shipping_integration.last_test_message %}
           <div class="meta" style="margin-top:8px;">{{ shipping_integration.last_test_message }}</div>
         {% endif %}
