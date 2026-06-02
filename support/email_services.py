@@ -41,12 +41,14 @@ class TenantEmailClient:
 
 
 @transaction.atomic
-def ingest_inbound_email(*, integration: TenantEmailIntegration, from_email: str, from_name: str = '', subject: str = '', body_text: str = '', provider_message_id: str = ''):
+def ingest_inbound_email(*, integration: TenantEmailIntegration, from_email: str, from_name: str = '', subject: str = '', body_text: str = '', provider_message_id: str = '', provider_thread_id: str = '', raw_payload: dict | None = None):
     from_email = (from_email or '').strip().lower()
     from_name = (from_name or '').strip()
     subject = (subject or '').strip()
     body_text = (body_text or '').strip()
     provider_message_id = (provider_message_id or '').strip()
+    provider_thread_id = (provider_thread_id or '').strip()
+    raw_payload = raw_payload or {}
 
     if not from_email:
         raise TenantEmailIntegrationError('Inbound email is missing sender email address.')
@@ -93,12 +95,21 @@ def ingest_inbound_email(*, integration: TenantEmailIntegration, from_email: str
         contact.name = from_name
         contact.save(update_fields=['name', 'updated_at'])
 
-    conversation = SupportConversation.objects.filter(
-        tenant=integration.tenant,
-        channel=channel,
-        contact=contact,
-        status__in=[SupportConversation.STATUS_OPEN, SupportConversation.STATUS_PENDING],
-    ).order_by('-last_message_at', '-updated_at', '-id').first()
+    conversation = None
+    if provider_thread_id:
+        conversation = SupportConversation.objects.filter(
+            tenant=integration.tenant,
+            channel=channel,
+            metadata_json__email_thread_id=provider_thread_id,
+        ).order_by('-last_message_at', '-updated_at', '-id').first()
+
+    if conversation is None:
+        conversation = SupportConversation.objects.filter(
+            tenant=integration.tenant,
+            channel=channel,
+            contact=contact,
+            status__in=[SupportConversation.STATUS_OPEN, SupportConversation.STATUS_PENDING],
+        ).order_by('-last_message_at', '-updated_at', '-id').first()
 
     if conversation is None:
         conversation = SupportConversation.objects.create(
@@ -109,8 +120,17 @@ def ingest_inbound_email(*, integration: TenantEmailIntegration, from_email: str
             status=SupportConversation.STATUS_OPEN,
             subject=subject[:255],
             last_message_at=timezone.now(),
-            metadata_json={'source': 'email', 'integration_id': integration.id},
+            metadata_json={
+                'source': 'email',
+                'integration_id': integration.id,
+                'email_thread_id': provider_thread_id,
+            },
         )
+    elif provider_thread_id and (conversation.metadata_json or {}).get('email_thread_id') != provider_thread_id:
+        conversation.metadata_json = {
+            **(conversation.metadata_json or {}),
+            'email_thread_id': provider_thread_id,
+        }
 
     message = SupportMessage.objects.create(
         conversation=conversation,
@@ -124,6 +144,8 @@ def ingest_inbound_email(*, integration: TenantEmailIntegration, from_email: str
             'from_email': from_email,
             'from_name': from_name,
             'integration_id': integration.id,
+            'provider_thread_id': provider_thread_id,
+            'raw_payload': raw_payload,
         },
     )
     conversation.last_message_at = message.created_at
@@ -131,7 +153,7 @@ def ingest_inbound_email(*, integration: TenantEmailIntegration, from_email: str
         conversation.status = SupportConversation.STATUS_OPEN
     if not conversation.workspace_context_id and integration.default_workspace_id:
         conversation.workspace_context = integration.default_workspace
-    conversation.save(update_fields=['last_message_at', 'status', 'workspace_context', 'updated_at'])
+    conversation.save(update_fields=['last_message_at', 'status', 'workspace_context', 'metadata_json', 'updated_at'])
     return conversation, message
 
 
@@ -156,6 +178,7 @@ def send_support_email_reply(*, conversation: SupportConversation, body: str, se
     send_result = client.send_message(to_email=to_email, subject=subject, text=body, html=html)
     provider_message_id = str((send_result or {}).get('id') or (send_result or {}).get('message_id') or '')
 
+    thread_id = (conversation.metadata_json or {}).get('email_thread_id', '')
     message = SupportMessage.objects.create(
         conversation=conversation,
         direction=SupportMessage.DIR_OUTBOUND,
@@ -170,6 +193,7 @@ def send_support_email_reply(*, conversation: SupportConversation, body: str, se
             'to_email': to_email,
             'from_email': integration.from_email,
             'subject': subject,
+            'provider_thread_id': thread_id,
             'send_result': send_result,
         },
     )

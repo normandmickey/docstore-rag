@@ -11,11 +11,16 @@ from .models import TenantEmailIntegration
 class AgentMailInboundSerializer(serializers.Serializer):
     inbox_id = serializers.CharField(required=False, allow_blank=True)
     message_id = serializers.CharField(required=False, allow_blank=True)
+    thread_id = serializers.CharField(required=False, allow_blank=True)
     subject = serializers.CharField(required=False, allow_blank=True)
     text = serializers.CharField(required=False, allow_blank=True)
     html = serializers.CharField(required=False, allow_blank=True)
     from_email = serializers.EmailField(required=False, allow_blank=True)
     from_name = serializers.CharField(required=False, allow_blank=True)
+    event_type = serializers.CharField(required=False, allow_blank=True)
+    event_id = serializers.CharField(required=False, allow_blank=True)
+    message = serializers.JSONField(required=False)
+    thread = serializers.JSONField(required=False)
     payload_json = serializers.JSONField(required=False)
 
 
@@ -47,20 +52,59 @@ class AgentMailInboundWebhookView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
+        message_payload = data.get('message') or {}
+        thread_payload = data.get('thread') or {}
+        payload_json = data.get('payload_json') or {}
+
+        normalized_inbox_id = (
+            (data.get('inbox_id') or '').strip()
+            or str(message_payload.get('inbox_id') or '').strip()
+            or str(payload_json.get('inbox_id') or '').strip()
+        )
+
         integration = TenantEmailIntegration.objects.filter(
-            inbox_id=(data.get('inbox_id') or '').strip(),
+            inbox_id=normalized_inbox_id,
             provider=TenantEmailIntegration.PROVIDER_AGENTMAIL,
             status=TenantEmailIntegration.STATUS_ACTIVE,
         ).first()
         if integration is None:
             return Response({'detail': 'No active tenant email integration found for that inbox.'}, status=404)
 
-        payload_json = data.get('payload_json') or {}
-        from_email = (data.get('from_email') or payload_json.get('from_email') or '').strip().lower()
-        from_name = (data.get('from_name') or payload_json.get('from_name') or '').strip()
-        subject = (data.get('subject') or payload_json.get('subject') or '').strip()
-        body_text = (data.get('text') or payload_json.get('text') or data.get('html') or '').strip()
-        provider_message_id = (data.get('message_id') or payload_json.get('message_id') or '').strip()
+        raw_from = message_payload.get('from') or payload_json.get('from') or []
+        first_from = raw_from[0] if isinstance(raw_from, list) and raw_from else {}
+        from_email = (
+            (data.get('from_email') or '').strip().lower()
+            or str(first_from.get('email') or '').strip().lower()
+            or str(payload_json.get('from_email') or '').strip().lower()
+        )
+        from_name = (
+            (data.get('from_name') or '').strip()
+            or str(first_from.get('name') or '').strip()
+            or str(payload_json.get('from_name') or '').strip()
+        )
+        subject = (
+            (data.get('subject') or '').strip()
+            or str(message_payload.get('subject') or '').strip()
+            or str(thread_payload.get('subject') or '').strip()
+            or str(payload_json.get('subject') or '').strip()
+        )
+        body_text = (
+            (data.get('text') or '').strip()
+            or str(message_payload.get('text') or '').strip()
+            or str(payload_json.get('text') or '').strip()
+            or (data.get('html') or '').strip()
+            or str(message_payload.get('html') or '').strip()
+        )
+        provider_message_id = (
+            (data.get('message_id') or '').strip()
+            or str(message_payload.get('message_id') or '').strip()
+            or str(payload_json.get('message_id') or '').strip()
+        )
+        provider_thread_id = (
+            (data.get('thread_id') or '').strip()
+            or str(thread_payload.get('thread_id') or '').strip()
+            or str(message_payload.get('thread_id') or '').strip()
+        )
 
         try:
             conversation, message = ingest_inbound_email(
@@ -70,6 +114,8 @@ class AgentMailInboundWebhookView(APIView):
                 subject=subject,
                 body_text=body_text,
                 provider_message_id=provider_message_id,
+                provider_thread_id=provider_thread_id,
+                raw_payload=request.data if isinstance(request.data, dict) else {},
             )
         except TenantEmailIntegrationError as exc:
             return Response({'detail': str(exc)}, status=400)
