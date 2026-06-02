@@ -46,12 +46,12 @@
   <h2>Original file preview</h2>
   <p class="meta">Real uploaded spreadsheet preview shown locally before any AI planning step.</p>
   <div class="meta" style="margin-bottom:10px;">Sheet: {{ spreadsheet_transform_source_sheet_name }} · Rows detected: {{ spreadsheet_transform_source_row_count }}</div>
-  <div style="overflow-x:auto;">
-    <table>
+  <div style="overflow-x:auto; border:1px solid #243055; border-radius:12px; background:#0f172a;">
+    <table style="width:max-content; min-width:100%; border-collapse:separate; border-spacing:0; table-layout:auto;">
       <thead>
         <tr>
           {% for header in spreadsheet_transform_source_headers %}
-            <th>{{ header }}</th>
+            <th style="position:sticky; top:0; background:#172036; color:#e5edff; text-align:left; padding:10px 12px; border-bottom:1px solid #243055; border-right:1px solid #243055; min-width:140px; white-space:normal; vertical-align:top;">{{ header }}</th>
           {% endfor %}
         </tr>
       </thead>
@@ -59,7 +59,7 @@
         {% for row in spreadsheet_transform_source_rows %}
           <tr>
             {% for header in spreadsheet_transform_source_headers %}
-              <td>{{ row|get_item:header }}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid #1f2a44; border-right:1px solid #1f2a44; min-width:140px; white-space:nowrap; vertical-align:top;">{{ row|get_item:header }}</td>
             {% endfor %}
           </tr>
         {% endfor %}
@@ -183,12 +183,12 @@
 <div class="card">
   <h2>Step 4 · Review preview and export</h2>
   <p class="meta">Review the transformed preview before exporting the final file.</p>
-  <div style="overflow-x:auto;">
-    <table>
+  <div style="overflow-x:auto; border:1px solid #243055; border-radius:12px; background:#0f172a;">
+    <table style="width:max-content; min-width:100%; border-collapse:separate; border-spacing:0; table-layout:auto;">
       <thead>
         <tr>
           {% for header in spreadsheet_transform_preview_headers %}
-            <th>{{ header }}</th>
+            <th style="position:sticky; top:0; background:#172036; color:#e5edff; text-align:left; padding:10px 12px; border-bottom:1px solid #243055; border-right:1px solid #243055; min-width:140px; white-space:normal; vertical-align:top;">{{ header }}</th>
           {% endfor %}
         </tr>
       </thead>
@@ -196,7 +196,7 @@
         {% for row in spreadsheet_transform_preview_rows %}
           <tr>
             {% for header in spreadsheet_transform_preview_headers %}
-              <td>{{ row|get_item:header }}</td>
+              <td style="padding:10px 12px; border-bottom:1px solid #1f2a44; border-right:1px solid #1f2a44; min-width:140px; white-space:nowrap; vertical-align:top;">{{ row|get_item:header }}</td>
             {% endfor %}
           </tr>
         {% endfor %}
