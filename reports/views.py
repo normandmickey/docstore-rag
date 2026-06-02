@@ -96,6 +96,26 @@ def spreadsheet_transformer(request):
         workspace=current_workspace,
     )[:10] if current_tenant and current_workspace else []
 
+    session_result = request.session.get('spreadsheet_transform_result') or {}
+    if session_result:
+        base['spreadsheet_transform_form'] = SpreadsheetTransformForm(initial={
+            'transform_request': session_result.get('transform_request', ''),
+            'export_format': session_result.get('export_format', 'xlsx'),
+            'strict_sanitization': session_result.get('strict_sanitization', False),
+            'has_prepared_file': True,
+        })
+        base['spreadsheet_transform_plan'] = session_result.get('plan')
+        base['spreadsheet_transform_detected_fields'] = session_result.get('detected_fields', {})
+        base['spreadsheet_transform_sanitized_samples'] = session_result.get('sanitized_samples', [])
+        base['spreadsheet_transform_prompt_preview'] = session_result.get('prompt_preview')
+        base['spreadsheet_transform_column_plan'] = session_result.get('column_plan', [])
+        base['spreadsheet_transform_preview_headers'] = session_result.get('headers', [])
+        base['spreadsheet_transform_preview_rows'] = (session_result.get('rows') or [])[:20]
+        base['spreadsheet_transform_source_headers'] = session_result.get('source_headers', [])
+        base['spreadsheet_transform_source_rows'] = session_result.get('source_rows', [])
+        base['spreadsheet_transform_source_sheet_name'] = session_result.get('source_sheet_name', '')
+        base['spreadsheet_transform_source_row_count'] = session_result.get('source_row_count', 0)
+
     if request.method == 'POST':
         action = (request.POST.get('action') or 'inspect').strip()
         form = SpreadsheetTransformForm(request.POST, request.FILES)
