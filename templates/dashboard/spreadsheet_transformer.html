@@ -22,15 +22,24 @@
         <div class="row">
           <strong>{{ field.label }}</strong><br>
           {{ field }}
+          <div class="meta" style="margin-top:8px;">Choose a file first. The button below only works after a CSV or XLSX file is selected.</div>
           {% if field.help_text %}<div class="meta" style="margin-top:6px;">{{ field.help_text }}</div>{% endif %}
           {% for error in field.errors %}<div class="meta" style="color:#fca5a5; margin-top:6px;">{{ error }}</div>{% endfor %}
         </div>
       {% endif %}
     {% endfor %}
     <button type="submit" name="action" value="inspect">Upload and inspect file</button>
-    <div class="meta" style="margin-top:8px;">After inspection, the original file preview and Step 2 will appear below.</div>
+    <div class="meta" style="margin-top:8px;">If the browser still says “No file chosen,” Step 1 has not been completed yet.</div>
+    <div class="meta" style="margin-top:4px;">After inspection, the original file preview and Step 2 will appear below.</div>
   </form>
 </div>
+
+{% if not spreadsheet_transform_source_headers %}
+<div class="card" style="opacity:0.75; border-style:dashed;">
+  <h2>Step 2 · Describe the target output</h2>
+  <p class="meta">Complete Step 1 first. After you upload and inspect a file, this step will appear here.</p>
+</div>
+{% endif %}
 
 {% if spreadsheet_transform_source_headers %}
 <div class="card">
