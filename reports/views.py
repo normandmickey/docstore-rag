@@ -5,7 +5,7 @@ from django import forms
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from django.shortcuts import redirect, render
 from django.utils import timezone
 
@@ -15,6 +15,8 @@ from control.views import _dashboard_base, _handle_workspace_actions
 from support.models import SupportChannel, SupportConversation, SupportMessage
 from integrations.voice.models import VoiceCallRecord
 from chatbots.models import ChatbotConversation, ChatbotIntegration
+from .models import SpreadsheetTransformJob
+from .tasks import build_spreadsheet_transform_export
 from .spreadsheet_transform import (
     SpreadsheetTransformError,
     apply_transform_plan,
@@ -66,6 +68,12 @@ def spreadsheet_transformer(request):
     base['spreadsheet_transform_detected_fields'] = {}
     base['spreadsheet_transform_sanitized_samples'] = []
     base['spreadsheet_transform_prompt_preview'] = None
+    current_tenant = base.get('current_tenant')
+    current_workspace = base.get('current_workspace')
+    base['spreadsheet_transform_jobs'] = SpreadsheetTransformJob.objects.filter(
+        tenant=current_tenant,
+        workspace=current_workspace,
+    )[:10] if current_tenant and current_workspace else []
 
     if request.method == 'POST':
         action = (request.POST.get('action') or 'prepare').strip()
@@ -140,21 +148,26 @@ def spreadsheet_transformer(request):
                 elif action == 'download':
                     if not session_result:
                         raise SpreadsheetTransformError('No preview is available yet. Run a preview first.')
-                    headers = session_result.get('headers') or []
-                    transformed_rows = session_result.get('rows') or []
+                    current_tenant = base.get('current_tenant')
+                    current_workspace = base.get('current_workspace')
+                    if not current_tenant or not current_workspace:
+                        raise SpreadsheetTransformError('A tenant and workspace are required to queue the export.')
                     export_format = form.cleaned_data['export_format'] or session_result.get('export_format') or 'xlsx'
-                    if export_format == 'csv':
-                        payload = export_transform_csv(headers, transformed_rows)
-                        response = HttpResponse(payload, content_type='text/csv')
-                        response['Content-Disposition'] = 'attachment; filename="spreadsheet-transform.csv"'
-                        return response
-                    payload = export_transform_xlsx(headers, transformed_rows)
-                    response = HttpResponse(
-                        payload,
-                        content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    job = SpreadsheetTransformJob.objects.create(
+                        tenant=current_tenant,
+                        workspace=current_workspace,
+                        created_by=request.user,
+                        status=SpreadsheetTransformJob.STATUS_QUEUED,
+                        export_format=export_format,
+                        source_name=(session_table.get('sheet_name') or session_table.get('source_type') or 'spreadsheet'),
+                        transform_request=session_result.get('transform_request', ''),
+                        strict_sanitization=bool(session_result.get('strict_sanitization')),
+                        plan_json=session_result.get('plan') or {},
+                        headers_json=session_result.get('headers') or [],
+                        rows_json=session_result.get('rows') or [],
                     )
-                    response['Content-Disposition'] = 'attachment; filename="spreadsheet-transform.xlsx"'
-                    return response
+                    build_spreadsheet_transform_export.delay(job.id)
+                    messages.success(request, f'Queued export job #{job.id}. Refresh to download when ready.')
 
                 if session_result:
                     base['spreadsheet_transform_plan'] = session_result.get('plan')
@@ -169,6 +182,26 @@ def spreadsheet_transformer(request):
                 messages.error(request, f'Spreadsheet transform failed: {exc}')
 
     return render(request, 'dashboard/spreadsheet_transformer.html', base)
+
+
+@login_required
+def spreadsheet_transform_download(request, job_id: int):
+    base = _dashboard_base(request)
+    handled = _handle_workspace_actions(request, base)
+    if handled:
+        return handled
+    current_tenant = base.get('current_tenant')
+    current_workspace = base.get('current_workspace')
+    job = SpreadsheetTransformJob.objects.filter(
+        id=job_id,
+        tenant=current_tenant,
+        workspace=current_workspace,
+        created_by=request.user,
+    ).first()
+    if not job or not job.output_file:
+        messages.error(request, 'Export file is not ready yet.')
+        return redirect('spreadsheet_transformer')
+    return FileResponse(job.output_file.open('rb'), as_attachment=True, filename=job.output_file.name.rsplit('/', 1)[-1])
 
 
 @login_required

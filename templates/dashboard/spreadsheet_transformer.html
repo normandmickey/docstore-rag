@@ -65,6 +65,23 @@
 </div>
 {% endif %}
 
+{% if spreadsheet_transform_jobs %}
+<div class="card">
+  <h2>Recent export jobs</h2>
+  {% for job in spreadsheet_transform_jobs %}
+    <div class="row">
+      <strong>Job #{{ job.id }}</strong> · <span class="status status-{{ job.status }}">{{ job.status }}</span><br>
+      <span class="meta">{{ job.source_name }} · {{ job.export_format|upper }} · {{ job.created_at }}</span>
+      {% if job.output_file %}
+        <div style="margin-top:8px;"><a href="/dashboard/reports/spreadsheet-transformer/jobs/{{ job.id }}/download/">Download file</a></div>
+      {% elif job.error_text %}
+        <div class="meta" style="margin-top:8px;color:#fca5a5;">{{ job.error_text }}</div>
+      {% endif %}
+    </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 {% if spreadsheet_transform_preview_headers %}
 <div class="card">
   <h2>Preview</h2>
