@@ -119,6 +119,7 @@ def spreadsheet_transformer(request):
     if request.method == 'POST':
         action = (request.POST.get('action') or 'inspect').strip()
         form = SpreadsheetTransformForm(request.POST, request.FILES)
+        logger.info('spreadsheet_transformer POST action=%s file_keys=%s post_keys=%s', action, list(request.FILES.keys()), list(request.POST.keys()))
         base['spreadsheet_transform_form'] = form
         if form.is_valid():
             try:
@@ -126,9 +127,11 @@ def spreadsheet_transformer(request):
                 session_result = request.session.get('spreadsheet_transform_result') or {}
 
                 if action == 'inspect':
+                    logger.info('spreadsheet_transformer inspect valid cleaned_has_file=%s', bool(form.cleaned_data.get('file')))
                     if not form.cleaned_data.get('file'):
                         raise SpreadsheetTransformError('Please upload a CSV or XLSX file to inspect.')
                     table = load_tabular_file(form.cleaned_data['file'])
+                    logger.info('spreadsheet_transformer inspect parsed sheet=%s rows=%s headers=%s', table.get('sheet_name'), table.get('row_count'), len(table.get('headers') or []))
                     request.session['spreadsheet_transform_table'] = table
                     request.session['spreadsheet_transform_result'] = {
                         'plan': None,
@@ -272,9 +275,13 @@ def spreadsheet_transformer(request):
                     base['spreadsheet_transform_source_sheet_name'] = session_result.get('source_sheet_name', '')
                     base['spreadsheet_transform_source_row_count'] = session_result.get('source_row_count', 0)
             except SpreadsheetTransformError as exc:
+                logger.warning('spreadsheet_transformer handled error action=%s error=%s', action, exc)
                 messages.error(request, str(exc))
             except Exception as exc:
+                logger.exception('spreadsheet_transformer unexpected failure action=%s', action)
                 messages.error(request, f'Spreadsheet transform failed: {exc}')
+        else:
+            logger.warning('spreadsheet_transformer invalid form action=%s errors=%s', action, form.errors.as_json())
 
     return render(request, 'dashboard/spreadsheet_transformer.html', base)
 
