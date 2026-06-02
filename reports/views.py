@@ -147,6 +147,7 @@ def spreadsheet_transformer(request):
                         'source_row_count': table.get('row_count') or 0,
                     }
                     request.session.modified = True
+                    messages.success(request, f"Inspected spreadsheet: {table.get('sheet_name') or 'Sheet1'} with {table.get('row_count') or 0} row(s). Step 2 is ready below.")
                     session_result = request.session['spreadsheet_transform_result']
                     base['spreadsheet_transform_form'] = SpreadsheetTransformForm(initial={
                         'transform_request': session_result.get('transform_request', ''),
