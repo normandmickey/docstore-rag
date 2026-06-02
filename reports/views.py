@@ -57,7 +57,6 @@ def _infer_support_source(conversation):
     return 'support'
 
 
-@login_required
 def _column_legend(headers: list[str]) -> list[dict]:
     legend = []
     for idx, header in enumerate(headers or []):
