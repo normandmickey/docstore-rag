@@ -1,3 +1,5 @@
+import json
+
 from drf_spectacular.utils import OpenApiExample, OpenApiResponse, extend_schema
 from rest_framework import serializers
 from rest_framework.permissions import AllowAny
@@ -48,13 +50,20 @@ class AgentMailInboundWebhookView(APIView):
         ],
     )
     def post(self, request):
-        serializer = AgentMailInboundSerializer(data=request.data)
+        raw_payload = {}
+        try:
+            raw_payload = json.loads((request.body or b'').decode('utf-8') or '{}')
+        except Exception:
+            raw_payload = {}
+
+        incoming = raw_payload if isinstance(raw_payload, dict) and raw_payload else request.data
+        serializer = AgentMailInboundSerializer(data=incoming)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        message_payload = data.get('message') or {}
-        thread_payload = data.get('thread') or {}
-        payload_json = data.get('payload_json') or {}
+        message_payload = data.get('message') or raw_payload.get('message') or {}
+        thread_payload = data.get('thread') or raw_payload.get('thread') or {}
+        payload_json = data.get('payload_json') or raw_payload.get('payload_json') or {}
 
         normalized_inbox_id = (
             (data.get('inbox_id') or '').strip()
@@ -124,7 +133,7 @@ class AgentMailInboundWebhookView(APIView):
                 body_text=body_text,
                 provider_message_id=provider_message_id,
                 provider_thread_id=provider_thread_id,
-                raw_payload=request.data if isinstance(request.data, dict) else {},
+                raw_payload=raw_payload if isinstance(raw_payload, dict) else {},
             )
         except TenantEmailIntegrationError as exc:
             return Response({'detail': str(exc)}, status=400)
