@@ -176,8 +176,6 @@ def spreadsheet_transformer(request):
                 elif action == 'prepare':
                     if not session_table:
                         raise SpreadsheetTransformError('No inspected file is available yet. Upload and inspect a CSV or XLSX file first.')
-                    if not (form.cleaned_data.get('transform_request') or '').strip():
-                        raise SpreadsheetTransformError('Please describe the spreadsheet you want to create before preparing the prompt.')
                     table = session_table
                     preliminary_payload, detected_fields, sanitized_samples, _ = build_transform_prompt_payload(
                         headers=table['headers'],
@@ -221,8 +219,6 @@ def spreadsheet_transformer(request):
                 elif action == 'preview':
                     if not session_table:
                         raise SpreadsheetTransformError('No prepared prompt is available yet. Upload a file and prepare the prompt first.')
-                    if not (form.cleaned_data.get('transform_request') or '').strip():
-                        raise SpreadsheetTransformError('Please describe the spreadsheet you want to create before generating a preview.')
                     column_plan = _read_column_plan_from_post(request) or session_result.get('column_plan') or []
                     output_plan = session_result.get('output_plan') or []
                     plan, detected_fields, sanitized_samples, prompt_preview = plan_transform(
