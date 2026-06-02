@@ -4,7 +4,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .email_services import TenantEmailIntegrationError, ingest_inbound_email
+from .email_services import TenantEmailClient, TenantEmailIntegrationError, ingest_inbound_email, send_support_email_reply
 from .models import TenantEmailIntegration
 
 
@@ -72,14 +72,23 @@ class AgentMailInboundWebhookView(APIView):
 
         raw_from = message_payload.get('from') or payload_json.get('from') or []
         first_from = raw_from[0] if isinstance(raw_from, list) and raw_from else {}
+        raw_from_string = raw_from if isinstance(raw_from, str) else str(payload_json.get('from_email') or '')
+
+        import re
+        email_match = re.search(r'<([^>]+@[^>]+)>', raw_from_string)
+        parsed_from_email = (email_match.group(1) if email_match else raw_from_string).strip().lower()
+        parsed_from_name = raw_from_string.split('<', 1)[0].strip().strip('"') if '<' in raw_from_string else ''
+
         from_email = (
             (data.get('from_email') or '').strip().lower()
             or str(first_from.get('email') or '').strip().lower()
+            or parsed_from_email
             or str(payload_json.get('from_email') or '').strip().lower()
         )
         from_name = (
             (data.get('from_name') or '').strip()
             or str(first_from.get('name') or '').strip()
+            or parsed_from_name
             or str(payload_json.get('from_name') or '').strip()
         )
         subject = (
@@ -120,9 +129,24 @@ class AgentMailInboundWebhookView(APIView):
         except TenantEmailIntegrationError as exc:
             return Response({'detail': str(exc)}, status=400)
 
+        auto_reply_sent = False
+        auto_reply_error = ''
+        if integration.auto_reply_enabled and (data.get('event_type') or request.data.get('event_type') or '') == 'message.received':
+            try:
+                reply_body = (
+                    f"Thanks for your email — I got your message about '{subject or 'your support request'}'. "
+                    "We’ve opened it in support and will follow up shortly."
+                )
+                send_support_email_reply(conversation=conversation, body=reply_body)
+                auto_reply_sent = True
+            except TenantEmailIntegrationError as exc:
+                auto_reply_error = str(exc)
+
         return Response({
             'ok': True,
             'conversation_id': conversation.id,
             'message_id': message.id,
             'tenant_id': integration.tenant_id,
+            'auto_reply_sent': auto_reply_sent,
+            'auto_reply_error': auto_reply_error,
         })
