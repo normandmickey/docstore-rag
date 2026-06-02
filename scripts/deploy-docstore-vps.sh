@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REMOTE_HOST="norm@178.156.201.237"
+REMOTE_HOST="docstore-vps"
 REMOTE_CHECKOUT="/home/norm/sites/docstore_checkout"
 REMOTE_DEPLOY_SCRIPT="/home/norm/bin/deploy-docstore"
 LOCAL_REPO="/home/pi/.openclaw/workspace/projects/docstore-rag"
