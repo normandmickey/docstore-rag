@@ -194,14 +194,20 @@
               <div class="meta">Secondary source / Source B</div>
               <input type="text" name="output_plan_{{ forloop.counter0 }}_source_b" value="{{ item.source_b }}" placeholder="Used for math operations like multiply/divide">
             </label>
-            <label>
+            <div>
               <div class="meta">Reference lookup</div>
               <div class="meta" style="margin-bottom:6px;">For lookup: Main file key → Lookup file key → Return column</div>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
-                <input type="text" name="output_plan_{{ forloop.counter0 }}_lookup_key" value="{{ item.lookup_key|default:'' }}" placeholder="Lookup file key column">
-                <input type="text" name="output_plan_{{ forloop.counter0 }}_lookup_return" value="{{ item.lookup_return|default:'' }}" placeholder="Return column from lookup file">
+                <label>
+                  <div class="meta">Lookup file key column</div>
+                  <input type="text" name="output_plan_{{ forloop.counter0 }}_lookup_key" value="{{ item.lookup_key|default:'' }}" placeholder="Example: A">
+                </label>
+                <label>
+                  <div class="meta">Return column from lookup file</div>
+                  <input type="text" name="output_plan_{{ forloop.counter0 }}_lookup_return" value="{{ item.lookup_return|default:'' }}" placeholder="Example: B">
+                </label>
               </div>
-            </label>
+            </div>
             <label>
               <div class="meta">Optional notes / freeform instructions</div>
               <input type="text" name="output_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}" placeholder="Optional extra guidance, fallback notes, or custom behavior">
