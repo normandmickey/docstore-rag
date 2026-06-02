@@ -22,8 +22,11 @@
       </div>
       {% endif %}
     {% endfor %}
-    <button type="submit" name="action" value="prepare">Prepare prompt</button>
-    {% if spreadsheet_transform_prompt_preview %}
+    <button type="submit" name="action" value="inspect">Inspect file</button>
+    {% if spreadsheet_transform_source_headers %}
+      <button type="submit" name="action" value="prepare" style="margin-left:10px;">Prepare prompt</button>
+    {% endif %}
+    {% if spreadsheet_transform_column_plan %}
       <button type="submit" name="action" value="preview" style="margin-left:10px;">Send to AI and preview transform</button>
     {% endif %}
     {% if spreadsheet_transform_plan %}
@@ -31,6 +34,34 @@
     {% endif %}
   </form>
 </div>
+
+{% if spreadsheet_transform_source_headers %}
+<div class="card">
+  <h2>Original file preview</h2>
+  <p class="meta">Real uploaded spreadsheet preview shown locally before any AI planning step.</p>
+  <div class="meta" style="margin-bottom:10px;">Sheet: {{ spreadsheet_transform_source_sheet_name }} · Rows detected: {{ spreadsheet_transform_source_row_count }}</div>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead>
+        <tr>
+          {% for header in spreadsheet_transform_source_headers %}
+            <th>{{ header }}</th>
+          {% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in spreadsheet_transform_source_rows %}
+          <tr>
+            {% for header in spreadsheet_transform_source_headers %}
+              <td>{{ row|get_item:header }}</td>
+            {% endfor %}
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
 
 {% if spreadsheet_transform_detected_fields %}
 <div class="card">

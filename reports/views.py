@@ -85,6 +85,10 @@ def spreadsheet_transformer(request):
     base['spreadsheet_transform_sanitized_samples'] = []
     base['spreadsheet_transform_prompt_preview'] = None
     base['spreadsheet_transform_column_plan'] = []
+    base['spreadsheet_transform_source_headers'] = []
+    base['spreadsheet_transform_source_rows'] = []
+    base['spreadsheet_transform_source_sheet_name'] = ''
+    base['spreadsheet_transform_source_row_count'] = 0
     current_tenant = base.get('current_tenant')
     current_workspace = base.get('current_workspace')
     base['spreadsheet_transform_jobs'] = SpreadsheetTransformJob.objects.filter(
@@ -93,7 +97,7 @@ def spreadsheet_transformer(request):
     )[:10] if current_tenant and current_workspace else []
 
     if request.method == 'POST':
-        action = (request.POST.get('action') or 'prepare').strip()
+        action = (request.POST.get('action') or 'inspect').strip()
         form = SpreadsheetTransformForm(request.POST, request.FILES)
         base['spreadsheet_transform_form'] = form
         if form.is_valid():
@@ -101,7 +105,37 @@ def spreadsheet_transformer(request):
                 session_table = request.session.get('spreadsheet_transform_table') or {}
                 session_result = request.session.get('spreadsheet_transform_result') or {}
 
-                if action == 'prepare':
+                if action == 'inspect':
+                    if not form.cleaned_data.get('file'):
+                        raise SpreadsheetTransformError('Please upload a CSV or XLSX file to inspect.')
+                    table = load_tabular_file(form.cleaned_data['file'])
+                    request.session['spreadsheet_transform_table'] = table
+                    request.session['spreadsheet_transform_result'] = {
+                        'plan': None,
+                        'detected_fields': {},
+                        'sanitized_samples': [],
+                        'prompt_preview': None,
+                        'headers': [],
+                        'rows': [],
+                        'export_format': form.cleaned_data['export_format'],
+                        'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
+                        'transform_request': form.cleaned_data['transform_request'],
+                        'column_plan': [],
+                        'source_headers': table.get('headers') or [],
+                        'source_rows': (table.get('rows') or [])[:20],
+                        'source_sheet_name': table.get('sheet_name') or '',
+                        'source_row_count': table.get('row_count') or 0,
+                    }
+                    request.session.modified = True
+                    session_result = request.session['spreadsheet_transform_result']
+                    base['spreadsheet_transform_form'] = SpreadsheetTransformForm(initial={
+                        'transform_request': session_result.get('transform_request', ''),
+                        'export_format': session_result.get('export_format', 'xlsx'),
+                        'strict_sanitization': session_result.get('strict_sanitization', False),
+                        'has_prepared_file': True,
+                    })
+
+                elif action == 'prepare':
                     if not form.cleaned_data.get('file'):
                         raise SpreadsheetTransformError('Please upload a CSV or XLSX file to prepare the transform prompt.')
                     table = load_tabular_file(form.cleaned_data['file'])
@@ -206,6 +240,10 @@ def spreadsheet_transformer(request):
                     base['spreadsheet_transform_column_plan'] = session_result.get('column_plan', [])
                     base['spreadsheet_transform_preview_headers'] = session_result.get('headers', [])
                     base['spreadsheet_transform_preview_rows'] = (session_result.get('rows') or [])[:20]
+                    base['spreadsheet_transform_source_headers'] = session_result.get('source_headers', [])
+                    base['spreadsheet_transform_source_rows'] = session_result.get('source_rows', [])
+                    base['spreadsheet_transform_source_sheet_name'] = session_result.get('source_sheet_name', '')
+                    base['spreadsheet_transform_source_row_count'] = session_result.get('source_row_count', 0)
             except SpreadsheetTransformError as exc:
                 messages.error(request, str(exc))
             except Exception as exc:
