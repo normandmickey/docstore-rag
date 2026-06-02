@@ -229,24 +229,28 @@
 </div>
 {% endif %}
 
-{% if spreadsheet_transform_sanitized_samples %}
+{% if spreadsheet_transform_sanitized_samples or spreadsheet_transform_prompt_preview or spreadsheet_transform_plan %}
 <div class="card">
-  <h2>Sanitized sample rows sent to planner</h2>
-  <pre style="white-space:pre-wrap;">{{ spreadsheet_transform_sanitized_samples }}</pre>
-</div>
-{% endif %}
-
-{% if spreadsheet_transform_prompt_preview %}
-<div class="card">
-  <h2>Planner prompt preview</h2>
-  <pre style="white-space:pre-wrap;">{{ spreadsheet_transform_prompt_preview }}</pre>
-</div>
-{% endif %}
-
-{% if spreadsheet_transform_plan %}
-<div class="card">
-  <h2>Generated transform plan</h2>
-  <pre style="white-space:pre-wrap;">{{ spreadsheet_transform_plan }}</pre>
+  <h2>Planner internals</h2>
+  <p class="meta">These are mainly for debugging and inspection. Most users can ignore them.</p>
+  {% if spreadsheet_transform_sanitized_samples %}
+    <details style="margin-top:10px;">
+      <summary style="cursor:pointer; color:#93c5fd;">Show sanitized sample rows sent to planner</summary>
+      <pre style="white-space:pre-wrap; margin-top:10px;">{{ spreadsheet_transform_sanitized_samples }}</pre>
+    </details>
+  {% endif %}
+  {% if spreadsheet_transform_prompt_preview %}
+    <details style="margin-top:10px;">
+      <summary style="cursor:pointer; color:#93c5fd;">Show planner prompt preview</summary>
+      <pre style="white-space:pre-wrap; margin-top:10px;">{{ spreadsheet_transform_prompt_preview }}</pre>
+    </details>
+  {% endif %}
+  {% if spreadsheet_transform_plan %}
+    <details style="margin-top:10px;">
+      <summary style="cursor:pointer; color:#93c5fd;">Show generated transform plan</summary>
+      <pre style="white-space:pre-wrap; margin-top:10px;">{{ spreadsheet_transform_plan }}</pre>
+    </details>
+  {% endif %}
 </div>
 {% endif %}
 
