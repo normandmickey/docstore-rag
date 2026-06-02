@@ -244,6 +244,10 @@ For a fresh-server install guide, see:
 - `POST /api/v1/search/`
 - `POST /api/v1/chat/`
 - `POST /api/v1/support/channel-lookup/`
+- `POST /api/v1/support/shipping/health/`
+- `POST /api/v1/support/shipping/search/`
+- `POST /api/v1/support/shipping/package/`
+- `POST /api/v1/support/shipping/latest-status/`
 - `POST /api/v1/integrations/voice/calls/ingest/`
 - `POST /api/v1/chatbots/resolve/`
 - `POST /api/v1/chatbots/messages/ingest/`
@@ -517,6 +521,24 @@ Current behavior:
 - callback stores `access_token` and, when available, `bot_jid` in `credentials_json`
 
 This is the missing bridge between Zoom webhook validation and actual outbound Zoom Chat reply delivery.
+
+### Shipping manager integration
+Docstore can now call a separate internal shipping manager service instead of querying carrier APIs directly.
+
+Required env:
+
+```env
+SHIPPING_MANAGER_BASE_URL=https://ship.oddsmith.net
+SHIPPING_MANAGER_API_KEY=...
+```
+
+Current API bridge endpoints in Docstore:
+- `POST /api/v1/support/shipping/health/`
+- `POST /api/v1/support/shipping/search/`
+- `POST /api/v1/support/shipping/package/`
+- `POST /api/v1/support/shipping/latest-status/`
+
+These routes are intended for trusted signed-in tenant admins/owners or Bearer API-key callers already scoped to the tenant/workspace.
 
 ### AgentMail setup
 Docstore can now use an AgentMail inbox for project email.
