@@ -170,6 +170,8 @@
                 <option value="add" {% if item.operation == 'add' %}selected{% endif %}>Add</option>
                 <option value="subtract" {% if item.operation == 'subtract' %}selected{% endif %}>Subtract</option>
                 <option value="derive" {% if item.operation == 'derive' %}selected{% endif %}>Derive / custom</option>
+                <option value="time_to_decimal_hours" {% if item.operation == 'time_to_decimal_hours' %}selected{% endif %}>Convert hh:mm to decimal hours</option>
+                <option value="visible_only" {% if item.operation == 'visible_only' %}selected{% endif %}>Keep visible rows only</option>
               </select>
             </label>
             <label>

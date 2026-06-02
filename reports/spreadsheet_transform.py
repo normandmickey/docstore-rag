@@ -431,6 +431,44 @@ def _resolve_source_name(source: str, row: dict[str, Any]) -> str:
     return source
 
 
+def _parse_hours_minutes(value: Any) -> float | None:
+    text = str(value or '').strip()
+    if not text:
+        return None
+    match = re.fullmatch(r'(\d+):(\d{1,2})', text)
+    if not match:
+        return None
+    hours = int(match.group(1))
+    minutes = int(match.group(2))
+    return hours + (minutes / 60.0)
+
+
+def _filter_visible_rows(rows: list[dict[str, Any]], output_plan: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    if not rows or not output_plan:
+        return rows
+    wants_visible_only = any(
+        'visible' in (item.get('instructions') or '').lower() or (item.get('operation') or '').lower() == 'visible_only'
+        for item in output_plan
+    )
+    if not wants_visible_only:
+        return rows
+    visibility_keys = [key for key in rows[0].keys() if 'visible' in key.lower() or 'hidden' in key.lower()]
+    if not visibility_keys:
+        return rows
+    filtered = []
+    for row in rows:
+        keep = True
+        for key in visibility_keys:
+            value = str(row.get(key, '') or '').strip().lower()
+            if 'hidden' in key.lower() and value in {'true', 'yes', '1', 'hidden'}:
+                keep = False
+            elif 'visible' in key.lower() and value not in {'true', 'yes', '1', 'visible', 'shown'}:
+                keep = False
+        if keep:
+            filtered.append(row)
+    return filtered
+
+
 def _apply_output_plan_arithmetic(rows: list[dict[str, Any]], output_plan: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     if not output_plan:
         return rows
@@ -441,6 +479,16 @@ def _apply_output_plan_arithmetic(rows: list[dict[str, Any]], output_plan: list[
         source_hint = (item.get('source_hint') or '').strip()
         instruction = (item.get('instructions') or '').strip().lower()
         if not target or target not in (rows[0].keys() if rows else []):
+            continue
+        if operation == 'time_to_decimal_hours':
+            source_name = _resolve_source_name(item.get('source_a') or target, rows[0] if rows else {})
+            if rows and source_name not in rows[0]:
+                continue
+            for row in transformed_rows:
+                converted = _parse_hours_minutes(row.get(source_name, ''))
+                if converted is None:
+                    continue
+                row[target] = _format_numeric_like_source(converted, converted)
             continue
         if operation not in {'multiply', 'divide', 'add', 'subtract'} and all(token not in instruction for token in ['multiply', 'times', '*', 'divide', '/', 'add', '+', 'subtract', '-']):
             continue
@@ -513,7 +561,7 @@ def _apply_structured_output_plan(rows: list[dict[str, Any]], output_plan: list[
     output_headers = [item.get('name') or '' for item in output_plan if (item.get('name') or '').strip()]
     if not output_headers:
         return None
-    transformed_rows = _apply_output_plan_arithmetic(rows, output_plan)
+    transformed_rows = _filter_visible_rows(_apply_output_plan_arithmetic(rows, output_plan), output_plan)
     built_rows: list[dict[str, Any]] = []
     for row_index, row in enumerate(transformed_rows):
         out: dict[str, Any] = {}
