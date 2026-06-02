@@ -269,14 +269,24 @@ def sanitize_sample_rows(headers: list[str], rows: list[dict[str, Any]], strict:
     return sanitized, detected
 
 
+def _column_letter(index: int) -> str:
+    result = ''
+    current = index + 1
+    while current > 0:
+        current, remainder = divmod(current - 1, 26)
+        result = chr(65 + remainder) + result
+    return result
+
+
 def build_output_column_planner(headers: list[str]) -> list[dict[str, Any]]:
     return [
         {
+            'letter': _column_letter(idx),
             'name': header,
             'source_hint': header,
             'instructions': '',
         }
-        for header in headers
+        for idx, header in enumerate(headers)
     ]
 
 
@@ -291,6 +301,7 @@ def build_column_planner(headers: list[str], rows: list[dict[str, Any]], detecte
             if value:
                 samples.append(value)
         planner.append({
+            'letter': _column_letter(len(planner)),
             'source_column': header,
             'samples': samples[:3],
             'detected_sensitive_types': detected.get(header, []),

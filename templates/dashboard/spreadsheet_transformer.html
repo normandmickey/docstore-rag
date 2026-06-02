@@ -95,6 +95,7 @@
       <div class="meta" style="margin-top:6px;">Edit the output schema you want the transformed file to have. You can rename columns, describe derived fields, and explain what each output column should contain.</div>
       {% for item in spreadsheet_transform_output_plan %}
         <div style="border:1px solid #243041; border-radius:10px; padding:14px; margin-top:12px;">
+          <div class="meta" style="margin-bottom:10px;">Source column {% if item.letter %}{{ item.letter }} · {% endif %}{{ item.source_hint }}</div>
           <div style="display:grid; grid-template-columns: 1fr 1fr 2fr; gap:12px; align-items:start;">
             <label>
               <div class="meta">Output column name</div>
@@ -157,7 +158,7 @@
     <input type="hidden" name="column_plan_total" value="{{ spreadsheet_transform_column_plan|length }}">
     {% for item in spreadsheet_transform_column_plan %}
       <div class="row" style="border:1px solid #243041; border-radius:10px; padding:14px; margin-bottom:12px;">
-        <strong>{{ item.source_column }}</strong>
+        <strong>{% if item.letter %}{{ item.letter }} · {% endif %}{{ item.source_column }}</strong>
         {% if item.samples %}<div class="meta" style="margin:6px 0 10px 0;">Samples: {{ item.samples|join:" | " }}</div>{% endif %}
         {% if item.detected_sensitive_types %}<div class="meta" style="margin-bottom:10px;">Sensitive types: {{ item.detected_sensitive_types|join:", " }}</div>{% endif %}
         <input type="hidden" name="column_plan_{{ forloop.counter0 }}_source_column" value="{{ item.source_column }}">
