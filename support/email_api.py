@@ -151,7 +151,7 @@ class AgentMailInboundWebhookView(APIView):
                     reply_body = (shipping_payload.get('answer') or '').strip()
                     auto_reply_mode = 'shipping'
                 else:
-                    workspace = integration.default_workspace
+                    workspace = integration.default_workspace or conversation.workspace_context
                     if workspace is not None:
                         chat_answer, _results = answer_question(
                             tenant=integration.tenant,
@@ -180,6 +180,12 @@ class AgentMailInboundWebhookView(APIView):
                     auto_reply_mode = 'ack'
 
                 send_support_email_reply(conversation=conversation, body=reply_body)
+                conversation.metadata_json = {
+                    **(conversation.metadata_json or {}),
+                    'last_auto_reply_mode': auto_reply_mode,
+                    'last_auto_reply_subject': subject,
+                }
+                conversation.save(update_fields=['metadata_json', 'updated_at'])
                 auto_reply_sent = True
             except TenantEmailIntegrationError as exc:
                 auto_reply_error = str(exc)

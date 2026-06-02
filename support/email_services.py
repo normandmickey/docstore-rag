@@ -108,6 +108,7 @@ def ingest_inbound_email(*, integration: TenantEmailIntegration, from_email: str
             tenant=integration.tenant,
             channel=channel,
             contact=contact,
+            subject=subject[:255],
             status__in=[SupportConversation.STATUS_OPEN, SupportConversation.STATUS_PENDING],
         ).order_by('-last_message_at', '-updated_at', '-id').first()
 
