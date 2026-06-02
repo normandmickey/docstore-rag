@@ -136,16 +136,17 @@ def spreadsheet_transformer(request):
                     })
 
                 elif action == 'prepare':
-                    if not form.cleaned_data.get('file'):
-                        raise SpreadsheetTransformError('Please upload a CSV or XLSX file to prepare the transform prompt.')
-                    table = load_tabular_file(form.cleaned_data['file'])
+                    if not session_table:
+                        raise SpreadsheetTransformError('No inspected file is available yet. Upload and inspect a CSV or XLSX file first.')
+                    table = session_table
                     preliminary_payload, detected_fields, sanitized_samples, _ = build_transform_prompt_payload(
                         headers=table['headers'],
                         rows=table['rows'],
                         user_request=form.cleaned_data['transform_request'],
                         strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
                     )
-                    column_plan = build_column_planner(table['headers'], sanitized_samples, detected_fields)
+                    existing_column_plan = session_result.get('column_plan') or []
+                    column_plan = existing_column_plan or build_column_planner(table['headers'], sanitized_samples, detected_fields)
                     user_payload, detected_fields, sanitized_samples, system_prompt = build_transform_prompt_payload(
                         headers=table['headers'],
                         rows=table['rows'],
@@ -153,7 +154,6 @@ def spreadsheet_transformer(request):
                         strict_sanitization=form.cleaned_data.get('strict_sanitization') or False,
                         column_plan=column_plan,
                     )
-                    request.session['spreadsheet_transform_table'] = table
                     request.session['spreadsheet_transform_result'] = {
                         'plan': None,
                         'detected_fields': detected_fields,
@@ -165,6 +165,10 @@ def spreadsheet_transformer(request):
                         'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
                         'transform_request': form.cleaned_data['transform_request'],
                         'column_plan': column_plan,
+                        'source_headers': session_result.get('source_headers', table.get('headers') or []),
+                        'source_rows': session_result.get('source_rows', (table.get('rows') or [])[:20]),
+                        'source_sheet_name': session_result.get('source_sheet_name', table.get('sheet_name') or ''),
+                        'source_row_count': session_result.get('source_row_count', table.get('row_count') or 0),
                     }
                     request.session.modified = True
                     session_result = request.session['spreadsheet_transform_result']
@@ -198,6 +202,10 @@ def spreadsheet_transformer(request):
                         'strict_sanitization': form.cleaned_data.get('strict_sanitization') or False,
                         'transform_request': form.cleaned_data['transform_request'],
                         'column_plan': column_plan,
+                        'source_headers': session_result.get('source_headers', session_table.get('headers') or []),
+                        'source_rows': session_result.get('source_rows', (session_table.get('rows') or [])[:20]),
+                        'source_sheet_name': session_result.get('source_sheet_name', session_table.get('sheet_name') or ''),
+                        'source_row_count': session_result.get('source_row_count', session_table.get('row_count') or 0),
                     }
                     request.session.modified = True
                     session_result = request.session['spreadsheet_transform_result']
