@@ -20,7 +20,8 @@
         <strong>Load a saved template</strong><br>
         <div class="meta" style="margin:6px 0 10px;">Optional: choose a saved template first, then inspect a file to confirm the input matches.</div>
         <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:end;">
-          <label style="flex:1 1 320px;">
+          <button type="submit" name="action" value="load_template" style="background:#334155; order:0;">Load template</button>
+          <label style="flex:1 1 320px; order:1;">
             <div class="meta">Template</div>
             <select name="template_id">
               <option value="">Choose template…</option>
@@ -29,7 +30,6 @@
               {% endfor %}
             </select>
           </label>
-          <button type="submit" name="action" value="load_template" style="background:#334155;">Load template</button>
         </div>
       </div>
     {% endif %}
