@@ -8,6 +8,8 @@ from rest_framework.views import APIView
 
 from retrieval.service import answer_question, shipping_answer_payload
 
+from control.models import Workspace
+
 from .email_services import TenantEmailClient, TenantEmailIntegrationError, ingest_inbound_email, send_support_email_reply
 from .models import TenantEmailIntegration
 
@@ -151,7 +153,7 @@ class AgentMailInboundWebhookView(APIView):
                     reply_body = (shipping_payload.get('answer') or '').strip()
                     auto_reply_mode = 'shipping'
                 else:
-                    workspace = integration.default_workspace or conversation.workspace_context
+                    workspace = integration.default_workspace or conversation.workspace_context or Workspace.objects.filter(tenant=integration.tenant).order_by('id').first()
                     if workspace is not None:
                         chat_answer, _results = answer_question(
                             tenant=integration.tenant,

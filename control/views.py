@@ -1428,6 +1428,8 @@ def dashboard_connectors(request):
             integration = email_form.save(commit=False)
             integration.tenant = current_tenant
             integration.provider = TenantEmailIntegration.PROVIDER_AGENTMAIL
+            if not integration.default_workspace_id:
+                integration.default_workspace = current_workspace
             integration.save()
             messages.success(request, 'Saved tenant support email connection.')
             return redirect('dashboard_connectors')

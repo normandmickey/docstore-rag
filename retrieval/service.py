@@ -14,9 +14,14 @@ from support.shipping import ShippingManagerClient, ShippingManagerError, Shippi
 
 
 SHIPPING_QUERY_HINTS = [
-    'tracking', 'shipment', 'package', 'packages', 'fedex', 'delivered', 'delivery status', 'where is my package',
+    'tracking', 'shipment', 'package', 'packages', 'fedex', 'delivery status', 'where is my package',
     'where is the package', 'where is my shipment', 'latest status', 'tracking number', 'find package', 'find packages',
     'recent delivered packages', 'recent packages', 'show packages', 'show shipments'
+]
+
+SHIPPING_NEGATIVE_HINTS = [
+    'parking', 'permit', 'permits', 'fee', 'fees', 'policy', 'handbook', 'benefits', 'paystub', 'hr', 'faculty', 'staff',
+    'employee', 'employees', 'tuition', 'vacation', 'leave', 'holiday'
 ]
 
 
@@ -460,7 +465,9 @@ def _build_shipping_detail_answer(row: dict, *, include_intro: bool = False) -> 
 def shipping_answer_payload(*, tenant, query: str, limit: int = 3):
     normalized = (query or '').strip().lower()
     tracking_number = _extract_tracking_number(query)
-    if not tracking_number and not any(hint in normalized for hint in SHIPPING_QUERY_HINTS):
+    has_shipping_hint = any(hint in normalized for hint in SHIPPING_QUERY_HINTS)
+    has_negative_hint = any(hint in normalized for hint in SHIPPING_NEGATIVE_HINTS)
+    if not tracking_number and (not has_shipping_hint or has_negative_hint):
         return None
 
     try:
