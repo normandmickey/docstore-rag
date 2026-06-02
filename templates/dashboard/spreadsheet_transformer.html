@@ -79,7 +79,7 @@
     {% for field in spreadsheet_transform_form %}
       {% if field.name == 'has_prepared_file' %}
         {{ field }}
-      {% elif field.name == 'transform_request' or field.name == 'strict_sanitization' or field.name == 'export_format' %}
+      {% elif field.name == 'strict_sanitization' or field.name == 'export_format' %}
         <div class="row">
           <strong>{{ field.label }}</strong><br>
           {{ field }}
@@ -125,6 +125,18 @@
         <input type="hidden" name="column_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}">
       {% endfor %}
     {% endif %}
+
+    {% for field in spreadsheet_transform_form %}
+      {% if field.name == 'transform_request' %}
+        <div class="row">
+          <strong>{{ field.label }}</strong><br>
+          {{ field }}
+          {% if field.help_text %}<div class="meta" style="margin-top:6px;">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="meta" style="color:#fca5a5; margin-top:6px;">{{ error }}</div>{% endfor %}
+        </div>
+      {% endif %}
+    {% endfor %}
+
     <button type="submit" name="action" value="prepare">Prepare prompt</button>
   </form>
 </div>

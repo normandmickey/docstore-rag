@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 class SpreadsheetTransformForm(forms.Form):
     file = forms.FileField(required=False)
-    transform_request = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 5}), help_text='Describe the columns and layout you want in the exported file.')
+    transform_request = forms.CharField(required=False, label='Optional overall notes', widget=forms.Textarea(attrs={'rows': 4}), help_text='Optional extra context for the planner after you define the desired output columns.')
     export_format = forms.ChoiceField(required=False, choices=[('xlsx', 'XLSX'), ('csv', 'CSV')], initial='xlsx')
     strict_sanitization = forms.BooleanField(required=False, initial=False, help_text='Use more aggressive prompt-side masking for sample rows before AI planning.')
     has_prepared_file = forms.BooleanField(required=False, widget=forms.HiddenInput())
