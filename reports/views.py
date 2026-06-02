@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 
 class SpreadsheetTransformForm(forms.Form):
     file = forms.FileField(required=False)
+    lookup_file = forms.FileField(required=False, help_text='Optional reference/lookup CSV or XLSX for exact-match lookups.')
     transform_request = forms.CharField(required=False, label='Optional overall notes', widget=forms.Textarea(attrs={'rows': 4}), help_text='Optional extra context for the planner after you define the desired output columns.')
     export_format = forms.ChoiceField(required=False, choices=[('xlsx', 'XLSX'), ('csv', 'CSV')], initial='xlsx')
     strict_sanitization = forms.BooleanField(required=False, initial=False, help_text='Use more aggressive prompt-side masking for sample rows before AI planning.')
@@ -133,6 +134,8 @@ def _read_output_plan_from_post(request) -> list[dict]:
             'format': (request.POST.get(f'output_plan_{idx}_format') or 'keep_source').strip(),
             'source_a': (request.POST.get(f'output_plan_{idx}_source_a') or '').strip(),
             'source_b': (request.POST.get(f'output_plan_{idx}_source_b') or '').strip(),
+            'lookup_key': (request.POST.get(f'output_plan_{idx}_lookup_key') or '').strip(),
+            'lookup_return': (request.POST.get(f'output_plan_{idx}_lookup_return') or '').strip(),
             'source_hint': (request.POST.get(f'output_plan_{idx}_source_hint') or '').strip(),
             'instructions': (request.POST.get(f'output_plan_{idx}_instructions') or '').strip(),
         })
@@ -177,6 +180,9 @@ def spreadsheet_transformer(request):
     base['spreadsheet_transform_source_row_count'] = 0
     base['spreadsheet_transform_output_plan'] = []
     base['spreadsheet_transform_source_legend'] = []
+    base['spreadsheet_transform_lookup_headers'] = []
+    base['spreadsheet_transform_lookup_rows'] = []
+    base['spreadsheet_transform_lookup_sheet_name'] = ''
     current_tenant = base.get('current_tenant')
     current_workspace = base.get('current_workspace')
     base['spreadsheet_transform_jobs'] = SpreadsheetTransformJob.objects.filter(
@@ -215,6 +221,9 @@ def spreadsheet_transformer(request):
         base['spreadsheet_transform_source_legend'] = _column_legend(session_result.get('source_headers', []))
         base['spreadsheet_transform_selected_template_id'] = session_result.get('selected_template_id')
         base['spreadsheet_transform_template_match'] = session_result.get('template_match')
+        base['spreadsheet_transform_lookup_headers'] = session_result.get('lookup_headers', [])
+        base['spreadsheet_transform_lookup_rows'] = session_result.get('lookup_rows', [])
+        base['spreadsheet_transform_lookup_sheet_name'] = session_result.get('lookup_sheet_name', '')
 
     if request.method == 'POST':
         action = (request.POST.get('action') or 'inspect').strip()
@@ -269,7 +278,12 @@ def spreadsheet_transformer(request):
                         raise SpreadsheetTransformError('Please upload a CSV or XLSX file to inspect.')
                     table = load_tabular_file(form.cleaned_data['file'])
                     logger.info('spreadsheet_transformer inspect parsed sheet=%s rows=%s headers=%s', table.get('sheet_name'), table.get('row_count'), len(table.get('headers') or []))
+                    lookup_table = None
+                    if form.cleaned_data.get('lookup_file'):
+                        lookup_table = load_tabular_file(form.cleaned_data['lookup_file'])
                     request.session['spreadsheet_transform_table'] = table
+                    if lookup_table is not None:
+                        request.session['spreadsheet_transform_lookup_table'] = lookup_table
                     existing_result = request.session.get('spreadsheet_transform_result') or {}
                     selected_template_id = existing_result.get('selected_template_id')
                     template_match = None
@@ -309,6 +323,9 @@ def spreadsheet_transformer(request):
                         'source_rows': (table.get('rows') or [])[:20],
                         'source_sheet_name': table.get('sheet_name') or '',
                         'source_row_count': table.get('row_count') or 0,
+                        'lookup_headers': (lookup_table or existing_result.get('lookup_headers') and {'headers': existing_result.get('lookup_headers'), 'rows': existing_result.get('lookup_rows', []), 'sheet_name': existing_result.get('lookup_sheet_name', '')} or {}).get('headers', []) if lookup_table is not None else existing_result.get('lookup_headers', []),
+                        'lookup_rows': (lookup_table or {}).get('rows', [])[:20] if lookup_table is not None else existing_result.get('lookup_rows', []),
+                        'lookup_sheet_name': (lookup_table or {}).get('sheet_name', '') if lookup_table is not None else existing_result.get('lookup_sheet_name', ''),
                         'selected_template_id': selected_template_id,
                         'template_match': template_match,
                     }
@@ -395,6 +412,7 @@ def spreadsheet_transformer(request):
                         column_plan=column_plan,
                         output_plan=output_plan,
                     )
+                    lookup_table = request.session.get('spreadsheet_transform_lookup_table') or {}
                     headers, transformed_rows = apply_transform_plan(
                         rows=session_table.get('rows') or [],
                         plan=plan,
@@ -404,6 +422,7 @@ def spreadsheet_transformer(request):
                         hidden_columns=session_table.get('hidden_columns') or [],
                         ignore_hidden_rows=bool(form.cleaned_data.get('ignore_hidden_rows') or session_result.get('ignore_hidden_rows')),
                         ignore_hidden_columns=bool(form.cleaned_data.get('ignore_hidden_columns') or session_result.get('ignore_hidden_columns')),
+                        lookup_rows=lookup_table.get('rows') or [],
                     )
                     request.session['spreadsheet_transform_result'] = {
                         'plan': plan,

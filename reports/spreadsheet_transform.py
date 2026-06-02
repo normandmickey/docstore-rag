@@ -306,6 +306,8 @@ def build_output_column_planner(headers: list[str]) -> list[dict[str, Any]]:
             'format': 'keep_source',
             'source_a': header,
             'source_b': '',
+            'lookup_key': '',
+            'lookup_return': '',
             'source_hint': header,
             'instructions': '',
         }
@@ -478,6 +480,32 @@ def _filter_visible_rows(rows: list[dict[str, Any]], output_plan: list[dict[str,
     return filtered
 
 
+def _apply_output_plan_lookup(rows: list[dict[str, Any]], output_plan: list[dict[str, Any]] | None, lookup_rows: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
+    if not output_plan or not lookup_rows:
+        return rows
+    transformed_rows = [dict(row) for row in rows]
+    for item in output_plan:
+        target = (item.get('name') or '').strip()
+        operation = (item.get('operation') or '').strip().lower()
+        if operation != 'lookup' or not target:
+            continue
+        primary_key = (item.get('source_a') or '').strip()
+        lookup_key = (item.get('lookup_key') or '').strip()
+        lookup_return = (item.get('lookup_return') or '').strip()
+        if not primary_key or not lookup_key or not lookup_return:
+            continue
+        lookup_index = {}
+        for lookup_row in lookup_rows:
+            lookup_value = str(lookup_row.get(lookup_key, '') or '').strip()
+            if lookup_value:
+                lookup_index[lookup_value] = lookup_row.get(lookup_return, '')
+        for row in transformed_rows:
+            match_value = str(row.get(primary_key, '') or '').strip()
+            if match_value in lookup_index:
+                row[target] = lookup_index[match_value]
+    return transformed_rows
+
+
 def _apply_output_plan_arithmetic(rows: list[dict[str, Any]], output_plan: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     if not output_plan:
         return rows
@@ -564,13 +592,16 @@ def _generate_derived_value(column_name: str, instruction: str, row_index: int) 
     return instruction
 
 
-def _apply_structured_output_plan(rows: list[dict[str, Any]], output_plan: list[dict[str, Any]] | None) -> tuple[list[str], list[dict[str, Any]]] | None:
+def _apply_structured_output_plan(rows: list[dict[str, Any]], output_plan: list[dict[str, Any]] | None, lookup_rows: list[dict[str, Any]] | None = None) -> tuple[list[str], list[dict[str, Any]]] | None:
     if not rows or not output_plan:
         return None
     output_headers = [item.get('name') or '' for item in output_plan if (item.get('name') or '').strip()]
     if not output_headers:
         return None
-    transformed_rows = _filter_visible_rows(_apply_output_plan_arithmetic(rows, output_plan), output_plan)
+    transformed_rows = _filter_visible_rows(
+        _apply_output_plan_lookup(_apply_output_plan_arithmetic(rows, output_plan), output_plan, lookup_rows),
+        output_plan,
+    )
     built_rows: list[dict[str, Any]] = []
     for row_index, row in enumerate(transformed_rows):
         out: dict[str, Any] = {}
@@ -607,9 +638,9 @@ def _apply_hidden_options(rows: list[dict[str, Any]], source_headers: list[str] 
     return filtered_headers, filtered_rows
 
 
-def apply_transform_plan(*, rows: list[dict[str, Any]], plan: dict[str, Any], output_plan: list[dict[str, Any]] | None = None, source_headers: list[str] | None = None, hidden_row_indexes: list[int] | None = None, hidden_columns: list[str] | None = None, ignore_hidden_rows: bool = False, ignore_hidden_columns: bool = False) -> tuple[list[str], list[dict[str, Any]]]:
+def apply_transform_plan(*, rows: list[dict[str, Any]], plan: dict[str, Any], output_plan: list[dict[str, Any]] | None = None, source_headers: list[str] | None = None, hidden_row_indexes: list[int] | None = None, hidden_columns: list[str] | None = None, ignore_hidden_rows: bool = False, ignore_hidden_columns: bool = False, lookup_rows: list[dict[str, Any]] | None = None) -> tuple[list[str], list[dict[str, Any]]]:
     _, rows = _apply_hidden_options(rows, source_headers=source_headers, hidden_row_indexes=hidden_row_indexes, hidden_columns=hidden_columns, ignore_hidden_rows=ignore_hidden_rows, ignore_hidden_columns=ignore_hidden_columns)
-    structured_result = _apply_structured_output_plan(rows, output_plan)
+    structured_result = _apply_structured_output_plan(rows, output_plan, lookup_rows=lookup_rows)
     if structured_result is not None:
         return structured_result
 

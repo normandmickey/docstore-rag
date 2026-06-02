@@ -36,11 +36,11 @@
     {% for field in spreadsheet_transform_form %}
       {% if field.name == 'has_prepared_file' %}
         {{ field }}
-      {% elif field.name == 'file' %}
+      {% elif field.name == 'file' or field.name == 'lookup_file' %}
         <div class="row">
           <strong>{{ field.label }}</strong><br>
           {{ field }}
-          <div class="meta" style="margin-top:8px;">Choose a file first. The button below only works after a CSV or XLSX file is selected.</div>
+          {% if field.name == 'file' %}<div class="meta" style="margin-top:8px;">Choose a file first. The button below only works after a CSV or XLSX file is selected.</div>{% endif %}
           {% if field.help_text %}<div class="meta" style="margin-top:6px;">{{ field.help_text }}</div>{% endif %}
           {% for error in field.errors %}<div class="meta" style="color:#fca5a5; margin-top:6px;">{{ error }}</div>{% endfor %}
         </div>
@@ -170,6 +170,7 @@
                 <option value="add" {% if item.operation == 'add' %}selected{% endif %}>Add</option>
                 <option value="subtract" {% if item.operation == 'subtract' %}selected{% endif %}>Subtract</option>
                 <option value="derive" {% if item.operation == 'derive' %}selected{% endif %}>Derive / custom</option>
+                <option value="lookup" {% if item.operation == 'lookup' %}selected{% endif %}>Lookup from reference file</option>
                 <option value="time_to_decimal_hours" {% if item.operation == 'time_to_decimal_hours' %}selected{% endif %}>Convert hh:mm to decimal hours</option>
                 <option value="visible_only" {% if item.operation == 'visible_only' %}selected{% endif %}>Keep visible rows only</option>
               </select>
@@ -192,6 +193,17 @@
             <label>
               <div class="meta">Source B</div>
               <input type="text" name="output_plan_{{ forloop.counter0 }}_source_b" value="{{ item.source_b }}" placeholder="Example: L or Employee %">
+            </label>
+            <label>
+              <div class="meta">Lookup key / return</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <input type="text" name="output_plan_{{ forloop.counter0 }}_lookup_key" value="{{ item.lookup_key|default:'' }}" placeholder="Lookup key column">
+                <input type="text" name="output_plan_{{ forloop.counter0 }}_lookup_return" value="{{ item.lookup_return|default:'' }}" placeholder="Lookup return column">
+              </div>
+            </label>
+            <label>
+              <div class="meta">Optional notes / freeform instructions</div>
+" placeholder="Example: L or Employee %">
             </label>
             <label>
               <div class="meta">Optional notes / freeform instructions</div>
