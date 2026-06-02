@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 from io import BytesIO
 
@@ -27,6 +28,8 @@ from .spreadsheet_transform import (
     load_tabular_file,
     plan_transform,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class SpreadsheetTransformForm(forms.Form):
