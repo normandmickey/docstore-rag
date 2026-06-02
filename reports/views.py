@@ -252,6 +252,13 @@ def spreadsheet_transformer(request):
                         'has_prepared_file': True,
                     })
 
+                elif action == 'clear':
+                    request.session.pop('spreadsheet_transform_table', None)
+                    request.session.pop('spreadsheet_transform_result', None)
+                    request.session.modified = True
+                    messages.success(request, 'Cleared the spreadsheet transformer state. You can upload a new file and start over.')
+                    return redirect('spreadsheet_transformer')
+
                 elif action == 'download':
                     if not session_result:
                         raise SpreadsheetTransformError('No preview is available yet. Run a preview first.')
