@@ -2,12 +2,20 @@
 {% block title %}Connectors · Docstore{% endblock %}
 {% block content %}
 <div class="card">
-  <h2>Connectors</h2>
-  <p class="meta">Connect external sources so this workspace can pull in documents from systems your team already uses.</p>
-  {% if not connected_account_count and not connector_count %}
+  <h2>Connectors & integrations</h2>
+  <p class="meta">Connect external systems so Docstore can pull in knowledge, answer support questions, and power delivery surfaces like chat, email, bots, and voice.</p>
+  <div class="row">
+    <strong>Source systems</strong><br>
+    <span class="meta">Google Drive, Dropbox, SharePoint, Confluence, and direct URL ingest help you bring documents into the workspace knowledge layer.</span>
+  </div>
+  <div class="row">
+    <strong>Support and operational surfaces</strong><br>
+    <span class="meta">Shipping manager and support email are tenant-wide integrations that can power package lookup, support replies, and cross-channel automation across bots, voice, and inboxes.</span>
+  </div>
+  {% if not connected_account_count and not connector_count and not shipping_integration and not email_integration %}
     <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe; margin-top:16px;">
-      <strong>Bring in documents from another system</strong><br>
-      Connect an account here if you want to import from Google Drive, SharePoint, or Confluence instead of uploading files manually.
+      <strong>Connect Docstore to the systems your team already uses</strong><br>
+      Start with a source connector like Google Drive or Dropbox, or set up tenant-wide support integrations like Shipping Manager and AgentMail support email.
       <div class="nav" style="margin-top:12px;">
         <a href="/dashboard/documents/">Upload files instead</a>
         <a href="/dashboard/urls/">Import from URLs</a>
@@ -17,7 +25,7 @@
 </div>
 <div class="card">
   <h2>Shipping Manager</h2>
-  <p class="meta">Connect a tenant-wide shipping manager for package lookup workflows. This is tenant-scoped, not workspace-specific.</p>
+  <p class="meta">Connect a tenant-wide shipping manager for package lookup workflows. This is tenant-scoped, not workspace-specific, and can be used across bots, voice calls, support email, and internal support tools.</p>
   {% if can_manage_tenant %}
     <form method="post">
       {% csrf_token %}
@@ -84,7 +92,7 @@
 </div>
 <div class="card">
   <h2>Support Email</h2>
-  <p class="meta">Connect a tenant-wide AgentMail inbox for inbound and outbound support email. This is tenant-scoped, not workspace-specific, though you can set a default workspace context.</p>
+  <p class="meta">Connect a tenant-wide AgentMail inbox for inbound and outbound support email. This is tenant-scoped, not workspace-specific, though you can set a default workspace context for chat-style support replies.</p>
   {% if can_manage_tenant %}
     <form method="post">
       {% csrf_token %}
@@ -113,7 +121,7 @@
       </select>
       <label style="display:flex; align-items:center; gap:8px; margin: 10px 0 16px;">
         <input type="checkbox" name="auto_reply_enabled" value="1" {% if email_form.auto_reply_enabled.value %}checked{% endif %} style="width:auto; margin:0;">
-        <span>Enable automatic support replies later</span>
+        <span>Enable automatic support replies using shipping responses or the default workspace chat responder</span>
       </label>
       <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:12px;">
         <button type="submit">Save support email</button>
@@ -170,7 +178,7 @@
 </div>
 <div class="card">
   <h2>Microsoft / SharePoint connections</h2>
-  <p class="meta">Connect your own Microsoft account so this workspace can later sync SharePoint content.</p>
+  <p class="meta">Connect your own Microsoft account so this workspace can browse and later sync SharePoint content into the knowledge layer.</p>
   <p><a href="/connect/microsoft/">Connect Microsoft account</a></p>
   {% for account in external_accounts %}
     {% if account.provider == 'microsoft' %}
@@ -182,7 +190,7 @@
 </div>
 <div class="card">
   <h2>Google Drive connections</h2>
-  <p class="meta">Connect your own Google account so this workspace can browse, import, and sync Google Drive files.</p>
+  <p class="meta">Connect your own Google account so this workspace can browse, import, and sync Google Drive files into Docstore.</p>
   <p><a href="/connect/google/">Connect Google account</a></p>
   {% for account in external_accounts %}
     {% if account.provider == 'google' %}
@@ -299,7 +307,7 @@
 </div>
 <div class="card">
   <h2>Dropbox connections</h2>
-  <p class="meta">Connect your Dropbox account so this workspace can browse folders and import files.</p>
+  <p class="meta">Connect your Dropbox account so this workspace can browse folders, import files, and save a folder as a workspace source.</p>
   <p><a href="/connect/dropbox/">Connect Dropbox account</a></p>
   {% if dropbox_account %}
     {% for account in external_accounts %}
@@ -365,7 +373,7 @@
 </div>
 <div class="card">
   <h2>Atlassian / Confluence connections</h2>
-  <p class="meta">Connect your Atlassian account to start the Confluence foundation: account linking, accessible sites, and future page import/sync flows.</p>
+  <p class="meta">Connect your Atlassian account to start the Confluence foundation: account linking, accessible sites, and future page import and sync flows.</p>
   <p><a href="/connect/atlassian/">Connect Atlassian account</a></p>
   {% for account in external_accounts %}
     {% if account.provider == 'atlassian' %}
@@ -382,10 +390,11 @@
   {% endfor %}
 </div>
 <div class="card">
-  <h2>Planned connector types</h2>
+  <h2>Roadmap and planned integrations</h2>
   <div class="row"><strong>SharePoint</strong><br><span class="meta">OAuth scaffold exists; picker and sync UI still to come.</span></div>
   <div class="row"><strong>Google Drive</strong><br><span class="meta">OAuth, folder browser, one-off import, and recursive folder sync are now in place; incremental sync and richer history come next.</span></div>
   <div class="row"><strong>Confluence</strong><br><span class="meta">Atlassian account linking groundwork is now in place; site selection, page browse/import, and sync flows come next.</span></div>
+  <div class="row"><strong>Support surfaces</strong><br><span class="meta">Shipping manager and support email are live today. More support-oriented integrations can follow the same tenant-scoped pattern.</span></div>
   <div class="row"><strong>Web / URLs</strong><br><span class="meta">Already handled on the URLs page as direct imports.</span></div>
 </div>
 {% endblock %}
