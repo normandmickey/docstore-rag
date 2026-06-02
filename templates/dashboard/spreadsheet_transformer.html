@@ -4,34 +4,30 @@
 {% block content %}
 <div class="card">
   <h2>Spreadsheet Transformer</h2>
-  <p class="meta">Upload a CSV or XLSX file, describe the output columns and layout you want, and export a transformed spreadsheet.</p>
+  <p class="meta">Turn the spreadsheet you have into the spreadsheet you actually need. Inspect the real file first, then guide the planner column by column, then preview the transformed output before export.</p>
   <div class="msg" style="background:#13203f;border-color:#2563eb;color:#dbeafe;">
-    Sample row values sent to the AI planner are privacy-sanitized first. Your actual export still uses the original uploaded data.
+    Real file previews stay in the Docstore UI. Sample row values sent to the AI planner are privacy-sanitized first. Your actual export still uses the original uploaded data.
   </div>
+</div>
+
+<div class="card">
+  <h2>Step 1 · Upload and inspect</h2>
+  <p class="meta">Start by uploading a CSV or XLSX file and inspecting the real parsed spreadsheet before any AI planning step.</p>
   <form method="post" enctype="multipart/form-data" id="spreadsheet-transform-form">
     {% csrf_token %}
     {% for field in spreadsheet_transform_form %}
       {% if field.name == 'has_prepared_file' %}
         {{ field }}
-      {% else %}
-      <div class="row">
-        <strong>{{ field.label }}</strong><br>
-        {{ field }}
-        {% if field.help_text %}<div class="meta" style="margin-top:6px;">{{ field.help_text }}</div>{% endif %}
-        {% for error in field.errors %}<div class="meta" style="color:#fca5a5; margin-top:6px;">{{ error }}</div>{% endfor %}
-      </div>
+      {% elif field.name == 'file' %}
+        <div class="row">
+          <strong>{{ field.label }}</strong><br>
+          {{ field }}
+          {% if field.help_text %}<div class="meta" style="margin-top:6px;">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="meta" style="color:#fca5a5; margin-top:6px;">{{ error }}</div>{% endfor %}
+        </div>
       {% endif %}
     {% endfor %}
     <button type="submit" name="action" value="inspect">Inspect file</button>
-    {% if spreadsheet_transform_source_headers %}
-      <button type="submit" name="action" value="prepare" style="margin-left:10px;">Prepare prompt</button>
-    {% endif %}
-    {% if spreadsheet_transform_column_plan %}
-      <button type="submit" name="action" value="preview" style="margin-left:10px;">Send to AI and preview transform</button>
-    {% endif %}
-    {% if spreadsheet_transform_plan %}
-      <button type="submit" name="action" value="download" style="margin-left:10px;">Download transformed file</button>
-    {% endif %}
   </form>
 </div>
 
@@ -61,6 +57,36 @@
     </table>
   </div>
 </div>
+
+<div class="card">
+  <h2>Step 2 · Describe the target output</h2>
+  <p class="meta">Now describe the spreadsheet you want to create. This high-level goal helps the planner propose the right output structure.</p>
+  <form method="post" enctype="multipart/form-data" id="spreadsheet-transform-plan-form">
+    {% csrf_token %}
+    {% for field in spreadsheet_transform_form %}
+      {% if field.name == 'has_prepared_file' %}
+        {{ field }}
+      {% elif field.name == 'transform_request' or field.name == 'strict_sanitization' or field.name == 'export_format' %}
+        <div class="row">
+          <strong>{{ field.label }}</strong><br>
+          {{ field }}
+          {% if field.help_text %}<div class="meta" style="margin-top:6px;">{{ field.help_text }}</div>{% endif %}
+          {% for error in field.errors %}<div class="meta" style="color:#fca5a5; margin-top:6px;">{{ error }}</div>{% endfor %}
+        </div>
+      {% endif %}
+    {% endfor %}
+    {% if spreadsheet_transform_column_plan %}
+      <input type="hidden" name="column_plan_total" value="{{ spreadsheet_transform_column_plan|length }}">
+      {% for item in spreadsheet_transform_column_plan %}
+        <input type="hidden" name="column_plan_{{ forloop.counter0 }}_source_column" value="{{ item.source_column }}">
+        <input type="hidden" name="column_plan_{{ forloop.counter0 }}_action" value="{{ item.action }}">
+        <input type="hidden" name="column_plan_{{ forloop.counter0 }}_target_column" value="{{ item.target_column }}">
+        <input type="hidden" name="column_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}">
+      {% endfor %}
+    {% endif %}
+    <button type="submit" name="action" value="prepare">Prepare prompt</button>
+  </form>
+</div>
 {% endif %}
 
 {% if spreadsheet_transform_detected_fields %}
@@ -75,46 +101,57 @@
 </div>
 {% endif %}
 
+{% if spreadsheet_transform_column_plan %}
+<div class="card">
+  <h2>Step 3 · Review column-by-column planning</h2>
+  <p class="meta">Review each detected source column and tell the planner what should happen to it before generating the transform preview.</p>
+  <form method="post" enctype="multipart/form-data" id="spreadsheet-transform-preview-form">
+    {% csrf_token %}
+    {% for field in spreadsheet_transform_form %}
+      {% if field.name == 'has_prepared_file' %}
+        {{ field }}
+      {% elif field.name == 'transform_request' or field.name == 'strict_sanitization' or field.name == 'export_format' %}
+        <input type="hidden" name="{{ field.name }}" value="{{ field.value|default_if_none:'' }}">
+      {% endif %}
+    {% endfor %}
+    <input type="hidden" name="column_plan_total" value="{{ spreadsheet_transform_column_plan|length }}">
+    {% for item in spreadsheet_transform_column_plan %}
+      <div class="row" style="border:1px solid #243041; border-radius:10px; padding:14px; margin-bottom:12px;">
+        <strong>{{ item.source_column }}</strong>
+        {% if item.samples %}<div class="meta" style="margin:6px 0 10px 0;">Samples: {{ item.samples|join:" | " }}</div>{% endif %}
+        {% if item.detected_sensitive_types %}<div class="meta" style="margin-bottom:10px;">Sensitive types: {{ item.detected_sensitive_types|join:", " }}</div>{% endif %}
+        <input type="hidden" name="column_plan_{{ forloop.counter0 }}_source_column" value="{{ item.source_column }}">
+        <div style="display:grid; grid-template-columns: 180px 1fr 2fr; gap:12px; align-items:start;">
+          <label>
+            <div class="meta">Action</div>
+            <select name="column_plan_{{ forloop.counter0 }}_action">
+              <option value="keep" {% if item.action == 'keep' %}selected{% endif %}>Keep</option>
+              <option value="rename" {% if item.action == 'rename' %}selected{% endif %}>Rename</option>
+              <option value="drop" {% if item.action == 'drop' %}selected{% endif %}>Drop</option>
+              <option value="transform" {% if item.action == 'transform' %}selected{% endif %}>Transform</option>
+              <option value="derive" {% if item.action == 'derive' %}selected{% endif %}>Use in derived field</option>
+            </select>
+          </label>
+          <label>
+            <div class="meta">Target column</div>
+            <input type="text" name="column_plan_{{ forloop.counter0 }}_target_column" value="{{ item.target_column }}">
+          </label>
+          <label>
+            <div class="meta">Instructions for this column</div>
+            <input type="text" name="column_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}" placeholder="Example: split full name, normalize phone format, map department abbreviations">
+          </label>
+        </div>
+      </div>
+    {% endfor %}
+    <button type="submit" name="action" value="preview">Generate transform preview</button>
+  </form>
+</div>
+{% endif %}
+
 {% if spreadsheet_transform_sanitized_samples %}
 <div class="card">
   <h2>Sanitized sample rows sent to planner</h2>
   <pre style="white-space:pre-wrap;">{{ spreadsheet_transform_sanitized_samples }}</pre>
-</div>
-{% endif %}
-
-{% if spreadsheet_transform_column_plan %}
-<div class="card">
-  <h2>Column-by-column planning</h2>
-  <p class="meta">Review each detected source column and tell the planner what should happen to it. This gets included in the AI planning payload before preview/export.</p>
-  <input type="hidden" form="spreadsheet-transform-form" name="column_plan_total" value="{{ spreadsheet_transform_column_plan|length }}">
-  {% for item in spreadsheet_transform_column_plan %}
-    <div class="row" style="border:1px solid #243041; border-radius:10px; padding:14px; margin-bottom:12px;">
-      <strong>{{ item.source_column }}</strong>
-      {% if item.samples %}<div class="meta" style="margin:6px 0 10px 0;">Samples: {{ item.samples|join:" | " }}</div>{% endif %}
-      {% if item.detected_sensitive_types %}<div class="meta" style="margin-bottom:10px;">Sensitive types: {{ item.detected_sensitive_types|join:", " }}</div>{% endif %}
-      <input type="hidden" form="spreadsheet-transform-form" name="column_plan_{{ forloop.counter0 }}_source_column" value="{{ item.source_column }}">
-      <div style="display:grid; grid-template-columns: 180px 1fr 2fr; gap:12px; align-items:start;">
-        <label>
-          <div class="meta">Action</div>
-          <select form="spreadsheet-transform-form" name="column_plan_{{ forloop.counter0 }}_action">
-            <option value="keep" {% if item.action == 'keep' %}selected{% endif %}>Keep</option>
-            <option value="rename" {% if item.action == 'rename' %}selected{% endif %}>Rename</option>
-            <option value="drop" {% if item.action == 'drop' %}selected{% endif %}>Drop</option>
-            <option value="transform" {% if item.action == 'transform' %}selected{% endif %}>Transform</option>
-            <option value="derive" {% if item.action == 'derive' %}selected{% endif %}>Use in derived field</option>
-          </select>
-        </label>
-        <label>
-          <div class="meta">Target column</div>
-          <input form="spreadsheet-transform-form" type="text" name="column_plan_{{ forloop.counter0 }}_target_column" value="{{ item.target_column }}">
-        </label>
-        <label>
-          <div class="meta">Instructions for this column</div>
-          <input form="spreadsheet-transform-form" type="text" name="column_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}" placeholder="Example: split full name, normalize phone format, map department abbreviations">
-        </label>
-      </div>
-    </div>
-  {% endfor %}
 </div>
 {% endif %}
 
@@ -132,26 +169,10 @@
 </div>
 {% endif %}
 
-{% if spreadsheet_transform_jobs %}
-<div class="card">
-  <h2>Recent export jobs</h2>
-  {% for job in spreadsheet_transform_jobs %}
-    <div class="row">
-      <strong>Job #{{ job.id }}</strong> · <span class="status status-{{ job.status }}">{{ job.status }}</span><br>
-      <span class="meta">{{ job.source_name }} · {{ job.export_format|upper }} · {{ job.created_at }}</span>
-      {% if job.output_file %}
-        <div style="margin-top:8px;"><a href="/dashboard/reports/spreadsheet-transformer/jobs/{{ job.id }}/download/">Download file</a></div>
-      {% elif job.error_text %}
-        <div class="meta" style="margin-top:8px;color:#fca5a5;">{{ job.error_text }}</div>
-      {% endif %}
-    </div>
-  {% endfor %}
-</div>
-{% endif %}
-
 {% if spreadsheet_transform_preview_headers %}
 <div class="card">
-  <h2>Preview</h2>
+  <h2>Step 4 · Review preview and export</h2>
+  <p class="meta">Review the transformed preview before exporting the final file.</p>
   <div style="overflow-x:auto;">
     <table>
       <thead>
@@ -172,6 +193,34 @@
       </tbody>
     </table>
   </div>
+  <form method="post" style="margin-top:14px;">
+    {% csrf_token %}
+    {% for field in spreadsheet_transform_form %}
+      {% if field.name == 'has_prepared_file' %}
+        {{ field }}
+      {% elif field.name == 'transform_request' or field.name == 'strict_sanitization' or field.name == 'export_format' %}
+        <input type="hidden" name="{{ field.name }}" value="{{ field.value|default_if_none:'' }}">
+      {% endif %}
+    {% endfor %}
+    <button type="submit" name="action" value="download">Download transformed file</button>
+  </form>
+</div>
+{% endif %}
+
+{% if spreadsheet_transform_jobs %}
+<div class="card">
+  <h2>Recent export jobs</h2>
+  {% for job in spreadsheet_transform_jobs %}
+    <div class="row">
+      <strong>Job #{{ job.id }}</strong> · <span class="status status-{{ job.status }}">{{ job.status }}</span><br>
+      <span class="meta">{{ job.source_name }} · {{ job.export_format|upper }} · {{ job.created_at }}</span>
+      {% if job.output_file %}
+        <div style="margin-top:8px;"><a href="/dashboard/reports/spreadsheet-transformer/jobs/{{ job.id }}/download/">Download file</a></div>
+      {% elif job.error_text %}
+        <div class="meta" style="margin-top:8px;color:#fca5a5;">{{ job.error_text }}</div>
+      {% endif %}
+    </div>
+  {% endfor %}
 </div>
 {% endif %}
 {% endblock %}
