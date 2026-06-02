@@ -74,8 +74,19 @@ def _normalize_header(value: str) -> str:
     return re.sub(r'[^a-z0-9]+', '', (value or '').strip().lower())
 
 
-def _template_match_report(expected_headers: list[str], actual_headers: list[str]) -> dict:
+def _template_required_headers(template: SpreadsheetTransformTemplate) -> list[str]:
+    required = []
+    for item in template.output_plan_json or []:
+        for key in ['source_a', 'source_b', 'source_hint']:
+            value = (item.get(key) or '').strip()
+            if value and value not in required:
+                required.append(value)
+    return required or list(template.source_headers_json or [])
+
+
+def _template_match_report(expected_headers: list[str], actual_headers: list[str], required_headers: list[str] | None = None) -> dict:
     expected = [header for header in expected_headers or [] if header]
+    required_headers = [header for header in (required_headers or []) if header]
     actual = [header for header in actual_headers or [] if header]
     actual_map = {_normalize_header(header): header for header in actual}
     matched = []
@@ -83,26 +94,29 @@ def _template_match_report(expected_headers: list[str], actual_headers: list[str
     for header in expected:
         normalized = _normalize_header(header)
         if normalized and normalized in actual_map:
-            matched.append({'expected': header, 'actual': actual_map[normalized]})
+            matched.append({'expected': header, 'actual': actual_map[normalized], 'required': header in required_headers})
         else:
             missing.append(header)
+    required_missing = [header for header in required_headers if _normalize_header(header) not in actual_map]
     expected_norms = {_normalize_header(header) for header in expected if _normalize_header(header)}
     extra = [header for header in actual if _normalize_header(header) not in expected_norms]
     if expected and not missing and not extra:
         status = 'exact'
-    elif matched and len(matched) >= max(1, len(expected) // 2):
-        status = 'close'
+    elif not required_missing and matched:
+        status = 'usable'
     elif matched:
-        status = 'partial'
+        status = 'risky'
     else:
-        status = 'mismatch'
+        status = 'incompatible'
     return {
         'status': status,
         'matched': matched,
         'missing': missing,
+        'required_missing': required_missing,
         'extra': extra,
         'expected_count': len(expected),
         'actual_count': len(actual),
+        'can_proceed': status in {'exact', 'usable', 'risky'},
     }
 
 
@@ -260,7 +274,11 @@ def spreadsheet_transformer(request):
                             workspace=current_workspace,
                         ).first()
                         if template:
-                            template_match = _template_match_report(template.source_headers_json or [], table.get('headers') or [])
+                            template_match = _template_match_report(
+                                template.source_headers_json or [],
+                                table.get('headers') or [],
+                                required_headers=_template_required_headers(template),
+                            )
                             output_plan = template.output_plan_json or output_plan
                             column_plan = template.column_plan_json or column_plan
                             transform_request = template.transform_request or transform_request
