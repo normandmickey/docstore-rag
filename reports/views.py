@@ -31,7 +31,7 @@ from .spreadsheet_transform import (
 
 class SpreadsheetTransformForm(forms.Form):
     file = forms.FileField(required=False)
-    transform_request = forms.CharField(widget=forms.Textarea(attrs={'rows': 5}), help_text='Describe the columns and layout you want in the exported file.')
+    transform_request = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 5}), help_text='Describe the columns and layout you want in the exported file.')
     export_format = forms.ChoiceField(choices=[('xlsx', 'XLSX'), ('csv', 'CSV')], initial='xlsx')
     strict_sanitization = forms.BooleanField(required=False, initial=False, help_text='Use more aggressive prompt-side masking for sample rows before AI planning.')
     has_prepared_file = forms.BooleanField(required=False, widget=forms.HiddenInput())
@@ -158,6 +158,8 @@ def spreadsheet_transformer(request):
                 elif action == 'prepare':
                     if not session_table:
                         raise SpreadsheetTransformError('No inspected file is available yet. Upload and inspect a CSV or XLSX file first.')
+                    if not (form.cleaned_data.get('transform_request') or '').strip():
+                        raise SpreadsheetTransformError('Please describe the spreadsheet you want to create before preparing the prompt.')
                     table = session_table
                     preliminary_payload, detected_fields, sanitized_samples, _ = build_transform_prompt_payload(
                         headers=table['headers'],
@@ -202,6 +204,8 @@ def spreadsheet_transformer(request):
                 elif action == 'preview':
                     if not session_table:
                         raise SpreadsheetTransformError('No prepared prompt is available yet. Upload a file and prepare the prompt first.')
+                    if not (form.cleaned_data.get('transform_request') or '').strip():
+                        raise SpreadsheetTransformError('Please describe the spreadsheet you want to create before generating a preview.')
                     column_plan = _read_column_plan_from_post(request) or session_result.get('column_plan') or []
                     plan, detected_fields, sanitized_samples, prompt_preview = plan_transform(
                         headers=session_table.get('headers') or [],
