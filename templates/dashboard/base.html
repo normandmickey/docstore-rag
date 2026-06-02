@@ -22,8 +22,15 @@
     .context-pill .value { color: #f8fbff; font-weight: 700; }
     .context-pill .subvalue { color: #a8b6d3; font-size: 0.92rem; }
     .nav-groups { display: grid; gap: 14px; margin-top: 20px; }
-    .nav-group { background: rgba(12,18,36,0.55); border: 1px solid #22304f; border-radius: 14px; padding: 14px; }
-    .nav-group-title { margin: 0 0 10px; color: #8ea3c7; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    .nav-group { background: rgba(12,18,36,0.55); border: 1px solid #22304f; border-radius: 14px; padding: 0; overflow: hidden; }
+    .nav-group summary { list-style: none; cursor: pointer; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .nav-group summary::-webkit-details-marker { display: none; }
+    .nav-group-title { margin: 0; color: #8ea3c7; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    .nav-group-summary { display: flex; align-items: center; gap: 12px; }
+    .nav-group-count { color: #7f93b8; font-size: 0.9rem; }
+    .nav-group-chevron { color: #9fb2d7; font-size: 0.9rem; transition: transform 0.15s ease; }
+    .nav-group[open] .nav-group-chevron { transform: rotate(180deg); }
+    .nav-group-body { padding: 0 14px 14px; border-top: 1px solid #22304f; }
     .nav { display: flex; gap: 10px; flex-wrap: wrap; }
     .nav a { color: #d9e7ff; text-decoration: none; padding: 10px 14px; border-radius: 999px; background: linear-gradient(180deg, #1a2547, #16203d); border: 1px solid #2a3960; box-shadow: inset 0 1px 0 rgba(255,255,255,0.04); transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease; }
     .nav a:hover { background: linear-gradient(180deg, #22315b, #1a2748); border-color: #3b5287; transform: translateY(-1px); }
@@ -115,49 +122,81 @@
         <button id="install-button" type="button">Install</button>
       </div>
       <div class="nav-groups">
-        <div class="nav-group">
-          <div class="nav-group-title">Core</div>
-          <div class="nav">
-            <a href="/dashboard/" class="{% if section == 'overview' %}active{% endif %}">Overview</a>
-            <a href="/dashboard/get-started/" class="{% if section == 'get_started' %}active{% endif %}">Get Started</a>
-            <a href="/dashboard/workspace/" class="{% if section == 'workspace' %}active{% endif %}">Workspace</a>
-            <a href="/dashboard/documents/" class="{% if section == 'documents' %}active{% endif %}">Documents</a>
-            <a href="/dashboard/urls/" class="{% if section == 'urls' %}active{% endif %}">URLs</a>
-            <a href="/dashboard/chat/" class="{% if section == 'chat' %}active{% endif %}">Chat</a>
-            <a href="/dashboard/proxi-web/" class="{% if section == 'proxi_web' %}active{% endif %}">Proxi-Web</a>
+        <details class="nav-group" {% if section == 'overview' or section == 'get_started' or section == 'workspace' or section == 'documents' or section == 'urls' or section == 'chat' or section == 'proxi_web' %}open{% endif %}>
+          <summary>
+            <div class="nav-group-summary">
+              <div class="nav-group-title">Core</div>
+              <div class="nav-group-count">7 links</div>
+            </div>
+            <div class="nav-group-chevron">▾</div>
+          </summary>
+          <div class="nav-group-body">
+            <div class="nav">
+              <a href="/dashboard/" class="{% if section == 'overview' %}active{% endif %}">Overview</a>
+              <a href="/dashboard/get-started/" class="{% if section == 'get_started' %}active{% endif %}">Get Started</a>
+              <a href="/dashboard/workspace/" class="{% if section == 'workspace' %}active{% endif %}">Workspace</a>
+              <a href="/dashboard/documents/" class="{% if section == 'documents' %}active{% endif %}">Documents</a>
+              <a href="/dashboard/urls/" class="{% if section == 'urls' %}active{% endif %}">URLs</a>
+              <a href="/dashboard/chat/" class="{% if section == 'chat' %}active{% endif %}">Chat</a>
+              <a href="/dashboard/proxi-web/" class="{% if section == 'proxi_web' %}active{% endif %}">Proxi-Web</a>
+            </div>
           </div>
-        </div>
-        <div class="nav-group">
-          <div class="nav-group-title">Build</div>
-          <div class="nav">
-            <a href="/dashboard/chatbots/" class="{% if section == 'chatbots' %}active{% endif %}">Chatbots</a>
-            <a href="/dashboard/connectors/" class="{% if section == 'connectors' %}active{% endif %}">Connectors</a>
-            <a href="/dashboard/support/" class="{% if section == 'support' %}active{% endif %}">Support</a>
-            <a href="/dashboard/reports/support/" class="{% if section == 'reports' %}active{% endif %}">Reports</a>
-            <a href="/dashboard/reports/interactions/" class="{% if report_name == 'interactions' %}active{% endif %}">Interactions</a>
-            <a href="/dashboard/reports/spreadsheet-transformer/" class="{% if report_name == 'spreadsheet_transformer' %}active{% endif %}">Spreadsheet Transformer</a>
+        </details>
+        <details class="nav-group" {% if section == 'chatbots' or section == 'connectors' or section == 'support' or section == 'reports' or report_name == 'interactions' or report_name == 'spreadsheet_transformer' %}open{% endif %}>
+          <summary>
+            <div class="nav-group-summary">
+              <div class="nav-group-title">Build</div>
+              <div class="nav-group-count">6 links</div>
+            </div>
+            <div class="nav-group-chevron">▾</div>
+          </summary>
+          <div class="nav-group-body">
+            <div class="nav">
+              <a href="/dashboard/chatbots/" class="{% if section == 'chatbots' %}active{% endif %}">Chatbots</a>
+              <a href="/dashboard/connectors/" class="{% if section == 'connectors' %}active{% endif %}">Connectors</a>
+              <a href="/dashboard/support/" class="{% if section == 'support' %}active{% endif %}">Support</a>
+              <a href="/dashboard/reports/support/" class="{% if section == 'reports' %}active{% endif %}">Reports</a>
+              <a href="/dashboard/reports/interactions/" class="{% if report_name == 'interactions' %}active{% endif %}">Interactions</a>
+              <a href="/dashboard/reports/spreadsheet-transformer/" class="{% if report_name == 'spreadsheet_transformer' %}active{% endif %}">Spreadsheet Transformer</a>
+            </div>
           </div>
-        </div>
-        <div class="nav-group">
-          <div class="nav-group-title">Manage</div>
-          <div class="nav">
-            {% if can_manage_tenant %}<a href="/dashboard/tenant/" class="{% if section == 'tenant' %}active{% endif %}">Tenant</a>{% endif %}
-            <a href="/dashboard/api-keys/" class="{% if section == 'api_keys' %}active{% endif %}">API Keys</a>
-            <a href="/roadmap/scaling/" target="_blank" rel="noopener noreferrer">Scaling Roadmap</a>
-            <a href="/api/quickstart/" target="_blank" rel="noopener noreferrer">API Quickstart</a>
-            <a href="/api/docs/" target="_blank" rel="noopener noreferrer">API Docs</a>
+        </details>
+        <details class="nav-group" {% if section == 'tenant' or section == 'api_keys' %}open{% endif %}>
+          <summary>
+            <div class="nav-group-summary">
+              <div class="nav-group-title">Manage</div>
+              <div class="nav-group-count">4 links</div>
+            </div>
+            <div class="nav-group-chevron">▾</div>
+          </summary>
+          <div class="nav-group-body">
+            <div class="nav">
+              {% if can_manage_tenant %}<a href="/dashboard/tenant/" class="{% if section == 'tenant' %}active{% endif %}">Tenant</a>{% endif %}
+              <a href="/dashboard/api-keys/" class="{% if section == 'api_keys' %}active{% endif %}">API Keys</a>
+              <a href="/roadmap/scaling/" target="_blank" rel="noopener noreferrer">Scaling Roadmap</a>
+              <a href="/api/quickstart/" target="_blank" rel="noopener noreferrer">API Quickstart</a>
+              <a href="/api/docs/" target="_blank" rel="noopener noreferrer">API Docs</a>
+            </div>
           </div>
-        </div>
-        <div class="nav-group">
-          <div class="nav-group-title">Account</div>
-          <div class="nav nav-secondary">
-            {% if is_staff_user %}
-              <a href="/dashboard/staff/" class="{% if section == 'staff' %}active{% endif %}">Staff</a>
-              <a href="/admin/">Admin</a>
-            {% endif %}
-            <a href="/logout/">Log out</a>
+        </details>
+        <details class="nav-group" {% if section == 'staff' %}open{% endif %}>
+          <summary>
+            <div class="nav-group-summary">
+              <div class="nav-group-title">Account</div>
+              <div class="nav-group-count">{% if is_staff_user %}3 links{% else %}1 link{% endif %}</div>
+            </div>
+            <div class="nav-group-chevron">▾</div>
+          </summary>
+          <div class="nav-group-body">
+            <div class="nav nav-secondary">
+              {% if is_staff_user %}
+                <a href="/dashboard/staff/" class="{% if section == 'staff' %}active{% endif %}">Staff</a>
+                <a href="/admin/">Admin</a>
+              {% endif %}
+              <a href="/logout/">Log out</a>
+            </div>
           </div>
-        </div>
+        </details>
       </div>
     </div>
 
