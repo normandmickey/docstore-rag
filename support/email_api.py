@@ -6,6 +6,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from retrieval.service import answer_question, shipping_answer_payload
+
 from .email_services import TenantEmailClient, TenantEmailIntegrationError, ingest_inbound_email, send_support_email_reply
 from .models import TenantEmailIntegration
 
@@ -140,12 +142,36 @@ class AgentMailInboundWebhookView(APIView):
 
         auto_reply_sent = False
         auto_reply_error = ''
+        auto_reply_mode = ''
         if integration.auto_reply_enabled and (data.get('event_type') or request.data.get('event_type') or '') == 'message.received':
             try:
-                reply_body = (
-                    f"Thanks for your email — I got your message about '{subject or 'your support request'}'. "
-                    "We’ve opened it in support and will follow up shortly."
-                )
+                reply_body = ''
+                shipping_payload = shipping_answer_payload(tenant=integration.tenant, query=body_text or subject, limit=3)
+                if shipping_payload is not None:
+                    reply_body = (shipping_payload.get('answer') or '').strip()
+                    auto_reply_mode = 'shipping'
+                else:
+                    workspace = integration.default_workspace
+                    if workspace is not None:
+                        chat_answer, _results = answer_question(
+                            tenant=integration.tenant,
+                            workspace=workspace,
+                            query=body_text or subject,
+                            top_k=5,
+                        )
+                        if isinstance(chat_answer, dict):
+                            reply_body = (chat_answer.get('answer') or '').strip()
+                        else:
+                            reply_body = (chat_answer or '').strip()
+                        auto_reply_mode = 'chat'
+
+                if not reply_body:
+                    reply_body = (
+                        f"Thanks for your email — I got your message about '{subject or 'your support request'}'. "
+                        "We’ve opened it in support and will follow up shortly."
+                    )
+                    auto_reply_mode = 'ack'
+
                 send_support_email_reply(conversation=conversation, body=reply_body)
                 auto_reply_sent = True
             except TenantEmailIntegrationError as exc:
@@ -158,4 +184,5 @@ class AgentMailInboundWebhookView(APIView):
             'tenant_id': integration.tenant_id,
             'auto_reply_sent': auto_reply_sent,
             'auto_reply_error': auto_reply_error,
+            'auto_reply_mode': auto_reply_mode,
         })
