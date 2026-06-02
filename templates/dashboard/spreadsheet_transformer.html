@@ -62,6 +62,13 @@
 </div>
 {% endif %}
 
+{% if spreadsheet_transform_selected_template_id and spreadsheet_transform_output_plan %}
+<div class="card">
+  <h2>Loaded template setup</h2>
+  <p class="meta">The selected template has already prefilled the transformation setup below. Inspect the file, review the match check, and then continue with the preloaded output operations.</p>
+</div>
+{% endif %}
+
 {% if spreadsheet_transform_template_match %}
 <div class="card">
   <h2>Template match check</h2>
@@ -78,8 +85,10 @@
   {% if spreadsheet_transform_template_match.matched %}
     <div class="row"><strong>Matched columns</strong><div class="meta">{% for item in spreadsheet_transform_template_match.matched %}{% if item.required %}<strong>{% endif %}{{ item.expected }}{% if item.expected != item.actual %} → {{ item.actual }}{% endif %}{% if item.required %}</strong>{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</div></div>
   {% endif %}
-  {% if spreadsheet_transform_template_match.status != 'exact' and spreadsheet_transform_template_match.can_proceed %}
-    <div class="msg" style="margin-top:12px; background:#3a2812; border-color:#d97706; color:#ffedd5;">This file is not an exact template match, but you can still proceed if the differences are acceptable.</div>
+  {% if spreadsheet_transform_template_match.status == 'exact' %}
+    <div class="msg" style="margin-top:12px; background:#123524; border-color:#1f7a4c; color:#d1fae5;">This file matches the loaded template. The transformation setup below is ready to use.</div>
+  {% elif spreadsheet_transform_template_match.status != 'exact' and spreadsheet_transform_template_match.can_proceed %}
+    <div class="msg" style="margin-top:12px; background:#3a2812; border-color:#d97706; color:#ffedd5;">This file is not an exact template match, but the loaded template setup has been prefilled below and you can still proceed if the differences are acceptable.</div>
   {% endif %}
   {% if spreadsheet_transform_template_match.status == 'incompatible' %}
     <div class="msg" style="margin-top:12px; background:#3a1212; border-color:#dc2626; color:#fee2e2;">This file looks incompatible with the selected template. You can still inspect and adjust manually, but the saved template setup may not apply cleanly.</div>
@@ -117,6 +126,9 @@
 <div class="card">
   <h2>Step 2 · Describe the target output</h2>
   <p class="meta">Describe the spreadsheet you want to create, then sketch the desired output columns below so the planner knows the target shape — not just the source columns.</p>
+  {% if spreadsheet_transform_selected_template_id %}
+    <div class="msg" style="margin-top:12px; background:#13203f; border-color:#2563eb; color:#dbeafe;">This transformation setup was prefilled from the loaded template. Review it, make any needed adjustments, then continue.</div>
+  {% endif %}
   <form method="post" enctype="multipart/form-data" id="spreadsheet-transform-plan-form">
     {% csrf_token %}
     {% for field in spreadsheet_transform_form %}
