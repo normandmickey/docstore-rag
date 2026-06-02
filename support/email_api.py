@@ -168,13 +168,13 @@ class AgentMailInboundWebhookView(APIView):
                 if reply_body:
                     reply_body = reply_body.strip()
                     if auto_reply_mode == 'shipping':
-                        reply_body = f"Thanks for reaching out. {reply_body}"
+                        reply_body = f"Thanks for reaching out.\n\n{reply_body}"
                     elif auto_reply_mode == 'chat':
-                        reply_body = f"Thanks for your email. {reply_body}"
+                        reply_body = f"Thanks for your email.\n\n{reply_body}"
 
                 if not reply_body:
                     reply_body = (
-                        f"Thanks for your email. I received your message about '{subject or 'your support request'}' "
+                        f"Thanks for your email.\n\nI received your message about '{subject or 'your support request'}' "
                         "and opened it in support. We’ll follow up shortly."
                     )
                     auto_reply_mode = 'ack'

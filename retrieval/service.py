@@ -437,19 +437,23 @@ def _build_shipping_detail_answer(row: dict, *, include_intro: bool = False) -> 
     delivered_at = _format_shipping_datetime(row.get('delivered_at') or '')
     tracking_url = _carrier_tracking_url(row.get('carrier') or '', tracking)
 
-    lines = []
+    sections = []
     if include_intro:
-        lines.append('I found a matching shipment for your request.')
-    lines.append(f'{carrier} tracking {tracking} is currently marked {status.lower()}.')
+        sections.append('I found a matching shipment for your request.')
+
+    status_line = f'{carrier} tracking {tracking} is currently marked {status.lower()}.'
     if location:
-        lines.append(f'Latest location: {location}.')
+        status_line += f' Latest location: {location}.'
+    sections.append(status_line)
+
     if delivered_at:
-        lines.append(f'Delivered on {delivered_at}.')
+        sections.append(f'Delivered on {delivered_at}.')
     elif estimated_delivery:
-        lines.append(f'Current delivery timing: {estimated_delivery}.')
+        sections.append(f'Current delivery timing: {estimated_delivery}.')
+
     if tracking_url:
-        lines.append(f'Track it here: {tracking_url}')
-    return ' '.join(line.strip() for line in lines if line).strip()
+        sections.append(f'Track it here: {tracking_url}')
+    return '\n\n'.join(section.strip() for section in sections if section).strip()
 
 
 
