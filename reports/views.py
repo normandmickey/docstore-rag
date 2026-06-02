@@ -268,13 +268,8 @@ def spreadsheet_transformer(request):
                         'source_row_count': session_result.get('source_row_count', session_table.get('row_count') or 0),
                     }
                     request.session.modified = True
-                    session_result = request.session['spreadsheet_transform_result']
-                    base['spreadsheet_transform_form'] = SpreadsheetTransformForm(initial={
-                        'transform_request': session_result.get('transform_request', ''),
-                        'export_format': session_result.get('export_format', 'xlsx'),
-                        'strict_sanitization': session_result.get('strict_sanitization', False),
-                        'has_prepared_file': True,
-                    })
+                    messages.success(request, 'Previewed the transformed file. Review the preview below or download the transformed file.')
+                    return redirect('spreadsheet_transformer')
 
                 elif action == 'clear':
                     request.session.pop('spreadsheet_transform_table', None)
@@ -335,6 +330,7 @@ def spreadsheet_transformer(request):
                     )
                     build_spreadsheet_transform_export.delay(job.id)
                     messages.success(request, f'Queued export job #{job.id}. Refresh to download when ready.')
+                    return redirect('spreadsheet_transformer')
 
                 if session_result:
                     base['spreadsheet_transform_plan'] = session_result.get('plan')
