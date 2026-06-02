@@ -70,7 +70,7 @@
 
 <div class="card">
   <h2>Step 2 · Describe the target output</h2>
-  <p class="meta">Now describe the spreadsheet you want to create. This high-level goal helps the planner propose the right output structure.</p>
+  <p class="meta">Describe the spreadsheet you want to create, then sketch the desired output columns below so the planner knows the target shape — not just the source columns.</p>
   <form method="post" enctype="multipart/form-data" id="spreadsheet-transform-plan-form">
     {% csrf_token %}
     {% for field in spreadsheet_transform_form %}
@@ -85,6 +85,33 @@
         </div>
       {% endif %}
     {% endfor %}
+
+    {% if spreadsheet_transform_output_plan %}
+    <div class="row">
+      <strong>Desired output columns</strong>
+      <div class="meta" style="margin-top:6px;">Edit the output schema you want the transformed file to have. You can rename columns, describe derived fields, and explain what each output column should contain.</div>
+      {% for item in spreadsheet_transform_output_plan %}
+        <div style="border:1px solid #243041; border-radius:10px; padding:14px; margin-top:12px;">
+          <div style="display:grid; grid-template-columns: 1fr 1fr 2fr; gap:12px; align-items:start;">
+            <label>
+              <div class="meta">Output column name</div>
+              <input type="text" name="output_plan_{{ forloop.counter0 }}_name" value="{{ item.name }}">
+            </label>
+            <label>
+              <div class="meta">Source hint</div>
+              <input type="text" name="output_plan_{{ forloop.counter0 }}_source_hint" value="{{ item.source_hint }}" placeholder="Example: Full Name, First Name + Last Name, derive from Status">
+            </label>
+            <label>
+              <div class="meta">What should this output column contain?</div>
+              <input type="text" name="output_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}" placeholder="Example: normalize to title case, derive from two source columns, keep only active customers">
+            </label>
+          </div>
+        </div>
+      {% endfor %}
+      <input type="hidden" name="output_plan_total" value="{{ spreadsheet_transform_output_plan|length }}">
+    </div>
+    {% endif %}
+
     {% if spreadsheet_transform_column_plan %}
       <input type="hidden" name="column_plan_total" value="{{ spreadsheet_transform_column_plan|length }}">
       {% for item in spreadsheet_transform_column_plan %}
