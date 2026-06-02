@@ -75,6 +75,9 @@ def _read_output_plan_from_post(request) -> list[dict]:
     for idx in range(total):
         items.append({
             'name': (request.POST.get(f'output_plan_{idx}_name') or '').strip(),
+            'operation': (request.POST.get(f'output_plan_{idx}_operation') or 'keep').strip(),
+            'source_a': (request.POST.get(f'output_plan_{idx}_source_a') or '').strip(),
+            'source_b': (request.POST.get(f'output_plan_{idx}_source_b') or '').strip(),
             'source_hint': (request.POST.get(f'output_plan_{idx}_source_hint') or '').strip(),
             'instructions': (request.POST.get(f'output_plan_{idx}_instructions') or '').strip(),
         })

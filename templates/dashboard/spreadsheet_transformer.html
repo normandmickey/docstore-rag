@@ -96,20 +96,37 @@
       {% for item in spreadsheet_transform_output_plan %}
         <div style="border:1px solid #243041; border-radius:10px; padding:14px; margin-top:12px;">
           <div class="meta" style="margin-bottom:10px;">Source column {% if item.letter %}{{ item.letter }} · {% endif %}{{ item.source_hint }}</div>
-          <div style="display:grid; grid-template-columns: 1fr 1fr 2fr; gap:12px; align-items:start;">
+          <div style="display:grid; grid-template-columns: 1fr 1fr 1fr 1fr 2fr; gap:12px; align-items:start;">
             <label>
               <div class="meta">Output column name</div>
               <input type="text" name="output_plan_{{ forloop.counter0 }}_name" value="{{ item.name }}">
             </label>
             <label>
-              <div class="meta">Source hint</div>
-              <input type="text" name="output_plan_{{ forloop.counter0 }}_source_hint" value="{{ item.source_hint }}" placeholder="Example: Full Name, First Name + Last Name, derive from Status">
+              <div class="meta">Operation</div>
+              <select name="output_plan_{{ forloop.counter0 }}_operation">
+                <option value="keep" {% if item.operation == 'keep' %}selected{% endif %}>Keep</option>
+                <option value="rename" {% if item.operation == 'rename' %}selected{% endif %}>Rename</option>
+                <option value="multiply" {% if item.operation == 'multiply' %}selected{% endif %}>Multiply</option>
+                <option value="divide" {% if item.operation == 'divide' %}selected{% endif %}>Divide</option>
+                <option value="add" {% if item.operation == 'add' %}selected{% endif %}>Add</option>
+                <option value="subtract" {% if item.operation == 'subtract' %}selected{% endif %}>Subtract</option>
+                <option value="derive" {% if item.operation == 'derive' %}selected{% endif %}>Derive / custom</option>
+              </select>
             </label>
             <label>
-              <div class="meta">What should this output column contain?</div>
-              <input type="text" name="output_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}" placeholder="Example: normalize to title case, derive from two source columns, keep only active customers">
+              <div class="meta">Source A</div>
+              <input type="text" name="output_plan_{{ forloop.counter0 }}_source_a" value="{{ item.source_a }}" placeholder="Example: H or Employee">
+            </label>
+            <label>
+              <div class="meta">Source B</div>
+              <input type="text" name="output_plan_{{ forloop.counter0 }}_source_b" value="{{ item.source_b }}" placeholder="Example: L or Employee %">
+            </label>
+            <label>
+              <div class="meta">Optional notes / freeform instructions</div>
+              <input type="text" name="output_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}" placeholder="Example: multiply and write result here, round to whole dollars, or custom reshape notes">
             </label>
           </div>
+          <input type="hidden" name="output_plan_{{ forloop.counter0 }}_source_hint" value="{{ item.source_hint }}">
         </div>
       {% endfor %}
       <input type="hidden" name="output_plan_total" value="{{ spreadsheet_transform_output_plan|length }}">
@@ -171,6 +188,9 @@
       <input type="hidden" name="output_plan_total" value="{{ spreadsheet_transform_output_plan|length }}">
       {% for item in spreadsheet_transform_output_plan %}
         <input type="hidden" name="output_plan_{{ forloop.counter0 }}_name" value="{{ item.name }}">
+        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_operation" value="{{ item.operation|default:'keep' }}">
+        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_source_a" value="{{ item.source_a|default:'' }}">
+        <input type="hidden" name="output_plan_{{ forloop.counter0 }}_source_b" value="{{ item.source_b|default:'' }}">
         <input type="hidden" name="output_plan_{{ forloop.counter0 }}_source_hint" value="{{ item.source_hint }}">
         <input type="hidden" name="output_plan_{{ forloop.counter0 }}_instructions" value="{{ item.instructions }}">
       {% endfor %}

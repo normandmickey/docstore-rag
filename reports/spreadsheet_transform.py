@@ -293,6 +293,9 @@ def build_output_column_planner(headers: list[str]) -> list[dict[str, Any]]:
         {
             'letter': _column_letter(idx),
             'name': header,
+            'operation': 'keep',
+            'source_a': header,
+            'source_b': '',
             'source_hint': header,
             'instructions': '',
         }
@@ -408,22 +411,45 @@ def _format_numeric_like_source(value: float, source_value: Any = '') -> str:
     return f'{value:.2f}'
 
 
+def _resolve_source_name(source: str, row: dict[str, Any]) -> str:
+    source = (source or '').strip()
+    if not source:
+        return ''
+    if source in row:
+        return source
+    match = re.fullmatch(r'([A-Z]+)', source.upper())
+    if match:
+        letters = match.group(1)
+        index = 0
+        for ch in letters:
+            index = index * 26 + (ord(ch) - 64)
+        index -= 1
+        keys = list(row.keys())
+        if 0 <= index < len(keys):
+            return keys[index]
+    return source
+
+
 def _apply_output_plan_arithmetic(rows: list[dict[str, Any]], output_plan: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
     if not output_plan:
         return rows
     transformed_rows = [dict(row) for row in rows]
     for item in output_plan:
         target = (item.get('name') or '').strip()
+        operation = (item.get('operation') or '').strip().lower()
         source_hint = (item.get('source_hint') or '').strip()
         instruction = (item.get('instructions') or '').strip().lower()
         if not target or target not in (rows[0].keys() if rows else []):
             continue
-        if 'multiply' not in instruction and 'times' not in instruction and '*' not in instruction:
+        if operation not in {'multiply', 'divide', 'add', 'subtract'} and all(token not in instruction for token in ['multiply', 'times', '*', 'divide', '/', 'add', '+', 'subtract', '-']):
             continue
-        source_candidates = [part.strip() for part in re.split(r'[,+]| and ', source_hint) if part.strip()]
-        if len(source_candidates) < 2:
-            continue
-        left_source, right_source = source_candidates[0], source_candidates[1]
+        left_source = _resolve_source_name(item.get('source_a') or '', rows[0] if rows else {})
+        right_source = _resolve_source_name(item.get('source_b') or '', rows[0] if rows else {})
+        if not left_source or not right_source:
+            source_candidates = [part.strip() for part in re.split(r'[,+]| and ', source_hint) if part.strip()]
+            if len(source_candidates) >= 2:
+                left_source = _resolve_source_name(source_candidates[0], rows[0] if rows else {})
+                right_source = _resolve_source_name(source_candidates[1], rows[0] if rows else {})
         if rows and (left_source not in rows[0] or right_source not in rows[0]):
             continue
         for row in transformed_rows:
@@ -433,8 +459,17 @@ def _apply_output_plan_arithmetic(rows: list[dict[str, Any]], output_plan: list[
                 continue
             if '%' in str(row.get(right_source, '')):
                 right_value = right_value / 100.0
-            product = left_value * right_value
-            row[target] = _format_numeric_like_source(product, row.get(target, row.get(left_source, '')))
+            if operation == 'divide':
+                if right_value == 0:
+                    continue
+                result = left_value / right_value
+            elif operation == 'add':
+                result = left_value + right_value
+            elif operation == 'subtract':
+                result = left_value - right_value
+            else:
+                result = left_value * right_value
+            row[target] = _format_numeric_like_source(result, row.get(target, row.get(left_source, '')))
     return transformed_rows
 
 
