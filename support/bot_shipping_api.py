@@ -4,7 +4,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from control.api_guard import resolve_request_context
+from control.api_guard import resolve_tenant_context
 from retrieval.service import shipping_answer_payload
 
 
@@ -36,10 +36,9 @@ class BotShippingLookupView(APIView):
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
 
-        tenant, workspace, _api_key = resolve_request_context(
+        tenant, _workspace, _api_key = resolve_tenant_context(
             request,
             tenant_id=data.get('tenant_id'),
-            workspace_id=data.get('workspace_id'),
         )
         payload = shipping_answer_payload(
             tenant=tenant,

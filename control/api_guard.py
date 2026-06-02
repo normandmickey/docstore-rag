@@ -4,6 +4,24 @@ from .api_auth import get_api_key_from_header
 from .models import Tenant, Workspace
 
 
+def resolve_tenant_context(request, *, tenant_id=None):
+    if request.user.is_authenticated:
+        if tenant_id is None:
+            raise PermissionDenied('Signed-in requests must include tenant_id.')
+        tenant = Tenant.objects.get(id=tenant_id)
+        return tenant, None, None
+
+    api_key = get_api_key_from_header(request)
+    if not api_key:
+        raise PermissionDenied('Authentication required. Provide a valid Bearer API key or sign in.')
+
+    tenant = api_key.tenant
+    if tenant_id is not None and tenant_id != tenant.id:
+        raise PermissionDenied('API key is not scoped to this tenant.')
+    return tenant, None, api_key
+
+
+
 def resolve_request_context(request, *, tenant_id=None, workspace_id=None):
     if request.user.is_authenticated:
         if tenant_id is None or workspace_id is None:
