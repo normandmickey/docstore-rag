@@ -593,6 +593,15 @@ def google_connect_callback(request):
     try:
         tokens = exchange_google_code_for_tokens(code)
         profile = fetch_google_userinfo(tokens['access_token'])
+        granted_scopes = [scope for scope in (tokens.get('scope') or '').split() if scope]
+        if not granted_scopes:
+            granted_scopes = list(settings.GOOGLE_SCOPES)
+        has_drive_scope = 'https://www.googleapis.com/auth/drive.readonly' in granted_scopes
+        metadata = dict(profile)
+        if not has_drive_scope:
+            metadata['reauth_required'] = True
+            metadata['reauth_reason'] = 'missing_drive_scope'
+            metadata['reauth_required_at'] = timezone.now().isoformat()
         if not request.session.get('current_tenant_id') or not request.session.get('current_workspace_id'):
             tenant, workspace = _bootstrap_user_workspace(request.user, request.session)
         else:
@@ -611,11 +620,14 @@ def google_connect_callback(request):
                 'access_token': tokens.get('access_token', ''),
                 'refresh_token': tokens.get('refresh_token', ''),
                 'expires_at': tokens.get('expires_at'),
-                'scopes_json': settings.GOOGLE_SCOPES,
-                'metadata_json': profile,
+                'scopes_json': granted_scopes,
+                'metadata_json': metadata,
             },
         )
-        messages.success(request, f'Connected Google account for {account.email or account.display_name or "your account"}.')
+        if has_drive_scope:
+            messages.success(request, f'Connected Google account for {account.email or account.display_name or "your account"}.')
+        else:
+            messages.warning(request, 'Google account connected, but Google Drive permission was not granted. Reconnect and approve Drive access to browse or sync Drive.')
     except Exception as exc:
         logger.exception('Google OAuth callback failed for user=%s', request.user.id)
         messages.error(request, f'Google connection failed: {exc}')
