@@ -1379,6 +1379,30 @@ def dashboard_connectors(request):
             provider=Connector.PROVIDER_DROPBOX,
         ).order_by('-updated_at').first()
 
+    def ensure_docstore_google_connector(folder):
+        if not (google_account and current_workspace and current_tenant and folder):
+            return None
+        connector, _created = Connector.objects.update_or_create(
+            tenant=current_tenant,
+            workspace=current_workspace,
+            provider=Connector.PROVIDER_GOOGLE_DRIVE,
+            defaults={
+                'label': f"Google Drive · {folder.get('name') or 'Docstore'}",
+                'status': Connector.STATUS_ACTIVE,
+                'config_json': {
+                    'external_account_id': google_account.id,
+                    'account_email': google_account.email,
+                    'folder_id': folder.get('id', ''),
+                    'recursive': True,
+                },
+                'sync_enabled': base['google_drive_connector'].sync_enabled if base['google_drive_connector'] else False,
+                'sync_frequency_minutes': base['google_drive_connector'].sync_frequency_minutes if base['google_drive_connector'] else 60,
+                'next_sync_at': base['google_drive_connector'].next_sync_at if base['google_drive_connector'] else None,
+            },
+        )
+        base['google_drive_connector'] = connector
+        return connector
+
     if request.method == 'POST' and request.POST.get('action') == 'save_shipping_integration' and current_tenant:
         if not base.get('can_manage_tenant'):
             messages.error(request, 'Only tenant owners and admins can manage the shipping manager connection.')
@@ -1761,7 +1785,9 @@ def dashboard_connectors(request):
             client = GoogleDriveClient(_get_valid_google_access_token(google_account))
             matches = client.find_folder_by_name('Docstore', page_size=10)
             base['google_drive_docstore_folder'] = matches[0] if matches else None
-            if not matches:
+            if matches:
+                ensure_docstore_google_connector(matches[0])
+            else:
                 base['google_drive_docstore_error'] = 'No Google Drive folder named Docstore was found. Create one in Google Drive, then reconnect or refresh this page.'
         except Exception as exc:
             logger.exception('Google Drive Docstore folder lookup failed for user=%s', request.user.id)
