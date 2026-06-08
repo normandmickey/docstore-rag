@@ -203,28 +203,20 @@
   {% if google_account %}
     <hr style="border:0; border-top:1px solid #243055; margin: 20px 0;">
     <h3 style="margin-top:0;">Docstore folder setup</h3>
-    <p class="meta">Docstore looks only for a Google Drive folder named <strong>Docstore</strong>. No full Drive browser, no folder picking.</p>
+    <p class="meta">Docstore now auto-detects and auto-saves the Google Drive folder named <strong>Docstore</strong>.</p>
 
     {% if google_drive_docstore_folder %}
       <div class="row">
-        <strong>Found Docstore folder</strong><br>
+        <strong>Docstore folder connected</strong><br>
         <span class="meta">{{ google_drive_docstore_folder.name }} · {{ google_drive_docstore_folder.id }}</span>
-        <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
-          <form method="post" style="margin:0;">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="use_google_drive_folder">
-            <input type="hidden" name="folder_id" value="{{ google_drive_docstore_folder.id }}">
-            <input type="hidden" name="folder_name" value="{{ google_drive_docstore_folder.name }}">
-            <button type="submit">Use Docstore folder</button>
-          </form>
-          <form method="post" style="margin:0;">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="sync_google_drive_folder_now">
-            <input type="hidden" name="folder_id" value="{{ google_drive_docstore_folder.id }}">
-            <input type="hidden" name="folder_name" value="{{ google_drive_docstore_folder.name }}">
-            <button type="submit">Sync Docstore folder now</button>
-          </form>
-        </div>
+        <div class="meta" style="margin-top: 8px;">This folder is automatically used as the workspace Google Drive connector.</div>
+        <form method="post" style="margin-top: 12px;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="sync_google_drive_folder_now">
+          <input type="hidden" name="folder_id" value="{{ google_drive_docstore_folder.id }}">
+          <input type="hidden" name="folder_name" value="{{ google_drive_docstore_folder.name }}">
+          <button type="submit">Sync Docstore folder now</button>
+        </form>
       </div>
     {% else %}
       <div class="msg" style="background:#3f1d12;border-color:#c2410c;color:#fed7aa; margin-top:12px;">
