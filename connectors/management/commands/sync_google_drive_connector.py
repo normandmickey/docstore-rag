@@ -1,5 +1,7 @@
 from collections import deque
 
+from requests import HTTPError
+
 from django.core.files.base import ContentFile
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
@@ -15,6 +17,26 @@ from documents.upload_service import create_or_reuse_document
 SUPPORTED_FILE_EXTENSIONS = {'.pdf', '.docx', '.txt', '.md', '.html', '.htm', '.csv'}
 
 
+def mark_google_account_reauth_required(account, reason='refresh_token_invalid'):
+    metadata = dict(account.metadata_json or {})
+    metadata['reauth_required'] = True
+    metadata['reauth_reason'] = reason
+    metadata['reauth_required_at'] = timezone.now().isoformat()
+    account.access_token = ''
+    account.expires_at = None
+    account.metadata_json = metadata
+    account.save(update_fields=['access_token', 'expires_at', 'metadata_json', 'updated_at'])
+
+    Connector.objects.filter(
+        provider=Connector.PROVIDER_GOOGLE_DRIVE,
+        config_json__external_account_id=account.id,
+    ).update(
+        sync_enabled=False,
+        next_sync_at=None,
+        updated_at=timezone.now(),
+    )
+
+
 def get_valid_google_access_token(account):
     if not account:
         return ''
@@ -22,12 +44,32 @@ def get_valid_google_access_token(account):
         return account.access_token
     if not account.refresh_token:
         return account.access_token
-    tokens = refresh_google_tokens(account.refresh_token)
+
+    try:
+        tokens = refresh_google_tokens(account.refresh_token)
+    except HTTPError as exc:
+        response = exc.response
+        payload = {}
+        if response is not None:
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = {}
+        if response is not None and response.status_code == 400 and payload.get('error') == 'invalid_grant':
+            mark_google_account_reauth_required(account, reason=payload.get('error_description') or 'invalid_grant')
+            raise CommandError('Google account needs to be reconnected: refresh token expired or was revoked.') from exc
+        raise
+
     account.access_token = tokens.get('access_token', account.access_token)
     if tokens.get('refresh_token'):
         account.refresh_token = tokens.get('refresh_token')
     account.expires_at = tokens.get('expires_at')
-    account.save(update_fields=['access_token', 'refresh_token', 'expires_at'])
+    metadata = dict(account.metadata_json or {})
+    metadata.pop('reauth_required', None)
+    metadata.pop('reauth_reason', None)
+    metadata.pop('reauth_required_at', None)
+    account.metadata_json = metadata
+    account.save(update_fields=['access_token', 'refresh_token', 'expires_at', 'metadata_json', 'updated_at'])
     return account.access_token
 
 
@@ -55,11 +97,10 @@ class Command(BaseCommand):
             id=external_account_id,
             provider=ExternalAccount.PROVIDER_GOOGLE,
         ).first()
-        if not account or not account.access_token:
-            raise CommandError('Linked Google external account not found or missing access token.')
+        if not account:
+            raise CommandError('Linked Google external account not found.')
 
         sync_run = ConnectorSyncRun.objects.create(connector=connector, status=ConnectorSyncRun.STATUS_RUNNING)
-        client = GoogleDriveClient(get_valid_google_access_token(account))
         created = 0
         versioned = 0
         skipped = 0
@@ -69,6 +110,12 @@ class Command(BaseCommand):
         scanned_folders = 0
 
         try:
+            access_token = get_valid_google_access_token(account)
+            if not access_token:
+                raise CommandError('Google account needs to be reconnected before sync can run.')
+
+            client = GoogleDriveClient(access_token)
+
             while folder_queue:
                 current_folder_id = folder_queue.popleft()
                 if current_folder_id in visited_folders:
