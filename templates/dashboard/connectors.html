@@ -190,7 +190,7 @@
 </div>
 <div class="card">
   <h2>Google Drive connections</h2>
-  <p class="meta">Connect your own Google account so this workspace can browse, import, and sync Google Drive files into Docstore.</p>
+  <p class="meta">Connect your own Google account so this workspace can sync only a Google Drive folder named <strong>Docstore</strong> into Docstore.</p>
   <p><a href="/connect/google/">Connect Google account</a></p>
   {% for account in external_accounts %}
     {% if account.provider == 'google' %}
@@ -202,81 +202,53 @@
 
   {% if google_account %}
     <hr style="border:0; border-top:1px solid #243055; margin: 20px 0;">
-    <h3 style="margin-top:0;">Google Drive folder browser</h3>
-    <p class="meta">Browse folders, set one as the workspace connector target, or sync the current folder tree right away.</p>
-    <div class="row">
-      <strong>Current folder:</strong> {{ google_drive_folder_current_name }}<br>
-      <span class="meta">Folder id: {{ google_drive_folder_current_id }}</span>
-      <div style="margin-top: 10px; display: flex; gap: 10px; flex-wrap: wrap;">
-        <a href="/dashboard/connectors/?google_folder=root">Go to My Drive root</a>
-        {% if google_drive_folder_parent_id %}
-          <a href="/dashboard/connectors/?google_folder={{ google_drive_folder_parent_id }}">Go up one level</a>
-        {% endif %}
-      </div>
-      <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
-        <form method="post" style="margin:0;">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="use_google_drive_folder">
-          <input type="hidden" name="folder_id" value="{{ google_drive_folder_current_id }}">
-          <input type="hidden" name="folder_name" value="{{ google_drive_folder_current_name }}">
-          <button type="submit">Set as connector folder</button>
-        </form>
-        {% if google_drive_folder_current_id != 'root' %}
-        <form method="post" style="margin:0;">
-          {% csrf_token %}
-          <input type="hidden" name="action" value="sync_google_drive_folder_now">
-          <input type="hidden" name="folder_id" value="{{ google_drive_folder_current_id }}">
-          <input type="hidden" name="folder_name" value="{{ google_drive_folder_current_name }}">
-          <button type="submit">Sync this folder now</button>
-        </form>
-        {% endif %}
-      </div>
-    </div>
+    <h3 style="margin-top:0;">Docstore folder setup</h3>
+    <p class="meta">Docstore looks only for a Google Drive folder named <strong>Docstore</strong>. No full Drive browser, no folder picking.</p>
 
-    {% if google_drive_folders %}
-      {% for folder in google_drive_folders %}
-        <div class="row">
-          <strong>{{ folder.name }}</strong><br>
-          <span class="meta">Folder · {{ folder.id }}</span><br>
-          <div style="margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap;">
-            <a href="/dashboard/connectors/?google_folder={{ folder.id }}">Open folder</a>
-            <form method="post" style="margin:0;">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="use_google_drive_folder">
-              <input type="hidden" name="folder_id" value="{{ folder.id }}">
-              <input type="hidden" name="folder_name" value="{{ folder.name }}">
-              <button type="submit">Set as connector folder</button>
-            </form>
-            <form method="post" style="margin:0;">
-              {% csrf_token %}
-              <input type="hidden" name="action" value="sync_google_drive_folder_now">
-              <input type="hidden" name="folder_id" value="{{ folder.id }}">
-              <input type="hidden" name="folder_name" value="{{ folder.name }}">
-              <button type="submit">Sync this folder now</button>
-            </form>
-          </div>
+    {% if google_drive_docstore_folder %}
+      <div class="row">
+        <strong>Found Docstore folder</strong><br>
+        <span class="meta">{{ google_drive_docstore_folder.name }} · {{ google_drive_docstore_folder.id }}</span>
+        <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
+          <form method="post" style="margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="use_google_drive_folder">
+            <input type="hidden" name="folder_id" value="{{ google_drive_docstore_folder.id }}">
+            <input type="hidden" name="folder_name" value="{{ google_drive_docstore_folder.name }}">
+            <button type="submit">Use Docstore folder</button>
+          </form>
+          <form method="post" style="margin:0;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="sync_google_drive_folder_now">
+            <input type="hidden" name="folder_id" value="{{ google_drive_docstore_folder.id }}">
+            <input type="hidden" name="folder_name" value="{{ google_drive_docstore_folder.name }}">
+            <button type="submit">Sync Docstore folder now</button>
+          </form>
         </div>
-      {% endfor %}
+      </div>
     {% else %}
-      <p class="meta">No child folders found in this Drive location.</p>
+      <div class="msg" style="background:#3f1d12;border-color:#c2410c;color:#fed7aa; margin-top:12px;">
+        <strong>Docstore folder not found</strong><br>
+        {{ google_drive_docstore_error|default:'Create a folder named Docstore in Google Drive, then reconnect or refresh this page.' }}
+      </div>
     {% endif %}
 
     <hr style="border:0; border-top:1px solid #243055; margin: 20px 0;">
     <h3 style="margin-top:0;">{% if google_drive_connector %}Edit Google Drive scheduled sync{% else %}Create Google Drive scheduled sync{% endif %}</h3>
     <p class="meta">
       {% if google_drive_connector %}
-        This workspace already has a saved Google Drive sync. Update the folder, schedule, or recursion settings here.
+        This workspace already has a saved Google Drive sync for the Docstore folder.
       {% else %}
-        Save one Google Drive folder sync for this workspace. You can change the folder and schedule later from this same form.
+        Save a scheduled sync for the Docstore folder in your Google Drive.
       {% endif %}
     </p>
     <form method="post">
       {% csrf_token %}
       <input type="hidden" name="action" value="save_google_drive_connector">
       <label for="google_connector_label">Connector label</label>
-      <input id="google_connector_label" type="text" name="label" value="{% if google_drive_connector %}{{ google_drive_connector.label }}{% else %}Google Drive{% endif %}">
-      <label for="google_folder_id">Folder id</label>
-      <input id="google_folder_id" type="text" name="folder_id" value="{% if google_drive_connector and google_drive_connector.config_json.folder_id %}{{ google_drive_connector.config_json.folder_id }}{% else %}{{ google_drive_folder_current_id|default:'root' }}{% endif %}" placeholder="root or a Google Drive folder id">
+      <input id="google_connector_label" type="text" name="label" value="{% if google_drive_connector %}{{ google_drive_connector.label }}{% else %}Google Drive · Docstore{% endif %}">
+      <label for="google_folder_id">Docstore folder id</label>
+      <input id="google_folder_id" type="text" name="folder_id" value="{% if google_drive_connector and google_drive_connector.config_json.folder_id %}{{ google_drive_connector.config_json.folder_id }}{% elif google_drive_docstore_folder %}{{ google_drive_docstore_folder.id }}{% else %}{% endif %}" readonly>
       <label style="display:flex; align-items:center; gap:8px; margin: 10px 0 16px;">
         <input type="checkbox" name="recursive" value="1" {% if not google_drive_connector or google_drive_connector.config_json.recursive != False %}checked{% endif %} style="width:auto; margin:0;">
         <span>Include subfolders recursively</span>
@@ -287,14 +259,14 @@
       </label>
       <label for="google_sync_frequency_minutes">Sync frequency (minutes)</label>
       <input id="google_sync_frequency_minutes" type="number" min="15" step="15" name="sync_frequency_minutes" value="{% if google_drive_connector %}{{ google_drive_connector.sync_frequency_minutes|default:60 }}{% else %}60{% endif %}">
-      <button type="submit">{% if google_drive_connector %}Update Google Drive scheduled sync{% else %}Save Google Drive scheduled sync{% endif %}</button>
+      <button type="submit" {% if not google_drive_docstore_folder and not google_drive_connector %}disabled{% endif %}>{% if google_drive_connector %}Update Google Drive scheduled sync{% else %}Save Google Drive scheduled sync{% endif %}</button>
     </form>
 
     {% if google_drive_connector %}
       <div class="row">
         <strong>{{ google_drive_connector.label }}</strong><br>
-        <span class="meta">Folder id: {{ google_drive_connector.config_json.folder_id|default:'root' }} · Recursive: {% if google_drive_connector.config_json.recursive == False %}No{% else %}Yes{% endif %} · Scheduled sync: {% if google_drive_connector.sync_enabled %}Enabled every {{ google_drive_connector.sync_frequency_minutes }} min{% else %}Disabled{% endif %}{% if google_drive_connector.next_sync_at %} · Next sync {{ google_drive_connector.next_sync_at }}{% endif %}{% if google_drive_connector.last_synced_at %} · Last synced {{ google_drive_connector.last_synced_at }}{% endif %}</span>
-        <div class="meta" style="margin-top: 8px;">Use the form above to edit this saved sync.</div>
+        <span class="meta">Folder id: {{ google_drive_connector.config_json.folder_id|default:'missing' }} · Recursive: {% if google_drive_connector.config_json.recursive == False %}No{% else %}Yes{% endif %} · Scheduled sync: {% if google_drive_connector.sync_enabled %}Enabled every {{ google_drive_connector.sync_frequency_minutes }} min{% else %}Disabled{% endif %}{% if google_drive_connector.next_sync_at %} · Next sync {{ google_drive_connector.next_sync_at }}{% endif %}{% if google_drive_connector.last_synced_at %} · Last synced {{ google_drive_connector.last_synced_at }}{% endif %}</span>
+        <div class="meta" style="margin-top: 8px;">This workspace syncs only the Google Drive folder named Docstore.</div>
         <form method="post" style="margin-top: 12px;">
           {% csrf_token %}
           <input type="hidden" name="action" value="sync_google_drive_connector">
@@ -392,7 +364,7 @@
 <div class="card">
   <h2>Roadmap and planned integrations</h2>
   <div class="row"><strong>SharePoint</strong><br><span class="meta">OAuth scaffold exists; picker and sync UI still to come.</span></div>
-  <div class="row"><strong>Google Drive</strong><br><span class="meta">OAuth, folder browser, one-off import, and recursive folder sync are now in place; incremental sync and richer history come next.</span></div>
+  <div class="row"><strong>Google Drive</strong><br><span class="meta">Google now defaults to a single Docstore folder flow instead of a full Drive browser.</span></div>
   <div class="row"><strong>Confluence</strong><br><span class="meta">Atlassian account linking groundwork is now in place; site selection, page browse/import, and sync flows come next.</span></div>
   <div class="row"><strong>Support surfaces</strong><br><span class="meta">Shipping manager and support email are live today. More support-oriented integrations can follow the same tenant-scoped pattern.</span></div>
   <div class="row"><strong>Web / URLs</strong><br><span class="meta">Already handled on the URLs page as direct imports.</span></div>

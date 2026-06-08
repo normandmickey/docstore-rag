@@ -85,6 +85,14 @@ class GoogleDriveClient:
         q = f"'{folder_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
         return self.list_files(q=q, page_size=page_size)
 
+    def find_folder_by_name(self, folder_name, page_size=25):
+        escaped = (folder_name or '').replace("'", "\\'")
+        q = (
+            "mimeType = 'application/vnd.google-apps.folder' "
+            f"and name = '{escaped}' and trashed = false"
+        )
+        return self.list_files(q=q, page_size=page_size)
+
     def download_file_bytes(self, file_id, mime_type=None, filename=''):
         if mime_type in GOOGLE_DOC_EXPORTS:
             export_mime, ext = GOOGLE_DOC_EXPORTS[mime_type]

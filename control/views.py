@@ -1331,13 +1331,9 @@ def dashboard_connectors(request):
     ).order_by('-updated_at').first()
     base['google_account'] = google_account
     base['dropbox_account'] = dropbox_account
-    base['google_drive_files'] = []
-    base['google_drive_query'] = ''
     base['google_drive_connector'] = None
-    base['google_drive_folders'] = []
-    base['google_drive_folder_parent_id'] = ''
-    base['google_drive_folder_current_id'] = 'root'
-    base['google_drive_folder_current_name'] = 'My Drive'
+    base['google_drive_docstore_folder'] = None
+    base['google_drive_docstore_error'] = ''
     base['dropbox_entries'] = []
     base['dropbox_connector'] = None
     base['dropbox_current_path'] = ''
@@ -1565,7 +1561,7 @@ def dashboard_connectors(request):
             },
         )
         messages.success(request, f'Now using Google Drive folder "{folder_name}" for this workspace connector.')
-        return redirect(f'/dashboard/connectors/?google_folder={folder_id}')
+        return redirect('dashboard_connectors')
 
     if request.method == 'POST' and request.POST.get('action') == 'sync_google_drive_folder_now' and current_workspace and current_tenant:
         if not google_account:
@@ -1607,7 +1603,7 @@ def dashboard_connectors(request):
         except Exception as exc:
             logger.exception('Google Drive folder sync command failed for connector=%s', connector.id)
             messages.error(request, f'Google Drive sync failed: {exc}')
-        return redirect(f'/dashboard/connectors/?google_folder={folder_id}')
+        return redirect('dashboard_connectors')
 
     if request.method == 'POST' and request.POST.get('action') == 'google_drive_import' and current_workspace and current_tenant:
         if not google_account:
@@ -1761,30 +1757,16 @@ def dashboard_connectors(request):
             return redirect('dashboard_connectors')
 
     if google_account:
-        query = (request.GET.get('google_q') or '').strip()
-        folder_current_id = (request.GET.get('google_folder') or '').strip() or 'root'
-        base['google_drive_query'] = query
-        base['google_drive_folder_current_id'] = folder_current_id
         try:
             client = GoogleDriveClient(_get_valid_google_access_token(google_account))
-            q = None
-            if query:
-                escaped = query.replace("'", "\\'")
-                q = f"name contains '{escaped}' and trashed = false"
-            else:
-                q = 'trashed = false'
-            base['google_drive_files'] = client.list_files(q=q, page_size=20)
-
-            current_folder = {'id': 'root', 'name': 'My Drive', 'parents': []}
-            if folder_current_id != 'root':
-                current_folder = client.get_file(folder_current_id)
-            parents = current_folder.get('parents') or []
-            base['google_drive_folder_parent_id'] = parents[0] if parents else ''
-            base['google_drive_folder_current_name'] = current_folder.get('name') or 'My Drive'
-            base['google_drive_folders'] = client.list_folders(folder_id=folder_current_id, page_size=100)
+            matches = client.find_folder_by_name('Docstore', page_size=10)
+            base['google_drive_docstore_folder'] = matches[0] if matches else None
+            if not matches:
+                base['google_drive_docstore_error'] = 'No Google Drive folder named Docstore was found. Create one in Google Drive, then reconnect or refresh this page.'
         except Exception as exc:
-            logger.exception('Google Drive list failed for user=%s', request.user.id)
-            messages.error(request, f'Google Drive browse failed: {exc}')
+            logger.exception('Google Drive Docstore folder lookup failed for user=%s', request.user.id)
+            base['google_drive_docstore_error'] = str(exc)
+            messages.error(request, f'Google Drive setup check failed: {exc}')
 
     if dropbox_account:
         dropbox_path = (request.GET.get('dropbox_path') or '').strip()
