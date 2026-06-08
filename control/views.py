@@ -1334,6 +1334,8 @@ def dashboard_connectors(request):
     base['google_drive_connector'] = None
     base['google_drive_docstore_folder'] = None
     base['google_drive_docstore_error'] = ''
+    base['google_drive_status'] = 'disconnected'
+    base['google_drive_status_reason'] = ''
     base['dropbox_entries'] = []
     base['dropbox_connector'] = None
     base['dropbox_current_path'] = ''
@@ -1781,17 +1783,35 @@ def dashboard_connectors(request):
             return redirect('dashboard_connectors')
 
     if google_account:
+        metadata = google_account.metadata_json or {}
+        granted_scopes = set(google_account.scopes_json or [])
+        if metadata.get('reauth_required'):
+            base['google_drive_status'] = 'reauth_required'
+            base['google_drive_status_reason'] = metadata.get('reauth_reason', '')
+        elif 'https://www.googleapis.com/auth/drive.readonly' not in granted_scopes:
+            base['google_drive_status'] = 'missing_scope'
+            base['google_drive_status_reason'] = 'Google Drive permission was not granted.'
+        else:
+            base['google_drive_status'] = 'connected'
         try:
             client = GoogleDriveClient(_get_valid_google_access_token(google_account))
             matches = client.find_folder_by_name('Docstore', page_size=10)
             base['google_drive_docstore_folder'] = matches[0] if matches else None
             if matches:
                 ensure_docstore_google_connector(matches[0])
+                if base['google_drive_status'] == 'connected':
+                    base['google_drive_status_reason'] = 'Connected and ready to sync the Docstore folder.'
             else:
                 base['google_drive_docstore_error'] = 'No Google Drive folder named Docstore was found. Create one in Google Drive, then reconnect or refresh this page.'
+                if base['google_drive_status'] == 'connected':
+                    base['google_drive_status'] = 'missing_folder'
+                    base['google_drive_status_reason'] = base['google_drive_docstore_error']
         except Exception as exc:
             logger.exception('Google Drive Docstore folder lookup failed for user=%s', request.user.id)
             base['google_drive_docstore_error'] = str(exc)
+            if base['google_drive_status'] == 'connected':
+                base['google_drive_status'] = 'error'
+                base['google_drive_status_reason'] = str(exc)
             messages.error(request, f'Google Drive setup check failed: {exc}')
 
     if dropbox_account:

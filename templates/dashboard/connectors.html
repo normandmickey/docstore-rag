@@ -201,6 +201,35 @@
   {% endfor %}
 
   {% if google_account %}
+    <div class="row" style="margin-top:16px;">
+      {% if google_drive_status == 'connected' %}
+        <div class="msg" style="background:#153a22;border-color:#166534;color:#bbf7d0;">
+          <strong>Google Drive connected</strong><br>
+          {{ google_drive_status_reason|default:'Connected and ready.' }}
+        </div>
+      {% elif google_drive_status == 'reauth_required' %}
+        <div class="msg" style="background:#3b1724;border-color:#9f1239;color:#fecdd3;">
+          <strong>Google reconnect required</strong><br>
+          {{ google_drive_status_reason|default:'Your Google token needs to be refreshed by reconnecting the account.' }}
+        </div>
+      {% elif google_drive_status == 'missing_scope' %}
+        <div class="msg" style="background:#3f1d12;border-color:#c2410c;color:#fed7aa;">
+          <strong>Google Drive permission missing</strong><br>
+          {{ google_drive_status_reason|default:'Reconnect Google and approve Drive access.' }}
+        </div>
+      {% elif google_drive_status == 'missing_folder' %}
+        <div class="msg" style="background:#3f1d12;border-color:#c2410c;color:#fed7aa;">
+          <strong>Docstore folder not found</strong><br>
+          {{ google_drive_status_reason }}
+        </div>
+      {% elif google_drive_status == 'error' %}
+        <div class="msg" style="background:#3f1d12;border-color:#c2410c;color:#fed7aa;">
+          <strong>Google Drive needs attention</strong><br>
+          {{ google_drive_status_reason }}
+        </div>
+      {% endif %}
+    </div>
+
     <hr style="border:0; border-top:1px solid #243055; margin: 20px 0;">
     <h3 style="margin-top:0;">Docstore folder setup</h3>
     <p class="meta">Docstore now auto-detects and auto-saves the Google Drive folder named <strong>Docstore</strong>.</p>
@@ -217,11 +246,6 @@
           <input type="hidden" name="folder_name" value="{{ google_drive_docstore_folder.name }}">
           <button type="submit">Sync Docstore folder now</button>
         </form>
-      </div>
-    {% else %}
-      <div class="msg" style="background:#3f1d12;border-color:#c2410c;color:#fed7aa; margin-top:12px;">
-        <strong>Docstore folder not found</strong><br>
-        {{ google_drive_docstore_error|default:'Create a folder named Docstore in Google Drive, then reconnect or refresh this page.' }}
       </div>
     {% endif %}
 
@@ -242,16 +266,16 @@
       <label for="google_folder_id">Docstore folder id</label>
       <input id="google_folder_id" type="text" name="folder_id" value="{% if google_drive_connector and google_drive_connector.config_json.folder_id %}{{ google_drive_connector.config_json.folder_id }}{% elif google_drive_docstore_folder %}{{ google_drive_docstore_folder.id }}{% else %}{% endif %}" readonly>
       <label style="display:flex; align-items:center; gap:8px; margin: 10px 0 16px;">
-        <input type="checkbox" name="recursive" value="1" {% if not google_drive_connector or google_drive_connector.config_json.recursive != False %}checked{% endif %} style="width:auto; margin:0;">
+        <input type="checkbox" name="recursive" value="1" {% if not google_drive_connector or google_drive_connector.config_json.recursive != False %}checked{% endif %} style="width:auto; margin:0;" {% if google_drive_status in 'reauth_required missing_scope error' %}disabled{% endif %}>
         <span>Include subfolders recursively</span>
       </label>
       <label style="display:flex; align-items:center; gap:8px; margin: 10px 0 10px;">
-        <input type="checkbox" name="sync_enabled" value="1" {% if google_drive_connector and google_drive_connector.sync_enabled %}checked{% endif %} style="width:auto; margin:0;">
+        <input type="checkbox" name="sync_enabled" value="1" {% if google_drive_connector and google_drive_connector.sync_enabled %}checked{% endif %} style="width:auto; margin:0;" {% if google_drive_status in 'reauth_required missing_scope error' %}disabled{% endif %}>
         <span>Enable scheduled sync</span>
       </label>
       <label for="google_sync_frequency_minutes">Sync frequency (minutes)</label>
-      <input id="google_sync_frequency_minutes" type="number" min="15" step="15" name="sync_frequency_minutes" value="{% if google_drive_connector %}{{ google_drive_connector.sync_frequency_minutes|default:60 }}{% else %}60{% endif %}">
-      <button type="submit" {% if not google_drive_docstore_folder and not google_drive_connector %}disabled{% endif %}>{% if google_drive_connector %}Update Google Drive scheduled sync{% else %}Save Google Drive scheduled sync{% endif %}</button>
+      <input id="google_sync_frequency_minutes" type="number" min="15" step="15" name="sync_frequency_minutes" value="{% if google_drive_connector %}{{ google_drive_connector.sync_frequency_minutes|default:60 }}{% else %}60{% endif %}" {% if google_drive_status in 'reauth_required missing_scope error' %}disabled{% endif %}>
+      <button type="submit" {% if not google_drive_docstore_folder and not google_drive_connector or google_drive_status in 'reauth_required missing_scope error' %}disabled{% endif %}>{% if google_drive_connector %}Update Google Drive scheduled sync{% else %}Save Google Drive scheduled sync{% endif %}</button>
     </form>
 
     {% if google_drive_connector %}
@@ -262,7 +286,7 @@
         <form method="post" style="margin-top: 12px;">
           {% csrf_token %}
           <input type="hidden" name="action" value="sync_google_drive_connector">
-          <button type="submit">Sync saved connector now</button>
+          <button type="submit" {% if google_drive_status in 'reauth_required missing_scope error' %}disabled{% endif %}>Sync saved connector now</button>
         </form>
       </div>
     {% endif %}
