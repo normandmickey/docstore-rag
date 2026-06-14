@@ -647,3 +647,7 @@ The current pattern is intentionally simple:
 Docstore is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0-only)**.
 
 See [`LICENSE`](./LICENSE) for the full license text.
+
+SPDX-License-Identifier: AGPL-3.0-only
+
+Copyright (c) 2026 Norm Moore
