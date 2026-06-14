@@ -640,3 +640,10 @@ The current pattern is intentionally simple:
 - add more retrieval evaluation fixtures / benchmark questions
 - continue chatbot UX polish and richer endpoint binding flows
 - continue voice-agent quality and transcript sync refinement
+
+
+## License
+
+Docstore is licensed under the **GNU Affero General Public License v3.0 (AGPL-3.0-only)**.
+
+See [`LICENSE`](./LICENSE) for the full license text.
