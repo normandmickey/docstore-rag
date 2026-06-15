@@ -608,6 +608,15 @@ def google_connect_callback(request):
             tenant = Tenant.objects.get(id=request.session['current_tenant_id'])
             workspace = Workspace.objects.get(id=request.session['current_workspace_id'], tenant=tenant)
 
+        existing_account = ExternalAccount.objects.filter(
+            user=request.user,
+            provider=ExternalAccount.PROVIDER_GOOGLE,
+            external_user_id=profile.get('sub', ''),
+        ).first()
+        resolved_refresh_token = tokens.get('refresh_token') or (
+            existing_account.refresh_token if existing_account else ''
+        )
+
         account, _created = ExternalAccount.objects.update_or_create(
             user=request.user,
             provider=ExternalAccount.PROVIDER_GOOGLE,
@@ -618,7 +627,7 @@ def google_connect_callback(request):
                 'email': profile.get('email', ''),
                 'display_name': profile.get('name', ''),
                 'access_token': tokens.get('access_token', ''),
-                'refresh_token': tokens.get('refresh_token', ''),
+                'refresh_token': resolved_refresh_token,
                 'expires_at': tokens.get('expires_at'),
                 'scopes_json': granted_scopes,
                 'metadata_json': metadata,
