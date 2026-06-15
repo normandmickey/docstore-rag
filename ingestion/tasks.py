@@ -6,6 +6,7 @@ from io import BytesIO
 from pathlib import Path
 
 import fitz
+import pandas as pd
 from celery import shared_task
 from django.utils import timezone
 from docx import Document as DocxDocument
@@ -272,6 +273,50 @@ def extract_text_document(raw):
     return raw.decode('utf-8', errors='ignore')
 
 
+def extract_xlsx_text(raw, filename='workbook.xlsx'):
+    def normalize_value(value):
+        if pd.isna(value):
+            return ''
+        return str(value).strip()
+
+    def row_has_content(values):
+        return any(v != '' for v in values)
+
+    sections = [f'Workbook: {filename}']
+    all_sheets = pd.read_excel(BytesIO(raw), sheet_name=None)
+
+    for sheet_name, df in all_sheets.items():
+        sections.append('')
+        sections.append(f'Sheet: {sheet_name}')
+
+        if df.empty:
+            sections.append('(empty sheet)')
+            continue
+
+        columns = [str(col).strip() for col in df.columns]
+        sections.append('')
+        sections.append('Columns:')
+        sections.append(' | '.join(columns))
+
+        row_number = 0
+        for _, row in df.iterrows():
+            values = [normalize_value(row[col]) for col in df.columns]
+            if not row_has_content(values):
+                continue
+
+            row_number += 1
+            sections.append('')
+            sections.append(f'Row {row_number}')
+            for col_name, value in zip(columns, values):
+                sections.append(f'{col_name}: {value}')
+
+        if row_number == 0:
+            sections.append('')
+            sections.append('(no non-empty rows)')
+
+    return '\n'.join(sections).strip()
+
+
 def extract_html_text(raw):
     html = raw.decode('utf-8', errors='ignore')
     return html_to_markdown(html)
@@ -296,6 +341,11 @@ def extract_document_text(document, version, extractor=IngestionJob.EXTRACTOR_ST
         'application/msword',
     }:
         return extract_docx_text(raw)
+    if filename.endswith('.xlsx') or mime_type in {
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/vnd.ms-excel',
+    }:
+        return extract_xlsx_text(raw, filename=document.filename or 'workbook.xlsx')
     if filename.endswith('.md') or mime_type in {'text/markdown', 'text/x-markdown'}:
         return extract_text_document(raw)
     if filename.endswith('.txt') or mime_type.startswith('text/plain'):
