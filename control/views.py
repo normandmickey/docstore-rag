@@ -57,6 +57,8 @@ from .pii import redact_pii
 from .email_flows import send_invite_email
 from support.email_forms import TenantEmailIntegrationForm
 from support.email_services import TenantEmailClient, TenantEmailIntegrationError
+from requests import HTTPError
+
 from support.shipping import ShippingManagerClient, ShippingManagerError, ShippingManagerNotConfigured
 
 logger = logging.getLogger(__name__)
@@ -70,7 +72,27 @@ def _get_valid_google_access_token(account):
         return account.access_token
     if not account.refresh_token:
         return account.access_token
-    tokens = refresh_google_tokens(account.refresh_token)
+    try:
+        tokens = refresh_google_tokens(account.refresh_token)
+    except HTTPError as exc:
+        response = exc.response
+        payload = {}
+        if response is not None:
+            try:
+                payload = response.json()
+            except ValueError:
+                payload = {}
+        if response is not None and response.status_code == 400 and payload.get('error') == 'invalid_grant':
+            metadata = dict(account.metadata_json or {})
+            metadata['reauth_required'] = True
+            metadata['reauth_reason'] = payload.get('error_description') or 'invalid_grant'
+            metadata['reauth_required_at'] = timezone.now().isoformat()
+            account.access_token = ''
+            account.expires_at = None
+            account.metadata_json = metadata
+            account.save(update_fields=['access_token', 'expires_at', 'metadata_json', 'updated_at'])
+            return ''
+        raise
     account.access_token = tokens.get('access_token', account.access_token)
     if tokens.get('refresh_token'):
         account.refresh_token = tokens.get('refresh_token')
