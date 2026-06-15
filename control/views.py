@@ -1825,18 +1825,25 @@ def dashboard_connectors(request):
         else:
             base['google_drive_status'] = 'connected'
         try:
-            client = GoogleDriveClient(_get_valid_google_access_token(google_account))
-            matches = client.find_folder_by_name('Docstore', page_size=10)
-            base['google_drive_docstore_folder'] = matches[0] if matches else None
-            if matches:
-                ensure_docstore_google_connector(matches[0])
+            token = _get_valid_google_access_token(google_account)
+            if not token:
+                base['google_drive_docstore_error'] = 'Google account needs to be reconnected before Drive can be accessed.'
                 if base['google_drive_status'] == 'connected':
-                    base['google_drive_status_reason'] = 'Connected and ready to sync the Docstore folder.'
-            else:
-                base['google_drive_docstore_error'] = 'No Google Drive folder named Docstore was found. Create one in Google Drive, then reconnect or refresh this page.'
-                if base['google_drive_status'] == 'connected':
-                    base['google_drive_status'] = 'missing_folder'
+                    base['google_drive_status'] = 'reauth_required'
                     base['google_drive_status_reason'] = base['google_drive_docstore_error']
+            else:
+                client = GoogleDriveClient(token)
+                matches = client.find_folder_by_name('Docstore', page_size=10)
+                base['google_drive_docstore_folder'] = matches[0] if matches else None
+                if matches:
+                    ensure_docstore_google_connector(matches[0])
+                    if base['google_drive_status'] == 'connected':
+                        base['google_drive_status_reason'] = 'Connected and ready to sync the Docstore folder.'
+                else:
+                    base['google_drive_docstore_error'] = 'No Google Drive folder named Docstore was found. Create one in Google Drive, then reconnect or refresh this page.'
+                    if base['google_drive_status'] == 'connected':
+                        base['google_drive_status'] = 'missing_folder'
+                        base['google_drive_status_reason'] = base['google_drive_docstore_error']
         except Exception as exc:
             logger.exception('Google Drive Docstore folder lookup failed for user=%s', request.user.id)
             base['google_drive_docstore_error'] = str(exc)
