@@ -1,4 +1,5 @@
 import os
+from collections import Counter
 import re
 import subprocess
 import tempfile
@@ -19,6 +20,8 @@ from .models import IngestionJob
 
 QUESTION_GEN_MIN_CHARS = int(os.getenv('QUESTION_GEN_MIN_CHARS', '300'))
 QUESTION_GEN_MAX_CHUNKS = int(os.getenv('QUESTION_GEN_MAX_CHUNKS', '120'))
+PDF_REPEAT_LINE_THRESHOLD = int(os.getenv('PDF_REPEAT_LINE_THRESHOLD', '12'))
+INGEST_MAX_CHUNKS = int(os.getenv('INGEST_MAX_CHUNKS', '500'))
 
 DOCLING_VENV = os.getenv('DOCLING_VENV_PATH', '/mnt/HC_Volume_105592620/tools/docling/.venv')
 DOCLING_PDF_BACKEND = os.getenv('DOCLING_PDF_BACKEND', 'docling_parse')
@@ -44,8 +47,29 @@ def repair_suspicious_pdf_tokens(text):
     return text
 
 
+def remove_repeated_pdf_boilerplate(text, repeat_threshold=PDF_REPEAT_LINE_THRESHOLD):
+    lines = [line.strip() for line in (text or '').split('\n')]
+    nonempty = [line for line in lines if line]
+    counts = Counter(nonempty)
+
+    cleaned = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            cleaned.append('')
+            continue
+        if counts.get(stripped, 0) >= repeat_threshold and len(stripped) <= 220:
+            continue
+        if 'Printed for:' in stripped and 'American Payroll Institute' in stripped:
+            continue
+        cleaned.append(line)
+
+    return '\n'.join(cleaned)
+
+
 def normalize_extracted_text(text):
     text = repair_suspicious_pdf_tokens((text or '').replace('\x00', ' '))
+    text = remove_repeated_pdf_boilerplate(text)
     text = text.replace('\r\n', '\n').replace('\r', '\n')
     text = re.sub(r'[ \t]+', ' ', text)
     text = re.sub(r'\n{3,}', '\n\n', text)
@@ -108,6 +132,12 @@ def build_chunks(text, chunk_size=1000, overlap=None):
         if chunk != last:
             deduped.append(chunk)
             last = chunk
+
+    if len(deduped) > INGEST_MAX_CHUNKS:
+        raise ValueError(
+            f'Extraction produced {len(deduped)} chunks, exceeding safety cap of {INGEST_MAX_CHUNKS}. Likely noisy or repetitive document extraction.'
+        )
+
     return deduped
 
 
