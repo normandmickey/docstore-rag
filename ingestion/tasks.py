@@ -6,7 +6,7 @@ from io import BytesIO
 from pathlib import Path
 
 import fitz
-import pandas as pd
+from openpyxl import load_workbook
 from celery import shared_task
 from django.utils import timezone
 from docx import Document as DocxDocument
@@ -275,7 +275,7 @@ def extract_text_document(raw):
 
 def extract_xlsx_text(raw, filename='workbook.xlsx'):
     def normalize_value(value):
-        if pd.isna(value):
+        if value is None:
             return ''
         return str(value).strip()
 
@@ -283,31 +283,44 @@ def extract_xlsx_text(raw, filename='workbook.xlsx'):
         return any(v != '' for v in values)
 
     sections = [f'Workbook: {filename}']
-    all_sheets = pd.read_excel(BytesIO(raw), sheet_name=None)
+    workbook = load_workbook(BytesIO(raw), data_only=True, read_only=True)
 
-    for sheet_name, df in all_sheets.items():
+    for sheet in workbook.worksheets:
         sections.append('')
-        sections.append(f'Sheet: {sheet_name}')
+        sections.append(f'Sheet: {sheet.title}')
 
-        if df.empty:
+        rows = list(sheet.iter_rows(values_only=True))
+        if not rows:
             sections.append('(empty sheet)')
             continue
 
-        columns = [str(col).strip() for col in df.columns]
+        header_row = rows[0]
+        columns = [normalize_value(col) or f'column_{idx + 1}' for idx, col in enumerate(header_row)]
         sections.append('')
         sections.append('Columns:')
         sections.append(' | '.join(columns))
 
         row_number = 0
-        for _, row in df.iterrows():
-            values = [normalize_value(row[col]) for col in df.columns]
+        for row in rows[1:]:
+            values = [normalize_value(cell) for cell in row]
+            if len(values) < len(columns):
+                values.extend([''] * (len(columns) - len(values)))
+            elif len(values) > len(columns):
+                extra_count = len(values) - len(columns)
+                columns_extended = columns + [f'column_{len(columns) + i + 1}' for i in range(extra_count)]
+            else:
+                columns_extended = columns
+
+            if len(values) <= len(columns):
+                columns_extended = columns
+
             if not row_has_content(values):
                 continue
 
             row_number += 1
             sections.append('')
             sections.append(f'Row {row_number}')
-            for col_name, value in zip(columns, values):
+            for col_name, value in zip(columns_extended, values):
                 sections.append(f'{col_name}: {value}')
 
         if row_number == 0:
