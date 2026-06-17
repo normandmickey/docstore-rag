@@ -43,6 +43,14 @@ That helper:
 - SSHes to the VPS
 - runs the remote git-based deploy script
 
+A cleaner repo-side reference implementation now lives at:
+
+```bash
+./scripts/deploy-docstore-systemd.sh
+```
+
+That version keeps the same checkout/symlink layout but uses `systemctl` for process restarts and performs post-deploy health checks.
+
 ## Deploy script responsibilities
 
 The deploy script should:
@@ -50,12 +58,16 @@ The deploy script should:
 - verify checkout exists
 - verify `.venv` exists
 - verify `.env` exists
+- fetch and hard-reset to `origin/main`
+- preserve `.env` and `.venv` during `git clean`
+- ensure `/home/norm/sites/docstore_rag` points at the checkout symlink target
 - install requirements
 - apply migrations
 - collect static
-- reload gunicorn
-- restart the Celery worker
 - run `manage.py check`
+- restart gunicorn, Celery worker, and Celery beat via `systemctl`
+- verify those services are active after restart
+- probe the local health endpoint before reporting success
 
 ## Production notes
 
@@ -79,13 +91,20 @@ That separation is intentional and should be preserved during deploy/design chan
 - Keep long-running bot/voice processes in their own services rather than folding them into gunicorn/Django.
 - Keep Postgres as the backing store for embeddings, retrieval data, support data, and chatbot state.
 
-## Future improvement
+## Recommended steady state
 
-Once VPS GitHub SSH auth is fixed cleanly, switch to true VPS-side git updates:
+The preferred deployment model is:
 
-- `git fetch origin`
-- `git checkout main`
-- `git reset --hard origin/main`
-- `/home/norm/bin/deploy-docstore`
+- local changes committed in `projects/docstore-rag`
+- push `main` to GitHub
+- remote VPS deploy script performs:
+  - `git fetch origin`
+  - `git checkout main`
+  - `git reset --hard origin/main`
+  - `git clean -fd -e .venv -e .env`
+  - dependency install, migrations, static collection, checks
+  - `systemctl restart` for app/worker/beat
+  - service status verification
+  - local `/healthz` probe
 
-That should become the preferred steady-state model.
+If the live VPS script still uses ad hoc `pkill`/`nohup` restarts, treat that as technical debt to replace rather than the desired long-term pattern.

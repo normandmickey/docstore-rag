@@ -511,6 +511,14 @@ After updating `.env`, rerun the deploy/reload path:
 /home/norm/bin/deploy-docstore
 ```
 
+Preferred behavior for that VPS script:
+- hard-reset checkout to `origin/main`
+- preserve `.env` and `.venv`
+- run migrations + collectstatic + `manage.py check`
+- restart gunicorn/Celery/Celery beat via `systemctl`
+- verify services are active
+- probe local `/healthz`
+
 Then test from:
 - `/dashboard/connectors/`
 
