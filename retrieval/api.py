@@ -5,7 +5,8 @@ from rest_framework.permissions import AllowAny
 from rest_framework.views import APIView
 
 from control.api_guard import resolve_request_context
-from .service import answer_question, retrieve_chunks, shipping_answer_payload
+from support.orchestration import handle_support_request
+from .service import retrieve_chunks
 
 
 def _preferred_source_url(row):
@@ -176,24 +177,27 @@ class ChatView(APIView):
             workspace_id=data.get('workspace_id'),
         )
 
-        answer, results = answer_question(
+        result = handle_support_request(
             tenant=tenant,
             workspace=workspace,
-            query=data['question'].strip(),
-            top_k=data['top_k'],
+            channel='api_chat',
+            conversation=None,
+            contact=None,
+            user_text=data['question'].strip(),
+            subject='',
+            metadata={
+                'surface': 'retrieval_api',
+                'temperature': data.get('temperature'),
+            },
             document_id=data.get('document_id'),
-            temperature=data.get('temperature'),
         )
 
-        if isinstance(answer, dict):
-            return Response({
-                'answer': answer.get('answer', ''),
-                'sources': answer.get('sources', []),
-                'shipping_lookup': bool(answer.get('shipping_lookup')),
-                'tracking_number': answer.get('tracking_number', ''),
-            })
-
         return Response({
-            'answer': answer,
-            'sources': [_serialize_source(row) for row in results]
+            'answer': result.reply_text,
+            'sources': result.sources if result.sources else [_serialize_source(row) for row in ((result.retrieval_metadata or {}).get('results') or [])],
+            'shipping_lookup': result.mode == 'shipping',
+            'tracking_number': ((result.capability_metadata or {}).get('raw_payload') or {}).get('tracking_number', ''),
+            'mode': result.mode,
+            'should_handoff': result.should_handoff,
+            'handoff_reason': result.handoff_reason,
         })

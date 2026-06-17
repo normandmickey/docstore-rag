@@ -63,6 +63,7 @@ def try_shipping_capability(*, tenant, query: str, limit: int = 3) -> SupportRep
             'capability': 'shipping',
             'matched': True,
             'shipping_lookup': bool(payload.get('shipping_lookup')),
+            'raw_payload': payload,
         },
     )
 
