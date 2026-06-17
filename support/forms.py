@@ -26,7 +26,7 @@ class SupportChannelForm(forms.ModelForm):
 
 
 class SupportReplyForm(forms.Form):
-    body = forms.CharField(widget=forms.Textarea(attrs={'rows': 4}), max_length=5000)
+    body = forms.CharField(widget=forms.Textarea(attrs={'rows': 4}), max_length=5000, required=False)
 
 
 class SupportConversationUpdateForm(forms.ModelForm):

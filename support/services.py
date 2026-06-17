@@ -6,6 +6,8 @@ from django.utils import timezone
 from control.email_flows import send_support_ack_email
 
 from .models import SupportCall, SupportChannel, SupportContact, SupportConversation, SupportMessage
+from .orchestration import handle_support_request
+from .twilio import send_sms, twilio_enabled
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +80,52 @@ def ingest_inbound_sms(*, to_number: str, from_number: str, body: str, provider_
     if not conversation.workspace_context_id and channel.default_workspace_id:
         conversation.workspace_context = channel.default_workspace
     conversation.save(update_fields=['last_message_at', 'status', 'workspace_context', 'updated_at'])
+
+    if channel.ai_enabled and channel.auto_reply_enabled and body.strip() and twilio_enabled():
+        try:
+            result = handle_support_request(
+                tenant=channel.tenant,
+                workspace=conversation.workspace_context or channel.default_workspace,
+                channel='sms',
+                conversation=conversation,
+                contact=contact,
+                user_text=body,
+                subject=conversation.subject or '',
+                metadata={
+                    'provider': 'twilio',
+                    'provider_message_sid': provider_message_sid,
+                    'surface': 'inbound_sms',
+                },
+            )
+            if result.should_reply and (result.reply_text or '').strip():
+                provider_message = send_sms(
+                    from_number=channel.twilio_phone_number,
+                    to_number=contact.phone_number,
+                    body=result.reply_text,
+                )
+                SupportMessage.objects.create(
+                    conversation=conversation,
+                    direction=SupportMessage.DIR_OUTBOUND,
+                    kind=SupportMessage.KIND_SMS,
+                    body=result.reply_text,
+                    provider_message_sid=getattr(provider_message, 'sid', '') or '',
+                    delivery_status=getattr(provider_message, 'status', '') or 'queued',
+                    metadata_json={
+                        'twilio_from': channel.twilio_phone_number,
+                        'twilio_to': contact.phone_number,
+                        'auto_reply': True,
+                        'support_result': result.as_metadata(),
+                    },
+                )
+                conversation.last_message_at = timezone.now()
+                conversation.metadata_json = {
+                    **(conversation.metadata_json or {}),
+                    'last_auto_reply_mode': result.mode,
+                    'last_support_result': result.as_metadata(),
+                }
+                conversation.save(update_fields=['last_message_at', 'metadata_json', 'updated_at'])
+        except Exception:
+            logger.exception('SMS auto-reply failed for conversation_id=%s', conversation.id)
 
     contact_email = ((contact.metadata_json or {}).get('email') or '').strip()
     if conversation_created and contact_email:
@@ -210,6 +258,25 @@ def attach_voicemail_to_call(*, call_sid: str, recording_url: str = '', recordin
     elif recording_url:
         body_parts.append(f'Recording: {recording_url.strip()}')
 
+    support_result = None
+    if transcription_text.strip():
+        try:
+            support_result = handle_support_request(
+                tenant=call.tenant,
+                workspace=call.conversation.workspace_context or call.channel.default_workspace,
+                channel='voice',
+                conversation=call.conversation,
+                contact=call.contact,
+                user_text=transcription_text.strip(),
+                subject=call.conversation.subject or '',
+                metadata={
+                    'surface': 'voicemail',
+                    'call_sid': call.call_sid,
+                },
+            )
+        except Exception:
+            logger.exception('Voice support orchestration failed for call_sid=%s', call.call_sid)
+
     message = SupportMessage.objects.create(
         conversation=call.conversation,
         direction=SupportMessage.DIR_INBOUND,
@@ -220,6 +287,7 @@ def attach_voicemail_to_call(*, call_sid: str, recording_url: str = '', recordin
             'call_sid': call.call_sid,
             'recording_sid': call.recording_sid,
             'recording_url': call.recording_url,
+            'support_result': support_result.as_metadata() if support_result else {},
         },
     )
     call.conversation.last_message_at = message.created_at

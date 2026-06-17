@@ -14,6 +14,7 @@ from integrations.voice.models import VoiceCallRecord
 from .forms import SupportChannelForm, SupportConversationUpdateForm, SupportReplyForm
 from .models import SupportChannel, SupportContact, SupportConversation, SupportMessage
 from .email_services import TenantEmailIntegrationError, send_support_email_reply
+from .orchestration import handle_support_request
 from .services import attach_voicemail_to_call, ingest_inbound_call, ingest_inbound_sms, update_message_delivery_status
 from .twilio import TwilioRestException, build_ivr_menu_twiml, build_voicemail_twiml, send_sms, twilio_enabled, validate_twilio_request
 
@@ -171,7 +172,24 @@ def support_conversation_detail(request, conversation_id):
         update_form = SupportConversationUpdateForm(instance=conversation, tenant=tenant)
         if reply_form.is_valid():
             body = (reply_form.cleaned_data.get('body') or '').strip()
-            if body:
+            if not body and request.POST.get('suggest_reply') == '1':
+                last_inbound = conversation.messages.filter(direction=SupportMessage.DIR_INBOUND).order_by('-created_at', '-id').first()
+                suggestion = handle_support_request(
+                    tenant=conversation.tenant,
+                    workspace=conversation.workspace_context,
+                    channel='email' if conversation.channel.channel_type == SupportChannel.TYPE_EMAIL else 'sms',
+                    conversation=conversation,
+                    contact=conversation.contact,
+                    user_text=(last_inbound.body if last_inbound else ''),
+                    subject=conversation.subject or '',
+                    metadata={
+                        'surface': 'support_conversation_detail',
+                        'suggested_by_user_id': request.user.id,
+                    },
+                )
+                reply_form = SupportReplyForm(initial={'body': suggestion.reply_text})
+                messages.success(request, f'Suggested a {suggestion.mode} reply draft.')
+            elif body:
                 if conversation.channel.channel_type == SupportChannel.TYPE_EMAIL:
                     try:
                         _message, _send_result = send_support_email_reply(
