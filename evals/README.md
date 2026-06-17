@@ -44,3 +44,8 @@ For each eval, review:
 
 These evals should grow over time.
 Whenever a real-world question fails in production, add a version of it here.
+
+## Files
+
+- `support_knowledge_eval.jsonl` — starter mixed eval set
+- `tenant_question_bank_template.jsonl` — template for building a more realistic tenant/workspace-specific eval bank
