@@ -11,7 +11,7 @@ APP_SERVICE="docstore-rag.service"
 CELERY_SERVICE="docstore-rag-celery.service"
 CELERY_BEAT_SERVICE="docstore-rag-celery-beat.service"
 
-LOCAL_HEALTH_URL="http://127.0.0.1:8010/healthz"
+LOCAL_HEALTH_URL="http://127.0.0.1:8010/healthz/"
 
 log() {
   printf '[deploy-docstore] %s\n' "$*"

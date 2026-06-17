@@ -517,7 +517,7 @@ Preferred behavior for that VPS script:
 - run migrations + collectstatic + `manage.py check`
 - restart gunicorn/Celery/Celery beat via `systemctl`
 - verify services are active
-- probe local `/healthz`
+- probe local `/healthz/`
 
 Then test from:
 - `/dashboard/connectors/`

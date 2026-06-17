@@ -67,7 +67,7 @@ The deploy script should:
 - run `manage.py check`
 - restart gunicorn, Celery worker, and Celery beat via `systemctl`
 - verify those services are active after restart
-- probe the local health endpoint before reporting success
+- probe the local health endpoint (`/healthz/`) before reporting success
 
 ## Production notes
 
