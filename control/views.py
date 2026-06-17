@@ -1154,6 +1154,8 @@ def dashboard_chat(request):
     base['chat_results'] = []
     base['chat_contains_pii'] = False
     base['chat_pii_types'] = []
+    base['chat_should_handoff'] = False
+    base['chat_handoff_reason'] = ''
     if request.method == 'POST' and request.POST.get('action') == 'ask_question' and current_workspace:
         raw_chat_question = (request.POST.get('question') or '').strip()
         redacted_chat_question = redact_pii(raw_chat_question)
@@ -1180,6 +1182,8 @@ def dashboard_chat(request):
                 redacted_chat_answer = redact_pii(support_result.reply_text)
                 base['chat_answer'] = redacted_chat_answer['text']
                 base['chat_results'] = (support_result.retrieval_metadata or {}).get('results', []) or []
+                base['chat_should_handoff'] = bool(support_result.should_handoff)
+                base['chat_handoff_reason'] = support_result.handoff_reason or ''
                 base['chat_contains_pii'] = redacted_chat_answer['contains_pii'] or redacted_chat_question['contains_pii']
                 base['chat_pii_types'] = sorted(set(redacted_chat_question['pii_types'] + redacted_chat_answer['pii_types']))
             except Exception as exc:

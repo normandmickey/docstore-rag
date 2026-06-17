@@ -128,7 +128,37 @@ class SupportOrchestrationTests(SimpleTestCase):
         self.assertTrue(result.should_reply)
         self.assertTrue(result.should_handoff)
         self.assertEqual(result.handoff_reason, 'no_confident_auto_answer')
+        self.assertIn('Thanks for your email.', result.reply_text)
         self.assertEqual(result.retrieval_metadata.get('result_count'), 0)
+
+    @patch('support.orchestration.try_knowledge_capability')
+    @patch('support.orchestration.try_shipping_capability')
+    def test_dashboard_chat_no_answer_uses_document_grounded_fallback(self, mock_shipping, mock_knowledge):
+        mock_shipping.return_value = SupportReplyResult(
+            mode='shipping',
+            handled=False,
+            should_reply=False,
+            reply_text='',
+        )
+        mock_knowledge.return_value = SupportReplyResult(
+            mode='knowledge',
+            handled=False,
+            should_reply=False,
+            reply_text='',
+            retrieval_metadata={'result_count': 0},
+        )
+        result = handle_support_request(
+            tenant=object(),
+            workspace=object(),
+            channel='dashboard_chat',
+            conversation=None,
+            contact=None,
+            user_text='Something obscure',
+            subject='',
+        )
+        self.assertEqual(result.mode, 'ack')
+        self.assertEqual(result.reply_text, 'I could not find a confident answer in the current workspace documents yet.')
+        self.assertTrue(result.should_handoff)
 
 
 class SupportConversationSuggestionTests(SimpleTestCase):

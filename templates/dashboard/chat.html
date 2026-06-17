@@ -29,6 +29,13 @@
   </form>
   {% if chat_answer %}
     <h3>Answer</h3>
+    {% if chat_should_handoff %}
+      <div class="msg" style="background:#3a2a12;border-color:#a16207;color:#fde68a;">
+        <strong>No confident answer yet.</strong><br>
+        Docstore could not ground this answer strongly enough in the current workspace documents.
+        {% if chat_handoff_reason %}<div class="meta" style="margin-top:8px; color:#fde68a;">Reason: {{ chat_handoff_reason }}</div>{% endif %}
+      </div>
+    {% endif %}
     {% if chat_contains_pii %}<div class="msg">PII-like strings were masked in this chat. Types: {{ chat_pii_types|join:", " }}</div>{% endif %}
     <pre>{{ chat_answer }}</pre>
   {% endif %}

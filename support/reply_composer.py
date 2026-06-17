@@ -32,9 +32,15 @@ def compose_acknowledgement(*, channel: str, subject: str = '') -> str:
         return 'Got it — we received your message and will follow up shortly.'
 
     if channel == 'chatbot':
-        return 'I’ve logged that and someone can follow up shortly if needed.'
+        return 'I’m not confident I can answer that from the current knowledge yet, so someone can follow up if needed.'
 
     if channel == 'voice':
         return 'We received your request and will follow up shortly.'
+
+    if channel == 'api_chat':
+        return 'I could not find a confident answer in the current document context.'
+
+    if channel == 'dashboard_chat':
+        return 'I could not find a confident answer in the current workspace documents yet.'
 
     return 'We received your request and will follow up shortly.'
