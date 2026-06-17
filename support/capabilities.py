@@ -67,7 +67,7 @@ def try_shipping_capability(*, tenant, query: str, limit: int = 3) -> SupportRep
     )
 
 
-def try_knowledge_capability(*, tenant, workspace, query: str, top_k: int = 5) -> SupportReplyResult:
+def try_knowledge_capability(*, tenant, workspace, query: str, top_k: int = 5, document_id=None) -> SupportReplyResult:
     if workspace is None:
         return SupportReplyResult(
             mode='knowledge',
@@ -86,6 +86,7 @@ def try_knowledge_capability(*, tenant, workspace, query: str, top_k: int = 5) -
         workspace=workspace,
         query=query,
         top_k=top_k,
+        document_id=document_id,
     )
 
     if isinstance(answer, dict):
@@ -94,12 +95,14 @@ def try_knowledge_capability(*, tenant, workspace, query: str, top_k: int = 5) -
         retrieval_metadata = {
             'answer_payload': answer,
             'result_count': len(results or []),
+            'results': results or [],
         }
     else:
         answer_text = (answer or '').strip()
         sources = []
         retrieval_metadata = {
             'result_count': len(results or []),
+            'results': results or [],
         }
 
     lowered = answer_text.lower()

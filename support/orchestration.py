@@ -3,7 +3,7 @@ from .reply_composer import compose_acknowledgement, compose_support_reply
 from .reply_result import SupportReplyResult
 
 
-def handle_support_request(*, tenant, workspace, channel: str, conversation, contact, user_text: str, subject: str = '', metadata: dict | None = None) -> SupportReplyResult:
+def handle_support_request(*, tenant, workspace, channel: str, conversation, contact, user_text: str, subject: str = '', metadata: dict | None = None, document_id=None) -> SupportReplyResult:
     metadata = metadata or {}
     query = (user_text or '').strip() or (subject or '').strip()
 
@@ -55,6 +55,7 @@ def handle_support_request(*, tenant, workspace, channel: str, conversation, con
         workspace=workspace,
         query=query,
         top_k=5,
+        document_id=document_id,
     )
     if knowledge_result.handled and knowledge_result.should_reply:
         knowledge_result.reply_text = compose_support_reply(

@@ -32,6 +32,7 @@ from ingestion.models import IngestionJob
 from ingestion.tasks import ingest_document_task
 from retrieval.service import answer_question, build_context_blocks, retrieve_chunks
 from providers import answer_with_general_context
+from support.orchestration import handle_support_request
 
 from .forms import SignUpForm, TenantSettingsForm
 from .models import APIKey, ExternalAccount, InviteToken, ProxiWebMessage, ProxiWebThread, Tenant, TenantMembership, Workspace
@@ -1162,16 +1163,23 @@ def dashboard_chat(request):
         base['chat_question'] = chat_question
         if chat_question:
             try:
-                chat_answer, chat_results = answer_question(
+                support_result = handle_support_request(
                     tenant=current_workspace.tenant,
                     workspace=current_workspace,
-                    query=chat_question,
-                    top_k=5,
+                    channel='dashboard_chat',
+                    conversation=None,
+                    contact=None,
+                    user_text=chat_question,
+                    subject='',
+                    metadata={
+                        'surface': 'dashboard_chat',
+                        'user_id': request.user.id,
+                    },
                     document_id=document_scope,
                 )
-                redacted_chat_answer = redact_pii(chat_answer)
+                redacted_chat_answer = redact_pii(support_result.reply_text)
                 base['chat_answer'] = redacted_chat_answer['text']
-                base['chat_results'] = chat_results
+                base['chat_results'] = (support_result.retrieval_metadata or {}).get('results', []) or []
                 base['chat_contains_pii'] = redacted_chat_answer['contains_pii'] or redacted_chat_question['contains_pii']
                 base['chat_pii_types'] = sorted(set(redacted_chat_question['pii_types'] + redacted_chat_answer['pii_types']))
             except Exception as exc:
