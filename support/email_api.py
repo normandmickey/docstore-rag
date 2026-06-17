@@ -6,12 +6,11 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from retrieval.service import answer_question, shipping_answer_payload
-
 from control.models import Workspace
 
-from .email_services import TenantEmailClient, TenantEmailIntegrationError, ingest_inbound_email, send_support_email_reply
+from .email_services import TenantEmailIntegrationError, ingest_inbound_email, send_support_email_reply
 from .models import TenantEmailIntegration
+from .orchestration import handle_support_request
 
 
 class AgentMailInboundSerializer(serializers.Serializer):
@@ -145,50 +144,36 @@ class AgentMailInboundWebhookView(APIView):
         auto_reply_sent = False
         auto_reply_error = ''
         auto_reply_mode = ''
-        if integration.auto_reply_enabled and (data.get('event_type') or request.data.get('event_type') or '') == 'message.received':
+        event_type = (data.get('event_type') or request.data.get('event_type') or '')
+        if integration.auto_reply_enabled and event_type == 'message.received':
+            workspace = integration.default_workspace or conversation.workspace_context or Workspace.objects.filter(tenant=integration.tenant).order_by('id').first()
+            result = handle_support_request(
+                tenant=integration.tenant,
+                workspace=workspace,
+                channel='email',
+                conversation=conversation,
+                contact=conversation.contact,
+                user_text=body_text,
+                subject=subject,
+                metadata={
+                    'provider': 'agentmail',
+                    'provider_message_id': provider_message_id,
+                    'provider_thread_id': provider_thread_id,
+                    'event_type': event_type,
+                },
+            )
+            auto_reply_mode = result.mode
             try:
-                reply_body = ''
-                shipping_payload = shipping_answer_payload(tenant=integration.tenant, query=body_text or subject, limit=3)
-                if shipping_payload is not None:
-                    reply_body = (shipping_payload.get('answer') or '').strip()
-                    auto_reply_mode = 'shipping'
-                else:
-                    workspace = integration.default_workspace or conversation.workspace_context or Workspace.objects.filter(tenant=integration.tenant).order_by('id').first()
-                    if workspace is not None:
-                        chat_answer, _results = answer_question(
-                            tenant=integration.tenant,
-                            workspace=workspace,
-                            query=body_text or subject,
-                            top_k=5,
-                        )
-                        if isinstance(chat_answer, dict):
-                            reply_body = (chat_answer.get('answer') or '').strip()
-                        else:
-                            reply_body = (chat_answer or '').strip()
-                        auto_reply_mode = 'chat'
-
-                if reply_body:
-                    reply_body = reply_body.strip()
-                    if auto_reply_mode == 'shipping':
-                        reply_body = f"Thanks for reaching out.\n\n{reply_body}"
-                    elif auto_reply_mode == 'chat':
-                        reply_body = f"Thanks for your email.\n\n{reply_body}"
-
-                if not reply_body:
-                    reply_body = (
-                        f"Thanks for your email.\n\nI received your message about '{subject or 'your support request'}' "
-                        "and opened it in support. We’ll follow up shortly."
-                    )
-                    auto_reply_mode = 'ack'
-
-                send_support_email_reply(conversation=conversation, body=reply_body)
-                conversation.metadata_json = {
-                    **(conversation.metadata_json or {}),
-                    'last_auto_reply_mode': auto_reply_mode,
-                    'last_auto_reply_subject': subject,
-                }
-                conversation.save(update_fields=['metadata_json', 'updated_at'])
-                auto_reply_sent = True
+                if result.should_reply and (result.reply_text or '').strip():
+                    send_support_email_reply(conversation=conversation, body=result.reply_text)
+                    conversation.metadata_json = {
+                        **(conversation.metadata_json or {}),
+                        'last_auto_reply_mode': result.mode,
+                        'last_auto_reply_subject': subject,
+                        'last_support_result': result.as_metadata(),
+                    }
+                    conversation.save(update_fields=['metadata_json', 'updated_at'])
+                    auto_reply_sent = True
             except TenantEmailIntegrationError as exc:
                 auto_reply_error = str(exc)
 
