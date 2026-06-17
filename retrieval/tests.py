@@ -105,5 +105,6 @@ class ChatApiTests(SimpleTestCase):
         response = ChatView.as_view()(request)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['mode'], 'ack')
+        self.assertEqual(response.data['answer'], 'We received your request and will follow up shortly.')
         self.assertTrue(response.data['should_handoff'])
         self.assertEqual(response.data['handoff_reason'], 'no_confident_auto_answer')

@@ -1,9 +1,11 @@
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from django.contrib.auth.models import AnonymousUser, User
+from django.contrib.auth.models import User
 from django.test import RequestFactory, SimpleTestCase
+from rest_framework.test import APIRequestFactory
 
+from support.email_api import AgentMailInboundWebhookView
 from support.orchestration import handle_support_request
 from support.reply_composer import compose_acknowledgement, compose_support_reply
 from support.reply_result import SupportReplyResult
@@ -191,3 +193,65 @@ class SupportConversationSuggestionTests(SimpleTestCase):
         kwargs = mock_render.call_args[0][2]
         self.assertEqual(kwargs['support_reply_form'].initial['body'], 'Here is a suggested answer.')
         mock_message_success.assert_called_once()
+
+
+class AgentMailWebhookTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = APIRequestFactory()
+
+    @patch('support.email_api.send_support_email_reply')
+    @patch('support.email_api.handle_support_request')
+    @patch('support.email_api.ingest_inbound_email')
+    @patch('support.email_api.TenantEmailIntegration.objects.filter')
+    def test_agentmail_webhook_auto_reply_uses_orchestrator(
+        self,
+        mock_filter,
+        mock_ingest,
+        mock_handle_support,
+        mock_send_reply,
+    ):
+        integration = SimpleNamespace(
+            id=7,
+            tenant=object(),
+            tenant_id=5,
+            inbox_id='inbox-123',
+            provider='agentmail',
+            status='active',
+            auto_reply_enabled=True,
+            default_workspace=object(),
+        )
+        conversation = SimpleNamespace(
+            id=11,
+            contact=object(),
+            workspace_context=integration.default_workspace,
+            metadata_json={},
+            save=MagicMock(),
+        )
+        message = SimpleNamespace(id=12)
+
+        mock_filter.return_value.first.return_value = integration
+        mock_ingest.return_value = (conversation, message)
+        mock_handle_support.return_value = SupportReplyResult(
+            mode='knowledge',
+            handled=True,
+            should_reply=True,
+            reply_text='Here is the auto reply.',
+        )
+
+        request = self.factory.post('/api/v1/support/email/agentmail/inbound/', {
+            'inbox_id': 'inbox-123',
+            'message_id': 'msg-1',
+            'thread_id': 'thread-1',
+            'subject': 'Need handbook help',
+            'text': 'What is the PTO policy?',
+            'from_email': 'user@example.com',
+            'from_name': 'User',
+            'event_type': 'message.received',
+        }, format='json')
+
+        response = AgentMailInboundWebhookView.as_view()(request)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data['auto_reply_sent'])
+        self.assertEqual(response.data['auto_reply_mode'], 'knowledge')
+        mock_handle_support.assert_called_once()
+        mock_send_reply.assert_called_once_with(conversation=conversation, body='Here is the auto reply.')
