@@ -503,9 +503,17 @@
             'X-CSRFToken': csrfToken,
           },
         });
+
+        const contentType = response.headers.get('Content-Type') || '';
+        if (!contentType.includes('application/json')) {
+          const bodyText = await response.text();
+          console.error('Non-JSON response:', response.status, bodyText.substring(0, 500));
+          throw new Error('Server returned ' + response.status + ' (' + contentType + '). Expected JSON. Body: ' + bodyText.substring(0, 200));
+        }
+
         const payload = await response.json();
         if (!response.ok || !payload.ok) {
-          throw new Error(payload.error || 'Request failed');
+          throw new Error(payload.error || ('Request failed with status ' + response.status));
         }
 
         const replacement = createMessageCard('assistant', payload.assistant_message && payload.assistant_message.content, { timestamp: 'Just now' });
@@ -513,7 +521,8 @@
         renderResults(payload.results || []);
       } catch (error) {
         console.warn('Proxi-Web send failed', error);
-        const replacement = createMessageCard('assistant', 'Something went wrong sending that message. Please try again.', { timestamp: 'Error' });
+        const errorDetail = error.message || String(error);
+        const replacement = createMessageCard('assistant', '⚠️ ' + errorDetail, { timestamp: 'Error' });
         thinkingCard.replaceWith(replacement);
       } finally {
         submitButton.disabled = false;
