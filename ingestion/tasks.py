@@ -425,24 +425,59 @@ def analyze_chunk_structure(chunk_text):
     heading_candidates = []
     list_lines = []
 
+    inline_heading_patterns = [
+        r'^(\d+(?:[\-.]\d+)*)\.\s+([A-Z][^.:]{2,80})',
+        r'^(Section\s+\d+\s+[–-]\s+[A-Z][^.:]{2,80})',
+    ]
+
     for line in cleaned_lines[:8]:
         normalized = re.sub(r'\s+', ' ', line).strip(' •\t-')
         if not normalized:
             continue
         if is_heading_candidate(normalized):
             heading_candidates.append(normalized)
+        else:
+            for pattern in inline_heading_patterns:
+                match = re.match(pattern, normalized)
+                if match:
+                    heading_candidates.append(match.group(0).strip())
+                    break
+
         if re.match(r'^(?:[\-•*]|\d+[.)])\s+', line):
             list_lines.append(re.sub(r'^(?:[\-•*]|\d+[.)])\s+', '', normalized).strip())
 
-    dominant_heading = heading_candidates[0] if heading_candidates else ''
+        if '•' in line and line.count('•') >= 2:
+            parts = [part.strip(' •\t-') for part in line.split('•') if part.strip(' •\t-')]
+            if len(parts) > 1:
+                for item in parts[1:]:
+                    if len(item) >= 3:
+                        list_lines.append(re.sub(r'\s+', ' ', item))
+
+    deduped_headings = []
+    seen_headings = set()
+    for heading in heading_candidates:
+        if heading not in seen_headings:
+            deduped_headings.append(heading)
+            seen_headings.add(heading)
+
+    deduped_list_lines = []
+    seen_items = set()
+    for item in list_lines:
+        normalized_item = re.sub(r'\s+', ' ', item).strip(' •\t-')
+        if not normalized_item or normalized_item in seen_items:
+            continue
+        seen_items.add(normalized_item)
+        deduped_list_lines.append(normalized_item)
+
+    dominant_heading = deduped_headings[0] if deduped_headings else ''
     return {
-        'heading_candidates': heading_candidates,
+        'heading_candidates': deduped_headings,
         'dominant_heading': dominant_heading,
-        'list_lines': list_lines,
-        'list_count': len(list_lines),
+        'list_lines': deduped_list_lines,
+        'list_count': len(deduped_list_lines),
         'line_count': len(cleaned_lines),
-        'has_heading': bool(heading_candidates),
-        'has_list': bool(list_lines),
+        'has_heading': bool(deduped_headings),
+        'has_list': bool(deduped_list_lines),
     }
 
 
