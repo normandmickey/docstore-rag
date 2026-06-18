@@ -1282,24 +1282,23 @@ def dashboard_proxi_web(request):
                 messages.error(request, 'Ask something first.')
             else:
                 history_messages = list(thread.messages.order_by('id'))
-                chat_history = [
-                    {'role': message.role, 'content': message.content}
-                    for message in history_messages[-12:]
-                ]
-                retrieval_results = retrieve_chunks(
+                support_result = handle_support_request(
                     tenant=current_workspace.tenant,
                     workspace=current_workspace,
-                    query=question,
-                    top_k=5,
+                    channel='dashboard_chat',
+                    conversation=None,
+                    contact=None,
+                    user_text=question,
+                    subject='',
+                    metadata={
+                        'surface': 'proxi_web',
+                        'thread_id': thread.id,
+                        'use_web_search': use_web,
+                        'history_count': min(len(history_messages), 12),
+                    },
                 )
-                context_blocks = build_context_blocks(retrieval_results)
                 web_results = []
-                answer = answer_with_general_context(
-                    question,
-                    context_blocks,
-                    chat_history=chat_history,
-                    model='groq/compound' if use_web else None,
-                ) if context_blocks or use_web else 'I could not find enough relevant context for that question yet.'
+                answer = support_result.reply_text or 'I could not find enough relevant context for that question yet.'
                 redacted_answer = redact_pii(answer)
                 ProxiWebMessage.objects.create(
                     thread=thread,
@@ -1320,7 +1319,10 @@ def dashboard_proxi_web(request):
                         'contains_pii': redacted_answer['contains_pii'],
                         'pii_types': redacted_answer['pii_types'],
                         'redacted_preview': redacted_answer['text'][:500],
-                        'result_count': len(retrieval_results),
+                        'mode': support_result.mode,
+                        'should_handoff': support_result.should_handoff,
+                        'handoff_reason': support_result.handoff_reason,
+                        'result_count': len((support_result.retrieval_metadata or {}).get('results') or []),
                         'results': [
                             {
                                 'document_id': result.document_id,
@@ -1330,7 +1332,7 @@ def dashboard_proxi_web(request):
                                 'detail_url': f'/documents/{result.document_id}/',
                                 'download_url': f'/documents/{result.document_id}/download/',
                             }
-                            for result in retrieval_results
+                            for result in ((support_result.retrieval_metadata or {}).get('results') or [])
                         ],
                         'web_results': web_results,
                     },
