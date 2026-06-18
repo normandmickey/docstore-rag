@@ -1,3 +1,5 @@
+import re
+
 from retrieval.service import answer_question, shipping_answer_payload
 
 from .reply_result import SupportReplyResult
@@ -43,6 +45,27 @@ NO_ANSWER_HINTS = [
     'sources: none',
     'i do not know',
 ]
+
+NO_ANSWER_PATTERNS = [
+    r'\b(i do not know|i don[’\']t know)\b.*\b(documents?|context|provided|shared|available)\b',
+    r'\b(i do not have information|i don[’\']t have information|i do not have enough information)\b.*\b(documents?|context|provided|shared|available)\b',
+    r'\b(i am not sure|i[’\']m not sure|i am not able to find|i[’\']m not able to find)\b.*\b(documents?|context|provided|shared|available)\b',
+    r'\b(i am not aware of any|i[’\']m not aware of any)\b',
+    r'\b(documents?|excerpts?|facts?)\b.*\b(do not|does not|don[’\']t)\b.*\b(contain|mention|address|discuss|include)\b',
+    r'\b(no|none of the)\b.*\b(excerpts?|facts?|documents?)\b.*\b(mention|address|discuss|include)\b',
+    r'\bno\s+(specific\s+)?(mention|information)\b',
+    r'\b(can[’\']t|cannot)\b.*\b(definitive answer|answer)\b.*\b(context|documents?)\b',
+    r'\bsources?\s*:\s*none\b',
+]
+
+
+def is_no_answer_response(answer_text: str) -> bool:
+    lowered = (answer_text or '').strip().lower()
+    if not lowered:
+        return True
+    if any(hint in lowered for hint in NO_ANSWER_HINTS):
+        return True
+    return any(re.search(pattern, lowered) for pattern in NO_ANSWER_PATTERNS)
 
 
 def decide_support_capability(*, tenant, channel: str, user_text: str, subject: str = '') -> str:
@@ -126,8 +149,7 @@ def try_knowledge_capability(*, tenant, workspace, query: str, top_k: int = 5, d
             'results': results or [],
         }
 
-    lowered = answer_text.lower()
-    no_answer = not answer_text or any(hint in lowered for hint in NO_ANSWER_HINTS)
+    no_answer = is_no_answer_response(answer_text)
     if no_answer:
         return SupportReplyResult(
             mode='knowledge',

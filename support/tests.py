@@ -7,7 +7,7 @@ from rest_framework.test import APIRequestFactory
 
 from support.email_api import AgentMailInboundWebhookView
 from support.orchestration import handle_support_request
-from support.capabilities import try_knowledge_capability
+from support.capabilities import is_no_answer_response, try_knowledge_capability
 from support.reply_composer import compose_acknowledgement, compose_support_reply
 from support.reply_result import SupportReplyResult
 from support.views import support_conversation_detail
@@ -207,6 +207,29 @@ class KnowledgeNoAnswerDetectionTests(SimpleTestCase):
         self.assertFalse(result.handled)
         self.assertFalse(result.should_reply)
         self.assertTrue(result.capability_metadata.get('no_answer_detected'))
+
+
+class NoAnswerPatternTests(SimpleTestCase):
+    def test_is_no_answer_response_matches_no_information_language(self):
+        self.assertTrue(
+            is_no_answer_response(
+                'I don’t have information on a specific reimbursement policy for coworking spaces based on the documents provided.'
+            )
+        )
+
+    def test_is_no_answer_response_matches_no_mention_language(self):
+        self.assertTrue(
+            is_no_answer_response(
+                'There is no mention in the provided documents of a waiting period for dental coverage.'
+            )
+        )
+
+    def test_is_no_answer_response_matches_documents_do_not_contain_language(self):
+        self.assertTrue(
+            is_no_answer_response(
+                'The documents provided do not contain any statement that employees may work a hybrid schedule.'
+            )
+        )
 
 
 class SupportConversationSuggestionTests(SimpleTestCase):
