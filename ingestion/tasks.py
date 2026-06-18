@@ -22,7 +22,7 @@ from .models import IngestionJob
 QUESTION_GEN_MIN_CHARS = int(os.getenv('QUESTION_GEN_MIN_CHARS', '300'))
 QUESTION_GEN_MAX_CHUNKS = int(os.getenv('QUESTION_GEN_MAX_CHUNKS', '120'))
 PDF_REPEAT_LINE_THRESHOLD = int(os.getenv('PDF_REPEAT_LINE_THRESHOLD', '12'))
-INGEST_MAX_CHUNKS = int(os.getenv('INGEST_MAX_CHUNKS', '1500'))
+INGEST_MAX_CHUNKS = int(os.getenv('INGEST_MAX_CHUNKS', '500'))
 
 DOCLING_VENV = os.getenv('DOCLING_VENV_PATH', '/mnt/HC_Volume_105592620/tools/docling/.venv')
 DOCLING_PDF_BACKEND = os.getenv('DOCLING_PDF_BACKEND', 'docling_parse')
@@ -743,19 +743,6 @@ def ingest_document_task(self, ingestion_job_id):
                 'has_list': structure.get('has_list', False),
                 'line_count': structure.get('line_count', 0),
             }
-            lowered_chunk = normalize_structure_text(chunk_text).lower()
-            if 'holiday' in lowered_chunk:
-                metadata_json['debug_structure'] = {
-                    'matched_debug_rule': True,
-                    'raw_preview': chunk_text[:1200],
-                    'analyze_result': {
-                        'dominant_heading': structure.get('dominant_heading', ''),
-                        'heading_candidates': structure.get('heading_candidates', []),
-                        'list_count': structure.get('list_count', 0),
-                        'has_list': structure.get('has_list', False),
-                        'list_lines_preview': (structure.get('list_lines', []) or [])[:10],
-                    },
-                }
 
             chunk = Chunk.objects.create(
                 tenant=job.tenant,
