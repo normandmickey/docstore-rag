@@ -217,6 +217,13 @@
 </div>
 <script>
   (function () {
+    function getCookie(name) {
+      const cookieValue = document.cookie
+        .split('; ')
+        .find(function (row) { return row.startsWith(name + '='); });
+      return cookieValue ? decodeURIComponent(cookieValue.split('=')[1]) : '';
+    }
+
     function bindCopyButtons(scope) {
       const buttons = (scope || document).querySelectorAll('.copy-response-button');
       buttons.forEach(function (button) {
@@ -333,6 +340,7 @@
           body: formData,
           headers: {
             'X-Requested-With': 'XMLHttpRequest',
+            'X-CSRFToken': getCookie('csrftoken'),
           },
         });
         const payload = await response.json();
