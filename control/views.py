@@ -1386,7 +1386,7 @@ def dashboard_proxi_web(request):
 
         if base['proxi_thread']:
             chronological_messages = list(base['proxi_thread'].messages.order_by('id'))
-            base['proxi_messages'] = list(reversed(chronological_messages))
+            base['proxi_messages'] = list(reversed(chronological_messages[-24:]))
             latest_assistant = next((msg for msg in reversed(chronological_messages) if msg.role == ProxiWebMessage.ROLE_ASSISTANT), None)
             if latest_assistant:
                 latest_meta = latest_assistant.retrieval_metadata_json or {}

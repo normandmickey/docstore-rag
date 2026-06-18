@@ -217,13 +217,6 @@
 </div>
 <script>
   (function () {
-    function getCookie(name) {
-      const cookieValue = document.cookie
-        .split('; ')
-        .find(function (row) { return row.startsWith(name + '='); });
-      return cookieValue ? decodeURIComponent(cookieValue.split('=')[1]) : '';
-    }
-
     function bindCopyButtons(scope) {
       const buttons = (scope || document).querySelectorAll('.copy-response-button');
       buttons.forEach(function (button) {
@@ -335,12 +328,13 @@
 
       try {
         const formData = new FormData(form);
+        const csrfToken = formData.get('csrfmiddlewaretoken') || '';
         const response = await fetch(window.location.href, {
           method: 'POST',
           body: formData,
           headers: {
             'X-Requested-With': 'XMLHttpRequest',
-            'X-CSRFToken': getCookie('csrftoken'),
+            'X-CSRFToken': csrfToken,
           },
         });
         const payload = await response.json();
