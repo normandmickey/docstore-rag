@@ -1195,6 +1195,154 @@ def dashboard_chat(request):
     return render(request, 'dashboard/chat.html', base)
 
 
+def _run_proxi_web_turn(*, request, current_workspace, thread, raw_question: str, use_web: bool):
+    redacted_question = redact_pii((raw_question or '').strip())
+    question = redacted_question['text']
+    if not question:
+        return {
+            'ok': False,
+            'error': 'Ask something first.',
+        }
+
+    history_messages = list(thread.messages.order_by('id'))
+    support_result = handle_support_request(
+        tenant=current_workspace.tenant,
+        workspace=current_workspace,
+        channel='dashboard_chat',
+        conversation=None,
+        contact=None,
+        user_text=question,
+        subject='',
+        metadata={
+            'surface': 'proxi_web',
+            'thread_id': thread.id,
+            'use_web_search': use_web,
+            'history_count': min(len(history_messages), 12),
+        },
+    )
+    web_results = []
+    answer = support_result.reply_text or 'I could not find enough relevant context for that question yet.'
+    redacted_answer = redact_pii(answer)
+    ProxiWebMessage.objects.create(
+        thread=thread,
+        role=ProxiWebMessage.ROLE_USER,
+        content=redacted_question['text'],
+        retrieval_metadata_json={
+            'contains_pii': redacted_question['contains_pii'],
+            'pii_types': redacted_question['pii_types'],
+            'redacted_preview': redacted_question['text'][:500],
+        },
+    )
+    ProxiWebMessage.objects.create(
+        thread=thread,
+        role=ProxiWebMessage.ROLE_ASSISTANT,
+        content=redacted_answer['text'],
+        retrieval_metadata_json={
+            'use_web_search': use_web,
+            'contains_pii': redacted_answer['contains_pii'],
+            'pii_types': redacted_answer['pii_types'],
+            'redacted_preview': redacted_answer['text'][:500],
+            'mode': support_result.mode,
+            'should_handoff': support_result.should_handoff,
+            'handoff_reason': support_result.handoff_reason,
+            'result_count': len((support_result.retrieval_metadata or {}).get('results') or []),
+            'results': [
+                {
+                    'document_id': result.document_id,
+                    'document': result.document.filename,
+                    'chunk_index': result.chunk_index,
+                    'distance': float(getattr(result, 'distance', 0.0) or 0.0),
+                    'detail_url': f'/documents/{result.document_id}/',
+                    'download_url': f'/documents/{result.document_id}/download/',
+                }
+                for result in ((support_result.retrieval_metadata or {}).get('results') or [])
+            ],
+            'web_results': web_results,
+        },
+    )
+    if (thread.title or '').strip() in {'', 'New Proxi-Web chat'}:
+        thread.title = (question[:80] or 'New Proxi-Web chat').strip()
+    thread.save(update_fields=['title', 'updated_at'])
+
+    return {
+        'ok': True,
+        'thread_id': thread.id,
+        'thread_title': thread.title,
+        'question': question,
+        'use_web_search': use_web,
+        'assistant_text': redacted_answer['text'],
+        'mode': support_result.mode,
+        'should_handoff': support_result.should_handoff,
+        'handoff_reason': support_result.handoff_reason,
+        'results': [
+            {
+                'document_id': result.document_id,
+                'document': result.document.filename,
+                'chunk_index': result.chunk_index,
+                'distance': float(getattr(result, 'distance', 0.0) or 0.0),
+                'detail_url': f'/documents/{result.document_id}/',
+                'download_url': f'/documents/{result.document_id}/download/',
+            }
+            for result in ((support_result.retrieval_metadata or {}).get('results') or [])
+        ],
+        'web_results': web_results,
+    }
+
+
+def dashboard_proxi_web_send(request):
+    if not request.user.is_authenticated:
+        return JsonResponse({'ok': False, 'error': 'Authentication required.'}, status=401)
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'POST required.'}, status=405)
+
+    base = _dashboard_base(request)
+    current_workspace = base['current_workspace']
+    if not current_workspace:
+        return JsonResponse({'ok': False, 'error': 'No workspace selected.'}, status=400)
+
+    thread_id = (request.POST.get('thread_id') or '').strip()
+    raw_question = (request.POST.get('question') or '').strip()
+    use_web = (request.POST.get('use_web_search') or '').strip() == '1'
+    threads = ProxiWebThread.objects.filter(
+        tenant=current_workspace.tenant,
+        workspace=current_workspace,
+        user=request.user,
+    )
+    thread = threads.filter(id=thread_id).first() if thread_id.isdigit() else None
+    if not thread:
+        return JsonResponse({'ok': False, 'error': 'Pick or create a Proxi-Web chat first.'}, status=400)
+
+    payload = _run_proxi_web_turn(
+        request=request,
+        current_workspace=current_workspace,
+        thread=thread,
+        raw_question=raw_question,
+        use_web=use_web,
+    )
+    if not payload.get('ok'):
+        return JsonResponse(payload, status=400)
+
+    return JsonResponse({
+        'ok': True,
+        'thread_id': payload['thread_id'],
+        'thread_title': payload['thread_title'],
+        'user_message': {
+            'role': 'user',
+            'content': payload['question'],
+        },
+        'assistant_message': {
+            'role': 'assistant',
+            'content': payload['assistant_text'],
+            'mode': payload['mode'],
+            'should_handoff': payload['should_handoff'],
+            'handoff_reason': payload['handoff_reason'],
+        },
+        'results': payload['results'],
+        'web_results': payload['web_results'],
+        'use_web_search': payload['use_web_search'],
+    })
+
+
 def dashboard_proxi_web(request):
     if not request.user.is_authenticated:
         return redirect('login')
@@ -1273,114 +1421,19 @@ def dashboard_proxi_web(request):
             if not thread:
                 messages.error(request, 'Pick or create a Proxi-Web chat first.')
                 return redirect('dashboard_proxi_web')
-            redacted_question = redact_pii(raw_question)
-            question = redacted_question['text']
+            payload = _run_proxi_web_turn(
+                request=request,
+                current_workspace=current_workspace,
+                thread=thread,
+                raw_question=raw_question,
+                use_web=use_web,
+            )
             base['proxi_thread'] = thread
-            base['proxi_question'] = question
+            base['proxi_question'] = payload.get('question', '')
             base['proxi_web_enabled'] = use_web
-            if not question:
-                messages.error(request, 'Ask something first.')
+            if not payload.get('ok'):
+                messages.error(request, payload.get('error') or 'Ask something first.')
             else:
-                history_messages = list(thread.messages.order_by('id'))
-                support_result = handle_support_request(
-                    tenant=current_workspace.tenant,
-                    workspace=current_workspace,
-                    channel='dashboard_chat',
-                    conversation=None,
-                    contact=None,
-                    user_text=question,
-                    subject='',
-                    metadata={
-                        'surface': 'proxi_web',
-                        'thread_id': thread.id,
-                        'use_web_search': use_web,
-                        'history_count': min(len(history_messages), 12),
-                    },
-                )
-                web_results = []
-                answer = support_result.reply_text or 'I could not find enough relevant context for that question yet.'
-                redacted_answer = redact_pii(answer)
-                ProxiWebMessage.objects.create(
-                    thread=thread,
-                    role=ProxiWebMessage.ROLE_USER,
-                    content=redacted_question['text'],
-                    retrieval_metadata_json={
-                        'contains_pii': redacted_question['contains_pii'],
-                        'pii_types': redacted_question['pii_types'],
-                        'redacted_preview': redacted_question['text'][:500],
-                    },
-                )
-                ProxiWebMessage.objects.create(
-                    thread=thread,
-                    role=ProxiWebMessage.ROLE_ASSISTANT,
-                    content=redacted_answer['text'],
-                    retrieval_metadata_json={
-                        'use_web_search': use_web,
-                        'contains_pii': redacted_answer['contains_pii'],
-                        'pii_types': redacted_answer['pii_types'],
-                        'redacted_preview': redacted_answer['text'][:500],
-                        'mode': support_result.mode,
-                        'should_handoff': support_result.should_handoff,
-                        'handoff_reason': support_result.handoff_reason,
-                        'result_count': len((support_result.retrieval_metadata or {}).get('results') or []),
-                        'results': [
-                            {
-                                'document_id': result.document_id,
-                                'document': result.document.filename,
-                                'chunk_index': result.chunk_index,
-                                'distance': float(getattr(result, 'distance', 0.0) or 0.0),
-                                'detail_url': f'/documents/{result.document_id}/',
-                                'download_url': f'/documents/{result.document_id}/download/',
-                            }
-                            for result in ((support_result.retrieval_metadata or {}).get('results') or [])
-                        ],
-                        'web_results': web_results,
-                    },
-                )
-                if (thread.title or '').strip() in {'', 'New Proxi-Web chat'}:
-                    thread.title = (question[:80] or 'New Proxi-Web chat').strip()
-                thread.save(update_fields=['title', 'updated_at'])
-
-                if request.POST.get('response_format') == 'json':
-                    latest_meta = {
-                        'use_web_search': use_web,
-                        'mode': support_result.mode,
-                        'should_handoff': support_result.should_handoff,
-                        'handoff_reason': support_result.handoff_reason,
-                        'result_count': len((support_result.retrieval_metadata or {}).get('results') or []),
-                        'results': [
-                            {
-                                'document_id': result.document_id,
-                                'document': result.document.filename,
-                                'chunk_index': result.chunk_index,
-                                'distance': float(getattr(result, 'distance', 0.0) or 0.0),
-                                'detail_url': f'/documents/{result.document_id}/',
-                                'download_url': f'/documents/{result.document_id}/download/',
-                            }
-                            for result in ((support_result.retrieval_metadata or {}).get('results') or [])
-                        ],
-                        'web_results': web_results,
-                    }
-                    return JsonResponse({
-                        'ok': True,
-                        'thread_id': thread.id,
-                        'thread_title': thread.title,
-                        'user_message': {
-                            'role': 'user',
-                            'content': redacted_question['text'],
-                        },
-                        'assistant_message': {
-                            'role': 'assistant',
-                            'content': redacted_answer['text'],
-                            'mode': support_result.mode,
-                            'should_handoff': support_result.should_handoff,
-                            'handoff_reason': support_result.handoff_reason,
-                        },
-                        'results': latest_meta['results'],
-                        'web_results': latest_meta['web_results'],
-                        'use_web_search': use_web,
-                    })
-
                 messages.success(request, 'Message added to Proxi-Web chat.')
                 return redirect(f'/dashboard/proxi-web/?thread={thread.id}')
 

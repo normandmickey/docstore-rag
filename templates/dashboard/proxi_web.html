@@ -329,7 +329,7 @@
       try {
         const formData = new FormData(form);
         const csrfToken = formData.get('csrfmiddlewaretoken') || '';
-        const response = await fetch(window.location.href, {
+        const response = await fetch('/dashboard/proxi-web/send/', {
           method: 'POST',
           body: formData,
           headers: {
