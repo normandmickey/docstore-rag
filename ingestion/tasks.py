@@ -3,6 +3,7 @@ from collections import Counter
 import re
 import subprocess
 import tempfile
+import unicodedata
 from io import BytesIO
 from pathlib import Path
 
@@ -399,8 +400,17 @@ def extract_document_text(document, version, extractor=IngestionJob.EXTRACTOR_ST
     return extract_text_document(raw)
 
 
+def normalize_structure_text(text):
+    text = unicodedata.normalize('NFKC', text or '')
+    text = text.replace('’', "'").replace('“', '"').replace('”', '"')
+    text = text.replace('–', '-').replace('—', '-')
+    text = text.replace('Ɵ', 'Ti').replace('Ō', 'O').replace('ﬁ', 'fi').replace('ﬂ', 'fl')
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
+
+
 def is_heading_candidate(text):
-    text = re.sub(r'\s+', ' ', (text or '')).strip(' •\t-')
+    text = normalize_structure_text(text).strip(' •\t-')
     if not text:
         return False
     if len(text) < 3 or len(text) > 70:
@@ -419,7 +429,7 @@ def is_heading_candidate(text):
 
 
 def analyze_chunk_structure(chunk_text):
-    text = (chunk_text or '').strip()
+    text = normalize_structure_text((chunk_text or '').strip())
     raw_lines = [line.rstrip() for line in text.split('\n') if line.strip()]
     cleaned_lines = [line.strip() for line in raw_lines]
     heading_candidates = []
@@ -733,8 +743,8 @@ def ingest_document_task(self, ingestion_job_id):
                 'has_list': structure.get('has_list', False),
                 'line_count': structure.get('line_count', 0),
             }
-            lowered_chunk = (chunk_text or '').lower()
-            if '6-3. holidays' in lowered_chunk or 'christmas day' in lowered_chunk:
+            lowered_chunk = normalize_structure_text(chunk_text).lower()
+            if 'holiday' in lowered_chunk:
                 metadata_json['debug_structure'] = {
                     'matched_debug_rule': True,
                     'raw_preview': chunk_text[:1200],
