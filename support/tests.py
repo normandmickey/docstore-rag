@@ -193,6 +193,21 @@ class KnowledgeNoAnswerDetectionTests(SimpleTestCase):
         self.assertFalse(result.should_reply)
         self.assertTrue(result.capability_metadata.get('no_answer_detected'))
 
+    @patch('support.capabilities.answer_question')
+    def test_try_knowledge_capability_detects_not_aware_and_excerpts_discuss_phrase(self, mock_answer_question):
+        mock_answer_question.return_value = (
+            'I’m not aware of any rule in the supplied documents that addresses home-office furniture specifically. None of the provided excerpts discuss home-office furniture expenses.',
+            [],
+        )
+        result = try_knowledge_capability(
+            tenant=object(),
+            workspace=object(),
+            query='Can I expense home office furniture?',
+        )
+        self.assertFalse(result.handled)
+        self.assertFalse(result.should_reply)
+        self.assertTrue(result.capability_metadata.get('no_answer_detected'))
+
 
 class SupportConversationSuggestionTests(SimpleTestCase):
     def setUp(self):
