@@ -19,7 +19,7 @@ SHIPPING_HINTS = [
     'tracking number',
 ]
 
-NO_ANSWER_HINTS = [
+STRONG_NO_ANSWER_HINTS = [
     'i do not know based on the provided documents',
     'i do not know based on the documents provided',
     'i do not know based on the documents you provided',
@@ -34,6 +34,11 @@ NO_ANSWER_HINTS = [
     'i’m not sure based on the documents',
     'i am not sure from the documents',
     'i’m not sure from the documents',
+    'sources: none',
+    'i do not know',
+]
+
+SOFT_NO_ANSWER_HINTS = [
     'i am not aware of any',
     'i’m not aware of any',
     'none of the excerpts mention',
@@ -42,8 +47,9 @@ NO_ANSWER_HINTS = [
     'none of the provided documents address',
     'does not address',
     'no specific mention of',
-    'sources: none',
-    'i do not know',
+    'there is no mention',
+    'i do not have information',
+    'i don’t have information',
 ]
 
 NO_ANSWER_PATTERNS = [
@@ -59,13 +65,48 @@ NO_ANSWER_PATTERNS = [
 ]
 
 
-def is_no_answer_response(answer_text: str) -> bool:
+def classify_answer_signal(answer_text: str) -> str:
     lowered = (answer_text or '').strip().lower()
     if not lowered:
+        return 'strong'
+    if any(hint in lowered for hint in STRONG_NO_ANSWER_HINTS):
+        return 'strong'
+
+    soft_patterns = [
+        r'\b(i do not have information|i don[’\']t have information)\b',
+        r'\b(i am not aware|i[’\']m not aware)\b',
+        r'\bthere is no mention\b',
+        r'\bnone of the .* (mention|address|discuss|include)\b',
+        r'\bdo not contain any statement\b',
+        r'\bdoes not mention\b',
+    ]
+    if any(hint in lowered for hint in SOFT_NO_ANSWER_HINTS):
+        return 'soft'
+    if any(re.search(pattern, lowered) for pattern in soft_patterns):
+        return 'soft'
+    if any(re.search(pattern, lowered) for pattern in NO_ANSWER_PATTERNS):
+        return 'strong'
+    return 'none'
+
+
+def _best_retrieval_score(results) -> float:
+    best = 0.0
+    for row in results or []:
+        try:
+            best = max(best, float(getattr(row, 'blended_score', 0.0) or 0.0))
+        except Exception:
+            continue
+    return best
+
+
+def is_no_answer_response(answer_text: str, results=None) -> bool:
+    signal = classify_answer_signal(answer_text)
+    if signal == 'strong':
         return True
-    if any(hint in lowered for hint in NO_ANSWER_HINTS):
-        return True
-    return any(re.search(pattern, lowered) for pattern in NO_ANSWER_PATTERNS)
+    if signal == 'soft':
+        best_score = _best_retrieval_score(results)
+        return best_score < 0.33
+    return False
 
 
 def decide_support_capability(*, tenant, channel: str, user_text: str, subject: str = '') -> str:
@@ -149,7 +190,7 @@ def try_knowledge_capability(*, tenant, workspace, query: str, top_k: int = 5, d
             'results': results or [],
         }
 
-    no_answer = is_no_answer_response(answer_text)
+    no_answer = is_no_answer_response(answer_text, results=results)
     if no_answer:
         return SupportReplyResult(
             mode='knowledge',

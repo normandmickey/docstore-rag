@@ -7,7 +7,7 @@ from rest_framework.test import APIRequestFactory
 
 from support.email_api import AgentMailInboundWebhookView
 from support.orchestration import handle_support_request
-from support.capabilities import is_no_answer_response, try_knowledge_capability
+from support.capabilities import classify_answer_signal, is_no_answer_response, try_knowledge_capability
 from support.reply_composer import compose_acknowledgement, compose_support_reply
 from support.reply_result import SupportReplyResult
 from support.views import support_conversation_detail
@@ -210,18 +210,38 @@ class KnowledgeNoAnswerDetectionTests(SimpleTestCase):
 
 
 class NoAnswerPatternTests(SimpleTestCase):
-    def test_is_no_answer_response_matches_no_information_language(self):
+    def test_classify_answer_signal_marks_soft_no_information_language(self):
+        self.assertEqual(
+            classify_answer_signal(
+                'I don’t have information on a specific reimbursement policy for coworking spaces based on the documents provided.'
+            ),
+            'soft',
+        )
+
+    def test_is_no_answer_response_soft_signal_with_weak_results(self):
+        weak = [SimpleNamespace(blended_score=0.22)]
         self.assertTrue(
             is_no_answer_response(
-                'I don’t have information on a specific reimbursement policy for coworking spaces based on the documents provided.'
+                'I don’t have information on a specific reimbursement policy for coworking spaces based on the documents provided.',
+                results=weak,
+            )
+        )
+
+    def test_is_no_answer_response_soft_signal_with_stronger_results(self):
+        strong = [SimpleNamespace(blended_score=0.41)]
+        self.assertFalse(
+            is_no_answer_response(
+                'I don’t have information on a specific reimbursement policy for coworking spaces based on the documents provided.',
+                results=strong,
             )
         )
 
     def test_is_no_answer_response_matches_no_mention_language(self):
-        self.assertTrue(
-            is_no_answer_response(
+        self.assertEqual(
+            classify_answer_signal(
                 'There is no mention in the provided documents of a waiting period for dental coverage.'
-            )
+            ),
+            'soft',
         )
 
     def test_is_no_answer_response_matches_documents_do_not_contain_language(self):
