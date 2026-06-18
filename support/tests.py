@@ -7,6 +7,7 @@ from rest_framework.test import APIRequestFactory
 
 from support.email_api import AgentMailInboundWebhookView
 from support.orchestration import handle_support_request
+from support.capabilities import try_knowledge_capability
 from support.reply_composer import compose_acknowledgement, compose_support_reply
 from support.reply_result import SupportReplyResult
 from support.views import support_conversation_detail
@@ -159,6 +160,38 @@ class SupportOrchestrationTests(SimpleTestCase):
         self.assertEqual(result.mode, 'ack')
         self.assertEqual(result.reply_text, 'I could not find a confident answer in the current workspace documents yet.')
         self.assertTrue(result.should_handoff)
+
+
+class KnowledgeNoAnswerDetectionTests(SimpleTestCase):
+    @patch('support.capabilities.answer_question')
+    def test_try_knowledge_capability_detects_documents_do_not_contain_phrase(self, mock_answer_question):
+        mock_answer_question.return_value = (
+            'I’m sorry, but the documents you provided do not contain any specific information about a reimbursement policy for coworking spaces.',
+            [],
+        )
+        result = try_knowledge_capability(
+            tenant=object(),
+            workspace=object(),
+            query='What is the reimbursement policy for coworking spaces?',
+        )
+        self.assertFalse(result.handled)
+        self.assertFalse(result.should_reply)
+        self.assertTrue(result.capability_metadata.get('no_answer_detected'))
+
+    @patch('support.capabilities.answer_question')
+    def test_try_knowledge_capability_detects_not_sure_based_on_documents_phrase(self, mock_answer_question):
+        mock_answer_question.return_value = (
+            'I’m not sure based on the documents you shared. None of the excerpts or facts mention a policy about reimbursing home-office furniture.',
+            [],
+        )
+        result = try_knowledge_capability(
+            tenant=object(),
+            workspace=object(),
+            query='Can I expense home office furniture?',
+        )
+        self.assertFalse(result.handled)
+        self.assertFalse(result.should_reply)
+        self.assertTrue(result.capability_metadata.get('no_answer_detected'))
 
 
 class SupportConversationSuggestionTests(SimpleTestCase):

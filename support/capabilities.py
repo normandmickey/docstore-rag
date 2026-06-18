@@ -19,8 +19,23 @@ SHIPPING_HINTS = [
 
 NO_ANSWER_HINTS = [
     'i do not know based on the provided documents',
+    'i do not know based on the documents provided',
+    'i do not know based on the documents you provided',
+    'i do not know based on the documents you shared',
     'i could not find relevant document context',
     'the answer is not found in the context',
+    'the documents you provided do not contain',
+    'the documents you shared do not contain',
+    'i do not have enough information in the documents',
+    'i do not have enough information in the documents you provided',
+    'i am not sure based on the documents',
+    'i’m not sure based on the documents',
+    'i am not sure from the documents',
+    'i’m not sure from the documents',
+    'none of the excerpts mention',
+    'none of the excerpts or facts mention',
+    'no specific mention of',
+    'sources: none',
     'i do not know',
 ]
 
