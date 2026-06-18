@@ -83,13 +83,40 @@ def keyword_score(query, text):
     return score / max(1.0, len(query_tokens))
 
 
+def chunk_structure_bonus(query, candidate):
+    query_tokens = tokenize_query(query)
+    if not query_tokens:
+        return 0.0
+
+    metadata_json = getattr(candidate, 'metadata_json', {}) or {}
+    dominant_heading = (metadata_json.get('dominant_heading') or getattr(candidate, 'metadata_text', '') or '').lower()
+    text = (getattr(candidate, 'text', '') or '').lower()
+    lowered_query = (query or '').lower()
+
+    heading_bonus = 0.0
+    if dominant_heading and any(token in dominant_heading for token in query_tokens):
+        heading_bonus += 0.08
+
+    list_bonus = 0.0
+    list_like_markers = text.count('•') + text.count('\n- ') + text.count(';')
+    if lowered_query.startswith('what are') or lowered_query.startswith('which') or 'list' in lowered_query:
+        if list_like_markers >= 2:
+            list_bonus += 0.07
+        title_case_items = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}\b', getattr(candidate, 'text', '') or '')
+        if len(title_case_items) >= 4:
+            list_bonus += 0.04
+
+    return min(0.15, heading_bonus + list_bonus)
+
+
 def chunk_relevance_score(query, candidate):
     text_relevance = 1.0 - float(getattr(candidate, 'distance', 1.0) or 1.0)
     metadata_relevance = 1.0 - float(getattr(candidate, 'metadata_distance', 1.0) or 1.0)
     question_relevance = 1.0 - float(getattr(candidate, 'question_distance', 1.0) or 1.0)
     lexical = keyword_score(query, ' '.join(filter(None, [getattr(candidate, 'text', ''), getattr(candidate, 'metadata_text', ''), getattr(candidate, 'question_text', '')])))
     lexical_rank = float(getattr(candidate, 'lexical_rank', 0.0) or 0.0)
-    blended_score = (0.32 * text_relevance) + (0.18 * metadata_relevance) + (0.25 * question_relevance) + (0.1 * lexical) + (0.15 * lexical_rank)
+    structure_bonus = chunk_structure_bonus(query, candidate)
+    blended_score = (0.32 * text_relevance) + (0.18 * metadata_relevance) + (0.25 * question_relevance) + (0.1 * lexical) + (0.15 * lexical_rank) + structure_bonus
     return blended_score, text_relevance, metadata_relevance, question_relevance, lexical
 
 
