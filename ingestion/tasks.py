@@ -426,7 +426,7 @@ def analyze_chunk_structure(chunk_text):
     list_lines = []
 
     inline_heading_patterns = [
-        r'^(\d+(?:[\-.]\d+)*)\.\s+([A-Z][^.:]{2,80})',
+        r'^(\d+(?:[\-.]\d+)*)\.\s+([A-Z][A-Za-z’\'&/\- ]{2,60}?)(?=\s+[A-Z][a-z]|\s+Full-|\s+If\s|\s+All\s|\s+Employees\s|:|$)',
         r'^(Section\s+\d+\s+[–-]\s+[A-Z][^.:]{2,80})',
     ]
 
@@ -450,8 +450,10 @@ def analyze_chunk_structure(chunk_text):
             parts = [part.strip(' •\t-') for part in line.split('•') if part.strip(' •\t-')]
             if len(parts) > 1:
                 for item in parts[1:]:
-                    if len(item) >= 3:
-                        list_lines.append(re.sub(r'\s+', ' ', item))
+                    cleaned_item = re.sub(r'\s+', ' ', item)
+                    cleaned_item = re.split(r'(?=\b(?:To be|If |Unless |Part-|Employees |Holiday pay|Time missed)\b)', cleaned_item, maxsplit=1)[0].strip(' •\t-')
+                    if len(cleaned_item) >= 3:
+                        list_lines.append(cleaned_item)
 
     deduped_headings = []
     seen_headings = set()
