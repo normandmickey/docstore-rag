@@ -611,7 +611,7 @@ def build_context_blocks(results, facts=None):
     return blocks
 
 
-def answer_question(*, tenant, workspace, query, top_k=5, document_id=None, temperature=None):
+def answer_question(*, tenant, workspace, query, top_k=8, document_id=None, temperature=None):
     shipping_payload = shipping_answer_payload(tenant=tenant, query=query, limit=3)
     if shipping_payload is not None:
         return shipping_payload, []
