@@ -487,14 +487,15 @@
       messagesEl.appendChild(userCard);
       messagesEl.appendChild(thinkingCard);
       messagesEl.scrollTop = messagesEl.scrollHeight;
+
+      const formData = new FormData(form);
+      const csrfToken = formData.get('csrfmiddlewaretoken') || '';
       textarea.value = '';
       textarea.focus();
       submitButton.disabled = true;
       submitButton.textContent = 'Sending…';
 
       try {
-        const formData = new FormData(form);
-        const csrfToken = formData.get('csrfmiddlewaretoken') || '';
         const response = await fetch('/dashboard/proxi-web/send/', {
           method: 'POST',
           body: formData,
