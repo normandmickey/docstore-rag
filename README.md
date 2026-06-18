@@ -20,7 +20,7 @@ Docstore is now well past the initial scaffold stage. The live product currently
 - document detail / facts / chunks / search inspection pages
 - invite-only signup
 - SharePoint OAuth foundation
-- MinIO-backed production file storage
+- S3-compatible document storage support (MinIO verified on the dev/test VPS)
 - tenant-scoped support flows across SMS, voice, and email
 - tenant-scoped shipping manager integrations for package lookup workflows
 - optional voice transcript ingest endpoint
