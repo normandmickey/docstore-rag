@@ -34,7 +34,7 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        repo_root = Path(__file__).resolve().parents[4]
+        repo_root = Path(__file__).resolve().parents[3]
         eval_path = repo_root / options['file']
         if not eval_path.exists():
             raise CommandError(f'Eval file not found: {eval_path}')
