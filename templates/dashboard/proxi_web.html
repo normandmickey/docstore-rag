@@ -3,28 +3,103 @@
 {% block title %}Proxi-Web · Docstore{% endblock %}
 {% block content %}
 <style>
-  .proxi-web-layout {
+  .proxi-web-shell {
     display: grid;
-    gap: 16px;
-    grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+    gap: 18px;
+    grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
     align-items: start;
   }
-  .proxi-web-card {
+  .proxi-web-sidebar,
+  .proxi-web-widget {
     margin-bottom: 0;
     min-width: 0;
   }
-  .proxi-web-rename-form {
-    margin-bottom: 14px;
-    display: grid;
-    gap: 10px;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: end;
+  .proxi-web-sidebar h3,
+  .proxi-web-widget h3,
+  .proxi-web-widget h4 {
+    margin-top: 0;
   }
-  .proxi-web-messages {
-    margin-top: 20px;
+  .proxi-web-thread-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 520px;
+    overflow: auto;
+    padding-right: 4px;
+  }
+  .proxi-web-thread-item {
+    border: 1px solid #243055;
+    border-radius: 12px;
+    padding: 12px;
+    background: #0f172a;
+  }
+  .proxi-web-thread-item a {
+    display: block;
+    text-decoration: none;
+    color: #dbe5ff;
+    font-weight: 600;
+  }
+  .proxi-web-thread-item.active {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 1px rgba(59,130,246,0.25);
+  }
+  .proxi-web-widget {
+    padding: 0;
+    overflow: hidden;
+  }
+  .proxi-web-widget-header {
+    padding: 20px 22px 10px;
+    border-bottom: 1px solid #243055;
+    background: linear-gradient(180deg, rgba(18,26,51,0.98), rgba(15,23,42,0.98));
+  }
+  .proxi-web-widget-subtitle {
+    color: #94a3b8;
+    font-size: 0.95rem;
+    margin-top: 6px;
+  }
+  .proxi-web-message-pane {
+    padding: 18px 22px;
+    max-height: 480px;
+    overflow-y: auto;
     display: flex;
     flex-direction: column;
     gap: 14px;
+    background: #0b1223;
+  }
+  .proxi-web-empty {
+    color: #94a3b8;
+    padding: 18px 0;
+  }
+  .proxi-web-message {
+    border: 1px solid #243055;
+    border-radius: 14px;
+    padding: 14px;
+    min-width: 0;
+    background: #10182f;
+  }
+  .proxi-web-message.user {
+    background: #13203e;
+    border-color: #2d4a7c;
+  }
+  .proxi-web-message.assistant {
+    background: #0f172a;
+  }
+  .proxi-web-message-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .proxi-web-copy-button {
+    background: #1d4ed8;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+  }
+  .proxi-web-composer {
+    padding: 18px 22px 22px;
+    border-top: 1px solid #243055;
+    background: #121a33;
   }
   .proxi-web-toggle {
     margin: 8px 0 16px;
@@ -55,31 +130,66 @@
     margin-top: 4px;
     line-height: 1.45;
   }
-  .proxi-web-message {
+  .proxi-web-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .proxi-web-actions button,
+  .proxi-web-actions a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+  }
+  .proxi-web-disclosures {
+    padding: 0 22px 22px;
+    display: grid;
+    gap: 12px;
+    background: #121a33;
+  }
+  .proxi-web-disclosure {
     border: 1px solid #243055;
     border-radius: 12px;
-    padding: 14px;
-    min-width: 0;
+    background: #0f172a;
+    overflow: hidden;
   }
-  .proxi-web-message-header {
+  .proxi-web-disclosure summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 14px 16px;
     display: flex;
     justify-content: space-between;
-    gap: 12px;
     align-items: center;
-    margin-bottom: 8px;
+    gap: 12px;
   }
-  .proxi-web-copy-button {
-    background: #1d4ed8;
-    padding: 8px 12px;
-    font-size: 0.9rem;
+  .proxi-web-disclosure summary::-webkit-details-marker {
+    display: none;
   }
-  @media (max-width: 860px) {
-    .proxi-web-layout {
+  .proxi-web-disclosure-body {
+    padding: 0 16px 16px;
+    border-top: 1px solid #243055;
+  }
+  .proxi-web-manage-form {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #243055;
+  }
+  .proxi-web-results-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  @media (max-width: 960px) {
+    .proxi-web-shell {
       grid-template-columns: minmax(0, 1fr);
     }
-    .proxi-web-rename-form {
-      grid-template-columns: minmax(0, 1fr);
+    .proxi-web-thread-list {
+      max-height: 260px;
     }
+  }
+  @media (max-width: 700px) {
     .proxi-web-message-header {
       align-items: flex-start;
       flex-direction: column;
@@ -87,16 +197,24 @@
     .proxi-web-copy-button {
       width: 100%;
     }
+    .proxi-web-message-pane,
+    .proxi-web-widget-header,
+    .proxi-web-composer,
+    .proxi-web-disclosures {
+      padding-left: 16px;
+      padding-right: 16px;
+    }
   }
 </style>
+
 <div class="card">
   <h2>Proxi-Web</h2>
-  <p class="meta">A separate history-aware chat surface. This does not replace the existing Chat with Documents page.</p>
+  <p class="meta">A focused chat widget for workspace-aware questions. History and management tools are still here — just not yelling at you by default.</p>
 </div>
 
-<div class="proxi-web-layout">
-  <div class="card proxi-web-card">
-    <h3 style="margin-top: 0;">Chats</h3>
+<div class="proxi-web-shell">
+  <div class="card proxi-web-sidebar">
+    <h3>Chats</h3>
     {% if current_workspace %}
       <form method="post" style="margin-bottom: 18px;">
         {% csrf_token %}
@@ -105,68 +223,38 @@
         <input type="text" name="title" placeholder="Optional title">
         <button type="submit">Create chat</button>
       </form>
-      {% for thread in proxi_threads %}
-        <div class="row">
-          <a href="/dashboard/proxi-web/?thread={{ thread.id }}" {% if proxi_thread and proxi_thread.id == thread.id %}style="font-weight: 700;"{% endif %}>{{ thread.title|default:'Untitled chat' }}</a>
-          <div class="meta">Updated {{ thread.updated_at }}</div>
-        </div>
-      {% empty %}
-        <p>No Proxi-Web chats yet.</p>
-      {% endfor %}
+      <div class="proxi-web-thread-list">
+        {% for thread in proxi_threads %}
+          <div class="proxi-web-thread-item {% if proxi_thread and proxi_thread.id == thread.id %}active{% endif %}">
+            <a href="/dashboard/proxi-web/?thread={{ thread.id }}">{{ thread.title|default:'Untitled chat' }}</a>
+            <div class="meta">Updated {{ thread.updated_at }}</div>
+          </div>
+        {% empty %}
+          <p class="meta">No Proxi-Web chats yet.</p>
+        {% endfor %}
+      </div>
     {% endif %}
   </div>
 
-  <div class="card proxi-web-card">
-    <h3 style="margin-top: 0;">Conversation</h3>
-    {% if not current_workspace %}
-      <p>No workspace selected.</p>
-    {% elif not proxi_thread %}
-      <p>Create a chat to start using Proxi-Web.</p>
-    {% else %}
-      <div class="meta" style="margin-bottom: 14px;">Current chat: <strong>{{ proxi_thread.title|default:'Untitled chat' }}</strong></div>
-
-      <form method="post" class="proxi-web-rename-form">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="rename_proxi_thread">
-        <input type="hidden" name="thread_id" value="{{ proxi_thread.id }}">
-        <div>
-          <label>Rename chat</label>
-          <input type="text" name="title" value="{{ proxi_thread.title }}" placeholder="Chat title">
+  <div class="card proxi-web-widget">
+    <div class="proxi-web-widget-header">
+      <h3>Ask Proxi-Web</h3>
+      {% if not current_workspace %}
+        <div class="proxi-web-widget-subtitle">No workspace selected.</div>
+      {% elif not proxi_thread %}
+        <div class="proxi-web-widget-subtitle">Create a chat to start using Proxi-Web.</div>
+      {% else %}
+        <div class="proxi-web-widget-subtitle">
+          Chat: <strong>{{ proxi_thread.title|default:'Untitled chat' }}</strong>
+          {% if current_workspace %} · Workspace: <strong>{{ current_workspace.name }}</strong>{% endif %}
         </div>
-        <button type="submit">Rename</button>
-      </form>
+      {% endif %}
+    </div>
 
-      <form method="post" id="proxi-send-form">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="send_proxi_message">
-        <input type="hidden" name="response_format" value="json">
-        <input type="hidden" name="thread_id" value="{{ proxi_thread.id }}">
-        <label>Ask Proxi-Web</label>
-        <textarea name="question" rows="4" placeholder="Ask a follow-up question that benefits from chat history...">{{ proxi_question }}</textarea>
-        <div class="proxi-web-toggle">
-          <label>
-            <input type="checkbox" name="use_web_search" value="1" {% if proxi_web_enabled %}checked{% endif %}>
-            <span>
-              <div class="proxi-web-toggle-title">Search the web too</div>
-              <div class="proxi-web-toggle-help">Optional. When enabled, Proxi-Web can use live web results alongside workspace context.</div>
-            </span>
-          </label>
-        </div>
-        <button type="submit">Send</button>
-      </form>
-
-      <form method="post" style="margin-top: 14px; padding-top: 14px; border-top: 1px solid #243055;">
-        {% csrf_token %}
-        <input type="hidden" name="action" value="delete_proxi_thread">
-        <input type="hidden" name="thread_id" value="{{ proxi_thread.id }}">
-        <label>Type <strong>DELETE</strong> to remove this chat</label>
-        <input type="text" name="confirm_delete_thread" placeholder="DELETE">
-        <button type="submit" style="background: #991b1b;">Delete chat</button>
-      </form>
-
-      <div class="proxi-web-messages" id="proxi-web-messages">
+    {% if current_workspace and proxi_thread %}
+      <div class="proxi-web-message-pane" id="proxi-web-messages">
         {% for message in proxi_messages %}
-          <div class="row proxi-web-message">
+          <div class="proxi-web-message {% if message.role == 'user' %}user{% else %}assistant{% endif %}">
             <div class="proxi-web-message-header">
               <div>
                 <strong>{% if message.role == 'user' %}You{% else %}Proxi-Web{% endif %}</strong>
@@ -183,38 +271,116 @@
             {% endif %}
           </div>
         {% empty %}
-          <p>No messages yet.</p>
+          <div class="proxi-web-empty">No messages yet. Ask something useful, strange, or both.</div>
         {% endfor %}
       </div>
 
-      <div id="proxi-results-panel" style="margin-top: 24px; {% if not proxi_results %}display: none;{% endif %}">
-        <div>
-          <h3>Latest retrieved document context</h3>
-          {% for result in proxi_results %}
-            <div class="row">
-              <strong>{{ result.document }}</strong><br>
-              <span class="meta">Chunk {{ result.chunk_index }} · Distance {{ result.distance|floatformat:4 }}</span><br>
-              <span class="meta"><a href="{{ result.detail_url }}" target="_blank" rel="noopener noreferrer">View document details</a> · <a href="{{ result.download_url }}" target="_blank" rel="noopener noreferrer">Open source document</a></span>
-            </div>
-          {% endfor %}
-        </div>
+      <div class="proxi-web-composer">
+        <form method="post" id="proxi-send-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="send_proxi_message">
+          <input type="hidden" name="response_format" value="json">
+          <input type="hidden" name="thread_id" value="{{ proxi_thread.id }}">
+          <label>Message</label>
+          <textarea name="question" rows="4" placeholder="Ask a workspace-aware question...">{{ proxi_question }}</textarea>
+          <div class="proxi-web-toggle">
+            <label>
+              <input type="checkbox" name="use_web_search" value="1" {% if proxi_web_enabled %}checked{% endif %}>
+              <span>
+                <div class="proxi-web-toggle-title">Search the web too</div>
+                <div class="proxi-web-toggle-help">Optional. When enabled, Proxi-Web can use live web results alongside workspace context.</div>
+              </span>
+            </label>
+          </div>
+          <div class="proxi-web-actions">
+            <button type="submit">Send</button>
+          </div>
+        </form>
       </div>
 
-      <div id="proxi-web-results-panel" style="margin-top: 24px; {% if not proxi_web_results %}display: none;{% endif %}">
-        <div>
-          <h3>Latest web results</h3>
-          {% for result in proxi_web_results %}
-            <div class="row">
-              <strong>{{ result.title|default:result.url }}</strong><br>
-              <span class="meta"><a href="{{ result.url }}" target="_blank" rel="noopener noreferrer">{{ result.url }}</a></span>
-              {% if result.snippet %}<pre>{{ result.snippet }}</pre>{% endif %}
-            </div>
-          {% endfor %}
-        </div>
+      <div class="proxi-web-disclosures">
+        <details class="proxi-web-disclosure">
+          <summary>
+            <span>Show older / full visible history</span>
+            <span class="meta">{{ proxi_messages|length }} recent messages loaded</span>
+          </summary>
+          <div class="proxi-web-disclosure-body">
+            <p class="meta">The widget keeps the visible thread compact. Older messages remain stored in the chat, but only the latest slice is rendered here by default.</p>
+          </div>
+        </details>
+
+        <details class="proxi-web-disclosure" {% if proxi_results %}open{% endif %}>
+          <summary>
+            <span>Latest retrieved document context</span>
+            <span class="meta">{% if proxi_results %}{{ proxi_results|length }} results{% else %}none{% endif %}</span>
+          </summary>
+          <div class="proxi-web-disclosure-body" id="proxi-results-panel">
+            {% if proxi_results %}
+              <div class="proxi-web-results-list">
+                {% for result in proxi_results %}
+                  <div class="row">
+                    <strong>{{ result.document }}</strong><br>
+                    <span class="meta">Chunk {{ result.chunk_index }} · Distance {{ result.distance|floatformat:4 }}</span><br>
+                    <span class="meta"><a href="{{ result.detail_url }}" target="_blank" rel="noopener noreferrer">View document details</a> · <a href="{{ result.download_url }}" target="_blank" rel="noopener noreferrer">Open source document</a></span>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="meta">No retrieved document context captured yet.</p>
+            {% endif %}
+          </div>
+        </details>
+
+        <details class="proxi-web-disclosure" {% if proxi_web_results %}open{% endif %}>
+          <summary>
+            <span>Latest web results</span>
+            <span class="meta">{% if proxi_web_results %}{{ proxi_web_results|length }} results{% else %}none{% endif %}</span>
+          </summary>
+          <div class="proxi-web-disclosure-body" id="proxi-web-results-panel">
+            {% if proxi_web_results %}
+              {% for result in proxi_web_results %}
+                <div class="row">
+                  <strong>{{ result.title|default:result.url }}</strong><br>
+                  <span class="meta"><a href="{{ result.url }}" target="_blank" rel="noopener noreferrer">{{ result.url }}</a></span>
+                  {% if result.snippet %}<pre>{{ result.snippet }}</pre>{% endif %}
+                </div>
+              {% endfor %}
+            {% else %}
+              <p class="meta">No web results captured.</p>
+            {% endif %}
+          </div>
+        </details>
+
+        <details class="proxi-web-disclosure">
+          <summary>
+            <span>Manage this chat</span>
+            <span class="meta">rename / delete</span>
+          </summary>
+          <div class="proxi-web-disclosure-body">
+            <form method="post" class="proxi-web-manage-form">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="rename_proxi_thread">
+              <input type="hidden" name="thread_id" value="{{ proxi_thread.id }}">
+              <label>Rename chat</label>
+              <input type="text" name="title" value="{{ proxi_thread.title }}" placeholder="Chat title">
+              <button type="submit">Rename</button>
+            </form>
+
+            <form method="post" class="proxi-web-manage-form">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="delete_proxi_thread">
+              <input type="hidden" name="thread_id" value="{{ proxi_thread.id }}">
+              <label>Type <strong>DELETE</strong> to remove this chat</label>
+              <input type="text" name="confirm_delete_thread" placeholder="DELETE">
+              <button type="submit" style="background: #991b1b;">Delete chat</button>
+            </form>
+          </div>
+        </details>
       </div>
     {% endif %}
   </div>
 </div>
+
 <script>
   (function () {
     function bindCopyButtons(scope) {
@@ -254,7 +420,7 @@
 
     function createMessageCard(role, content, options) {
       const card = document.createElement('div');
-      card.className = 'row proxi-web-message';
+      card.className = 'proxi-web-message ' + (role === 'assistant' ? 'assistant' : 'user');
       const isAssistant = role === 'assistant';
       const title = isAssistant ? 'Proxi-Web' : 'You';
       const timestamp = (options && options.timestamp) || 'Just now';
@@ -282,11 +448,10 @@
         return;
       }
       if (!results || !results.length) {
-        panel.style.display = 'none';
+        panel.innerHTML = '<p class="meta">No retrieved document context captured yet.</p>';
         return;
       }
-      panel.style.display = '';
-      panel.innerHTML = '<div><h3>Latest retrieved document context</h3></div>';
+      panel.innerHTML = '';
       results.forEach(function (result) {
         const row = document.createElement('div');
         row.className = 'row';
@@ -319,8 +484,9 @@
       const userCard = createMessageCard('user', question, { timestamp: 'Just now' });
       const thinkingCard = createMessageCard('assistant', 'Thinking…', { timestamp: 'Working…' });
       thinkingCard.dataset.pending = '1';
-      messagesEl.prepend(thinkingCard);
-      messagesEl.prepend(userCard);
+      messagesEl.appendChild(userCard);
+      messagesEl.appendChild(thinkingCard);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
       textarea.value = '';
       textarea.focus();
       submitButton.disabled = true;
@@ -352,7 +518,7 @@
       } finally {
         submitButton.disabled = false;
         submitButton.textContent = 'Send';
-        messagesEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        messagesEl.scrollTop = messagesEl.scrollHeight;
       }
     });
   })();
