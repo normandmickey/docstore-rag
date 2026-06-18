@@ -725,6 +725,28 @@ def ingest_document_task(self, ingestion_job_id):
                 structure['dominant_heading'] = dominant_heading
                 last_heading = dominant_heading
 
+            metadata_json = {
+                'stub': False,
+                'dominant_heading': dominant_heading,
+                'heading_candidates': structure.get('heading_candidates', []),
+                'list_count': structure.get('list_count', 0),
+                'has_list': structure.get('has_list', False),
+                'line_count': structure.get('line_count', 0),
+            }
+            lowered_chunk = (chunk_text or '').lower()
+            if '6-3. holidays' in lowered_chunk or 'christmas day' in lowered_chunk:
+                metadata_json['debug_structure'] = {
+                    'matched_debug_rule': True,
+                    'raw_preview': chunk_text[:1200],
+                    'analyze_result': {
+                        'dominant_heading': structure.get('dominant_heading', ''),
+                        'heading_candidates': structure.get('heading_candidates', []),
+                        'list_count': structure.get('list_count', 0),
+                        'has_list': structure.get('has_list', False),
+                        'list_lines_preview': (structure.get('list_lines', []) or [])[:10],
+                    },
+                }
+
             chunk = Chunk.objects.create(
                 tenant=job.tenant,
                 workspace=job.workspace,
@@ -735,14 +757,7 @@ def ingest_document_task(self, ingestion_job_id):
                 metadata_text=metadata_texts[idx] if idx < len(metadata_texts) else '',
                 question_text=question_texts[idx] if idx < len(question_texts) else '',
                 token_count=max(1, len(chunk_text) // 4),
-                metadata_json={
-                    'stub': False,
-                    'dominant_heading': dominant_heading,
-                    'heading_candidates': structure.get('heading_candidates', []),
-                    'list_count': structure.get('list_count', 0),
-                    'has_list': structure.get('has_list', False),
-                    'line_count': structure.get('line_count', 0),
-                },
+                metadata_json=metadata_json,
                 embedding=vectors[idx] if idx < len(vectors) else None,
                 metadata_embedding=metadata_vectors[idx] if idx < len(metadata_vectors) else None,
                 question_embedding=question_vectors[idx] if idx < len(question_vectors) else None,
