@@ -54,7 +54,7 @@ def handle_support_request(*, tenant, workspace, channel: str, conversation, con
         tenant=tenant,
         workspace=workspace,
         query=query,
-        top_k=5,
+        top_k=8,
         document_id=document_id,
     )
     if knowledge_result.handled and knowledge_result.should_reply:
