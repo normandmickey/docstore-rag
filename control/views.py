@@ -1341,7 +1341,7 @@ def dashboard_proxi_web(request):
                     thread.title = (question[:80] or 'New Proxi-Web chat').strip()
                 thread.save(update_fields=['title', 'updated_at'])
 
-                if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('response_format') == 'json':
+                if request.POST.get('response_format') == 'json':
                     latest_meta = {
                         'use_web_search': use_web,
                         'mode': support_result.mode,
