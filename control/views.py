@@ -19,6 +19,7 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.text import slugify
+from django.views.decorators.csrf import csrf_exempt
 
 from chatbots.models import ChatbotIntegration
 from connectors.dropbox import DropboxClient
@@ -1289,6 +1290,7 @@ def _run_proxi_web_turn(*, request, current_workspace, thread, raw_question: str
     }
 
 
+@csrf_exempt
 def dashboard_proxi_web_send(request):
     if not request.user.is_authenticated:
         return JsonResponse({'ok': False, 'error': 'Authentication required.'}, status=401)
