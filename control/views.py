@@ -19,7 +19,7 @@ from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.text import slugify
-from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.csrf import csrf_exempt  # noqa: F401 - temporarily unused, kept for compatibility
 
 from chatbots.models import ChatbotIntegration
 from connectors.dropbox import DropboxClient
@@ -1206,21 +1206,29 @@ def _run_proxi_web_turn(*, request, current_workspace, thread, raw_question: str
         }
 
     history_messages = list(thread.messages.order_by('id'))
-    support_result = handle_support_request(
-        tenant=current_workspace.tenant,
-        workspace=current_workspace,
-        channel='dashboard_chat',
-        conversation=None,
-        contact=None,
-        user_text=question,
-        subject='',
-        metadata={
-            'surface': 'proxi_web',
-            'thread_id': thread.id,
-            'use_web_search': use_web,
-            'history_count': min(len(history_messages), 12),
-        },
-    )
+    try:
+        support_result = handle_support_request(
+            tenant=current_workspace.tenant,
+            workspace=current_workspace,
+            channel='dashboard_chat',
+            conversation=None,
+            contact=None,
+            user_text=question,
+            subject='',
+            metadata={
+                'surface': 'proxi_web',
+                'thread_id': thread.id,
+                'use_web_search': use_web,
+                'history_count': min(len(history_messages), 12),
+            },
+        )
+    except Exception as exc:
+        logger.exception('Proxi-Web support request failed')
+        return {
+            'ok': False,
+            'error': 'The AI service is temporarily unavailable. Please try again in a moment.',
+        }
+
     web_results = []
     answer = support_result.reply_text or 'I could not find enough relevant context for that question yet.'
     redacted_answer = redact_pii(answer)
@@ -1290,7 +1298,6 @@ def _run_proxi_web_turn(*, request, current_workspace, thread, raw_question: str
     }
 
 
-@csrf_exempt
 def dashboard_proxi_web_send(request):
     if not request.user.is_authenticated:
         return JsonResponse({'ok': False, 'error': 'Authentication required.'}, status=401)
