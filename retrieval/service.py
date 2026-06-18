@@ -31,6 +31,18 @@ TERM_EQUIVALENTS = {
     'employees': {'employee', 'staff', 'worker', 'workers', 'personnel'},
     'worker': {'employee', 'employees', 'staff', 'personnel'},
     'workers': {'employee', 'employees', 'staff', 'personnel'},
+    'manager': {'supervisor', 'lead', 'leadership'},
+    'supervisor': {'manager', 'lead', 'leadership'},
+    'pto': {'leave', 'vacation', 'vacation/annual', 'time', 'paid', 'paid time off'},
+    'vacation': {'pto', 'leave', 'annual leave', 'paid time off'},
+    'leave': {'pto', 'vacation', 'time off', 'absence'},
+    'reimbursement': {'expense', 'expenses', 'expense reimbursement'},
+    'expense': {'reimbursement', 'expenses', 'expense reimbursement'},
+    'expenses': {'reimbursement', 'expense', 'expense reimbursement'},
+    'remote': {'telework', 'teleworking', 'work from home', 'hybrid'},
+    'telework': {'remote', 'work from home', 'hybrid'},
+    'handbook': {'policy', 'policies', 'guide'},
+    'policy': {'handbook', 'policies', 'guideline', 'guide'},
     'parking': {'permit', 'permits', 'garage', 'lot'},
     'fee': {'cost', 'price', 'charge', 'rate'},
     'cost': {'fee', 'price', 'charge', 'rate'},
@@ -77,7 +89,7 @@ def chunk_relevance_score(query, candidate):
     question_relevance = 1.0 - float(getattr(candidate, 'question_distance', 1.0) or 1.0)
     lexical = keyword_score(query, ' '.join(filter(None, [getattr(candidate, 'text', ''), getattr(candidate, 'metadata_text', ''), getattr(candidate, 'question_text', '')])))
     lexical_rank = float(getattr(candidate, 'lexical_rank', 0.0) or 0.0)
-    blended_score = (0.35 * text_relevance) + (0.2 * metadata_relevance) + (0.2 * question_relevance) + (0.1 * lexical) + (0.15 * lexical_rank)
+    blended_score = (0.32 * text_relevance) + (0.18 * metadata_relevance) + (0.25 * question_relevance) + (0.1 * lexical) + (0.15 * lexical_rank)
     return blended_score, text_relevance, metadata_relevance, question_relevance, lexical
 
 
