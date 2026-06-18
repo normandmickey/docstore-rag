@@ -214,10 +214,42 @@ Current configured chat/question model family:
 
 ## Install / Bootstrap
 
+Docstore is a Django app with three main runtime pieces:
+
+- web app (Gunicorn)
+- Celery worker
+- Celery beat scheduler
+
+A normal server install assumes you already have or will provide:
+
+- Postgres
+- Redis
+- nginx
+- TLS/certbot
+- object storage or another media storage strategy
+
 For a fresh-server install guide, see:
 
 - `INSTALL.md`
 - `scripts/bootstrap-docstore-server.sh`
+
+The bootstrap script writes and starts these systemd services by default:
+
+- `docstore-rag.service`
+- `docstore-rag-celery.service`
+- `docstore-rag-celery-beat.service`
+
+Default Gunicorn bind target:
+
+- `127.0.0.1:8010`
+
+Health check:
+
+- `/healthz/`
+
+Important:
+- `INSTALL.md` is the actual fresh-server guide.
+- `DEPLOY.md` describes the current git-based deploy model used after bootstrap.
 
 ## Important Routes
 
