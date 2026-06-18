@@ -98,15 +98,18 @@ def chunk_structure_bonus(query, candidate):
         heading_bonus += 0.08
 
     list_bonus = 0.0
+    is_list_seeking_query = lowered_query.startswith('what are') or lowered_query.startswith('which') or 'list' in lowered_query
     list_like_markers = text.count('•') + text.count('\n- ') + text.count(';')
-    if lowered_query.startswith('what are') or lowered_query.startswith('which') or 'list' in lowered_query:
+    if is_list_seeking_query:
+        if metadata_json.get('has_list') and int(metadata_json.get('list_count', 0) or 0) > 0:
+            list_bonus += 0.08
         if list_like_markers >= 2:
-            list_bonus += 0.07
+            list_bonus += 0.05
         title_case_items = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3}\b', getattr(candidate, 'text', '') or '')
         if len(title_case_items) >= 4:
-            list_bonus += 0.04
+            list_bonus += 0.03
 
-    return min(0.15, heading_bonus + list_bonus)
+    return min(0.18, heading_bonus + list_bonus)
 
 
 def chunk_relevance_score(query, candidate):
