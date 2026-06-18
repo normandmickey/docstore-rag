@@ -22,7 +22,7 @@ from .models import IngestionJob
 QUESTION_GEN_MIN_CHARS = int(os.getenv('QUESTION_GEN_MIN_CHARS', '300'))
 QUESTION_GEN_MAX_CHUNKS = int(os.getenv('QUESTION_GEN_MAX_CHUNKS', '120'))
 PDF_REPEAT_LINE_THRESHOLD = int(os.getenv('PDF_REPEAT_LINE_THRESHOLD', '12'))
-INGEST_MAX_CHUNKS = int(os.getenv('INGEST_MAX_CHUNKS', '500'))
+INGEST_MAX_CHUNKS = int(os.getenv('INGEST_MAX_CHUNKS', '1500'))
 
 DOCLING_VENV = os.getenv('DOCLING_VENV_PATH', '/mnt/HC_Volume_105592620/tools/docling/.venv')
 DOCLING_PDF_BACKEND = os.getenv('DOCLING_PDF_BACKEND', 'docling_parse')
