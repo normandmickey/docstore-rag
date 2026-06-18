@@ -425,9 +425,17 @@
       const title = isAssistant ? 'Proxi-Web' : 'You';
       const timestamp = (options && options.timestamp) || 'Just now';
       const extraButton = isAssistant ? '<button type="button" class="copy-response-button proxi-web-copy-button">Copy</button>' : '';
-      const body = isAssistant
-        ? `<div class="markdown-response" data-copy-source="true">${escapeHtml(content || '')}</div>`
-        : `<pre style="margin: 0;">${escapeHtml(content || '')}</pre>`;
+      var body;
+      if (isAssistant) {
+        var html = (options && options.html) || '';
+        if (html) {
+          body = '<div class="markdown-response" data-copy-source="true">' + html + '</div>';
+        } else {
+          body = '<div class="markdown-response" data-copy-source="true">' + escapeHtml(content || '') + '</div>';
+        }
+      } else {
+        body = '<pre style="margin: 0;">' + escapeHtml(content || '') + '</pre>';
+      }
       card.innerHTML = `
         <div class="proxi-web-message-header">
           <div>
@@ -517,7 +525,10 @@
           throw new Error(payload.error || ('Request failed with status ' + response.status));
         }
 
-        const replacement = createMessageCard('assistant', payload.assistant_message && payload.assistant_message.content, { timestamp: 'Just now' });
+        const replacement = createMessageCard('assistant',
+          (payload.assistant_message && payload.assistant_message.content) || '',
+          { timestamp: 'Just now', html: (payload.assistant_message && payload.assistant_message.content_html) || '' }
+        );
         thinkingCard.replaceWith(replacement);
         renderResults(payload.results || []);
       } catch (error) {

@@ -57,6 +57,7 @@ from .oauth import (
 )
 from .pii import redact_pii
 from .email_flows import send_invite_email
+from .templatetags.proxi_web_markdown import render_markdown as render_md_html
 from support.email_forms import TenantEmailIntegrationForm
 from support.email_services import TenantEmailClient, TenantEmailIntegrationError
 from requests import HTTPError
@@ -1342,6 +1343,7 @@ def dashboard_proxi_web_send(request):
         'assistant_message': {
             'role': 'assistant',
             'content': payload['assistant_text'],
+            'content_html': render_md_html(payload['assistant_text']),
             'mode': payload['mode'],
             'should_handoff': payload['should_handoff'],
             'handoff_reason': payload['handoff_reason'],
