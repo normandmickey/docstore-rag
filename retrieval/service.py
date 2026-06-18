@@ -146,10 +146,11 @@ def retrieve_chunks(*, tenant, workspace, query, top_k=5, document_id=None):
     )
 
     search_query = SearchQuery(standalone_query, search_type='plain')
+    lexical_search_vector = SearchVector('text') + SearchVector('metadata_text') + SearchVector('question_text')
     lexical_candidates = list(
         qs.annotate(
-            search_vector=SearchVector('text'),
-            lexical_rank=SearchRank(SearchVector('text'), search_query),
+            search_vector=lexical_search_vector,
+            lexical_rank=SearchRank(lexical_search_vector, search_query),
         )
         .filter(search_vector=search_query)
         .order_by('-lexical_rank')[:candidate_count]
