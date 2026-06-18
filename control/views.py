@@ -15,7 +15,7 @@ from django.core.files.base import ContentFile
 from django.core.paginator import Paginator
 from django.db.models import Count
 from django.urls import reverse
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.text import slugify
@@ -1340,6 +1340,47 @@ def dashboard_proxi_web(request):
                 if (thread.title or '').strip() in {'', 'New Proxi-Web chat'}:
                     thread.title = (question[:80] or 'New Proxi-Web chat').strip()
                 thread.save(update_fields=['title', 'updated_at'])
+
+                if request.headers.get('x-requested-with') == 'XMLHttpRequest' or request.POST.get('response_format') == 'json':
+                    latest_meta = {
+                        'use_web_search': use_web,
+                        'mode': support_result.mode,
+                        'should_handoff': support_result.should_handoff,
+                        'handoff_reason': support_result.handoff_reason,
+                        'result_count': len((support_result.retrieval_metadata or {}).get('results') or []),
+                        'results': [
+                            {
+                                'document_id': result.document_id,
+                                'document': result.document.filename,
+                                'chunk_index': result.chunk_index,
+                                'distance': float(getattr(result, 'distance', 0.0) or 0.0),
+                                'detail_url': f'/documents/{result.document_id}/',
+                                'download_url': f'/documents/{result.document_id}/download/',
+                            }
+                            for result in ((support_result.retrieval_metadata or {}).get('results') or [])
+                        ],
+                        'web_results': web_results,
+                    }
+                    return JsonResponse({
+                        'ok': True,
+                        'thread_id': thread.id,
+                        'thread_title': thread.title,
+                        'user_message': {
+                            'role': 'user',
+                            'content': redacted_question['text'],
+                        },
+                        'assistant_message': {
+                            'role': 'assistant',
+                            'content': redacted_answer['text'],
+                            'mode': support_result.mode,
+                            'should_handoff': support_result.should_handoff,
+                            'handoff_reason': support_result.handoff_reason,
+                        },
+                        'results': latest_meta['results'],
+                        'web_results': latest_meta['web_results'],
+                        'use_web_search': use_web,
+                    })
+
                 messages.success(request, 'Message added to Proxi-Web chat.')
                 return redirect(f'/dashboard/proxi-web/?thread={thread.id}')
 

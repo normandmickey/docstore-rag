@@ -136,9 +136,10 @@
         <button type="submit">Rename</button>
       </form>
 
-      <form method="post">
+      <form method="post" id="proxi-send-form">
         {% csrf_token %}
         <input type="hidden" name="action" value="send_proxi_message">
+        <input type="hidden" name="response_format" value="json">
         <input type="hidden" name="thread_id" value="{{ proxi_thread.id }}">
         <label>Ask Proxi-Web</label>
         <textarea name="question" rows="4" placeholder="Ask a follow-up question that benefits from chat history...">{{ proxi_question }}</textarea>
@@ -163,7 +164,7 @@
         <button type="submit" style="background: #991b1b;">Delete chat</button>
       </form>
 
-      <div class="proxi-web-messages">
+      <div class="proxi-web-messages" id="proxi-web-messages">
         {% for message in proxi_messages %}
           <div class="row proxi-web-message">
             <div class="proxi-web-message-header">
@@ -186,8 +187,8 @@
         {% endfor %}
       </div>
 
-      {% if proxi_results %}
-        <div style="margin-top: 24px;">
+      <div id="proxi-results-panel" style="margin-top: 24px; {% if not proxi_results %}display: none;{% endif %}">
+        <div>
           <h3>Latest retrieved document context</h3>
           {% for result in proxi_results %}
             <div class="row">
@@ -197,10 +198,10 @@
             </div>
           {% endfor %}
         </div>
-      {% endif %}
+      </div>
 
-      {% if proxi_web_results %}
-        <div style="margin-top: 24px;">
+      <div id="proxi-web-results-panel" style="margin-top: 24px; {% if not proxi_web_results %}display: none;{% endif %}">
+        <div>
           <h3>Latest web results</h3>
           {% for result in proxi_web_results %}
             <div class="row">
@@ -210,33 +211,147 @@
             </div>
           {% endfor %}
         </div>
-      {% endif %}
+      </div>
     {% endif %}
   </div>
 </div>
 <script>
   (function () {
-    const buttons = document.querySelectorAll('.copy-response-button');
-    buttons.forEach(function (button) {
-      button.addEventListener('click', async function () {
-        const messageCard = button.closest('.proxi-web-message');
-        const source = messageCard ? messageCard.querySelector('[data-copy-source="true"]') : null;
-        const text = source ? (source.innerText || source.textContent || '').trim() : '';
-        try {
-          await navigator.clipboard.writeText(text);
-          const original = button.textContent;
-          button.textContent = 'Copied';
-          setTimeout(function () {
-            button.textContent = original;
-          }, 1200);
-        } catch (error) {
-          console.warn('Copy failed', error);
-          button.textContent = 'Copy failed';
-          setTimeout(function () {
-            button.textContent = 'Copy';
-          }, 1500);
+    function bindCopyButtons(scope) {
+      const buttons = (scope || document).querySelectorAll('.copy-response-button');
+      buttons.forEach(function (button) {
+        if (button.dataset.boundCopy === '1') {
+          return;
         }
+        button.dataset.boundCopy = '1';
+        button.addEventListener('click', async function () {
+          const messageCard = button.closest('.proxi-web-message');
+          const source = messageCard ? messageCard.querySelector('[data-copy-source="true"]') : null;
+          const text = source ? (source.innerText || source.textContent || '').trim() : '';
+          try {
+            await navigator.clipboard.writeText(text);
+            const original = button.textContent;
+            button.textContent = 'Copied';
+            setTimeout(function () {
+              button.textContent = original;
+            }, 1200);
+          } catch (error) {
+            console.warn('Copy failed', error);
+            button.textContent = 'Copy failed';
+            setTimeout(function () {
+              button.textContent = 'Copy';
+            }, 1500);
+          }
+        });
       });
+    }
+
+    function escapeHtml(value) {
+      return (value || '').replace(/[&<>\"]/g, function (ch) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[ch] || ch;
+      });
+    }
+
+    function createMessageCard(role, content, options) {
+      const card = document.createElement('div');
+      card.className = 'row proxi-web-message';
+      const isAssistant = role === 'assistant';
+      const title = isAssistant ? 'Proxi-Web' : 'You';
+      const timestamp = (options && options.timestamp) || 'Just now';
+      const extraButton = isAssistant ? '<button type="button" class="copy-response-button proxi-web-copy-button">Copy</button>' : '';
+      const body = isAssistant
+        ? `<div class="markdown-response" data-copy-source="true">${escapeHtml(content || '')}</div>`
+        : `<pre style="margin: 0;">${escapeHtml(content || '')}</pre>`;
+      card.innerHTML = `
+        <div class="proxi-web-message-header">
+          <div>
+            <strong>${title}</strong>
+            <div class="meta">${timestamp}</div>
+          </div>
+          ${extraButton}
+        </div>
+        ${body}
+      `;
+      bindCopyButtons(card);
+      return card;
+    }
+
+    function renderResults(results) {
+      const panel = document.getElementById('proxi-results-panel');
+      if (!panel) {
+        return;
+      }
+      if (!results || !results.length) {
+        panel.style.display = 'none';
+        return;
+      }
+      panel.style.display = '';
+      panel.innerHTML = '<div><h3>Latest retrieved document context</h3></div>';
+      results.forEach(function (result) {
+        const row = document.createElement('div');
+        row.className = 'row';
+        row.innerHTML = `
+          <strong>${escapeHtml(result.document || '')}</strong><br>
+          <span class="meta">Chunk ${escapeHtml(String(result.chunk_index || ''))} · Distance ${Number(result.distance || 0).toFixed(4)}</span><br>
+          <span class="meta"><a href="${escapeHtml(result.detail_url || '#')}" target="_blank" rel="noopener noreferrer">View document details</a> · <a href="${escapeHtml(result.download_url || '#')}" target="_blank" rel="noopener noreferrer">Open source document</a></span>
+        `;
+        panel.appendChild(row);
+      });
+    }
+
+    bindCopyButtons(document);
+
+    const form = document.getElementById('proxi-send-form');
+    const messagesEl = document.getElementById('proxi-web-messages');
+    if (!form || !messagesEl) {
+      return;
+    }
+
+    form.addEventListener('submit', async function (event) {
+      event.preventDefault();
+      const textarea = form.querySelector('textarea[name="question"]');
+      const submitButton = form.querySelector('button[type="submit"]');
+      const question = (textarea.value || '').trim();
+      if (!question) {
+        return;
+      }
+
+      const userCard = createMessageCard('user', question, { timestamp: 'Just now' });
+      const thinkingCard = createMessageCard('assistant', 'Thinking…', { timestamp: 'Working…' });
+      thinkingCard.dataset.pending = '1';
+      messagesEl.prepend(thinkingCard);
+      messagesEl.prepend(userCard);
+      textarea.value = '';
+      textarea.focus();
+      submitButton.disabled = true;
+      submitButton.textContent = 'Sending…';
+
+      try {
+        const formData = new FormData(form);
+        const response = await fetch(window.location.href, {
+          method: 'POST',
+          body: formData,
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest',
+          },
+        });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) {
+          throw new Error(payload.error || 'Request failed');
+        }
+
+        const replacement = createMessageCard('assistant', payload.assistant_message && payload.assistant_message.content, { timestamp: 'Just now' });
+        thinkingCard.replaceWith(replacement);
+        renderResults(payload.results || []);
+      } catch (error) {
+        console.warn('Proxi-Web send failed', error);
+        const replacement = createMessageCard('assistant', 'Something went wrong sending that message. Please try again.', { timestamp: 'Error' });
+        thinkingCard.replaceWith(replacement);
+      } finally {
+        submitButton.disabled = false;
+        submitButton.textContent = 'Send';
+        messagesEl.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
     });
   })();
 </script>
