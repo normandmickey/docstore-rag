@@ -37,6 +37,7 @@ INSTALLED_APPS = [
     'integrations.voice',
     'chatbots',
     'reports',
+    'billing',
 ]
 
 MIDDLEWARE = [
@@ -48,6 +49,7 @@ MIDDLEWARE = [
     'allauth.account.middleware.AccountMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'billing.middleware.SubscriptionMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -207,3 +209,10 @@ CELERY_TASK_ROUTES = {
 }
 
 VOICE_INTEGRATION_ENABLED = os.getenv('VOICE_INTEGRATION_ENABLED', 'false').lower() == 'true'
+
+# Stripe / Billing
+STRIPE_SECRET_KEY = os.getenv('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.getenv('STRIPE_WEBHOOK_SECRET', '')
+STRIPE_PRO_PRICE_ID = os.getenv('STRIPE_PRO_PRICE_ID', '')
+STRIPE_BUSINESS_PRICE_ID = os.getenv('STRIPE_BUSINESS_PRICE_ID', '')
+SITE_URL = os.getenv('SITE_URL', 'https://ragbee.ai')

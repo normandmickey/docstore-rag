@@ -21,3 +21,4 @@ bleach==6.2.0
 openpyxl==3.1.5
 drf-spectacular==0.28.0
 Faker==37.4.0
+stripe==15.4.0

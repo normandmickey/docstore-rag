@@ -1,0 +1,151 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}Billing — Ragbee{% endblock %}
+
+{% block content %}
+<div class="billing-page">
+  <div class="billing-header">
+    <h1>Billing</h1>
+    <a href="{% url 'pricing' %}" class="btn-link">View plans →</a>
+  </div>
+
+  <div class="billing-section">
+    <h2>Current Plan</h2>
+    <div class="current-plan">
+      <div class="plan-badge plan-{{ subscription.tier }}">
+        {{ subscription.get_tier_display }}
+      </div>
+      <div class="plan-status status-{{ subscription.status }}">
+        {{ subscription.get_status_display }}
+      </div>
+      {% if subscription.current_period_end %}
+      <div class="period">
+        {% if subscription.cancel_at_period_end %}
+        Cancels on {{ subscription.current_period_end|date:"M j, Y" }}
+        {% else %}
+        Renews on {{ subscription.current_period_end|date:"M j, Y" }}
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="billing-section">
+    <h2>Usage This Month</h2>
+    <div class="usage-grid">
+      <div class="usage-item">
+        <div class="usage-label">Queries</div>
+        <div class="usage-value">
+          {{ subscription.queries_this_month }}
+          {% if subscription.limits.max_queries_per_month > 0 %}
+          / {{ subscription.limits.max_queries_per_month }}
+          {% else %}
+          / unlimited
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="billing-section">
+    <h2>Plan Limits</h2>
+    <div class="limits-grid">
+      <div class="limit-item">
+        <span class="limit-label">Workspaces</span>
+        <span class="limit-value">
+          {% if subscription.limits.max_workspaces == 0 %}Unlimited{% else %}{{ subscription.limits.max_workspaces }}{% endif %}
+        </span>
+      </div>
+      <div class="limit-item">
+        <span class="limit-label">Documents</span>
+        <span class="limit-value">
+          {% if subscription.limits.max_documents == 0 %}Unlimited{% else %}{{ subscription.limits.max_documents }}{% endif %}
+        </span>
+      </div>
+      <div class="limit-item">
+        <span class="limit-label">Connectors</span>
+        <span class="limit-value">
+          {% if subscription.limits.max_connectors == 0 %}All{% else %}{{ subscription.limits.max_connectors }}{% endif %}
+        </span>
+      </div>
+      <div class="limit-item">
+        <span class="limit-label">Chatbots</span>
+        <span class="limit-value">
+          {% if subscription.limits.max_chatbots == 0 %}Unlimited{% else %}{{ subscription.limits.max_chatbots }}{% endif %}
+        </span>
+      </div>
+      <div class="limit-item">
+        <span class="limit-label">Support channels</span>
+        <span class="limit-value">
+          {% if subscription.limits.max_support_channels == 0 %}Unlimited{% else %}{{ subscription.limits.max_support_channels }}{% endif %}
+        </span>
+      </div>
+      <div class="limit-item">
+        <span class="limit-label">API access</span>
+        <span class="limit-value">{% if subscription.limits.api_access %}✅{% else %}—{% endif %}</span>
+      </div>
+      <div class="limit-item">
+        <span class="limit-label">Voice agent</span>
+        <span class="limit-value">{% if subscription.limits.voice_agent %}✅{% else %}—{% endif %}</span>
+      </div>
+    </div>
+  </div>
+
+  {% if subscription.tier != 'business' %}
+  <div class="billing-section">
+    <h2>Upgrade</h2>
+    <div class="upgrade-options">
+      {% for plan in plans %}
+        {% if plan.tier != 'free' and plan.tier != subscription.tier %}
+        <div class="upgrade-card">
+          <div class="upgrade-name">{{ plan.name }} — ${{ plan.price }}/mo</div>
+          <a href="{% url 'checkout' plan.tier %}" class="btn-primary">Upgrade to {{ plan.name }}</a>
+        </div>
+        {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if subscription.tier != 'free' and subscription.stripe_subscription_id %}
+  <div class="billing-section">
+    <h2>Manage Subscription</h2>
+    <p class="muted">To cancel or change your subscription, contact support@ragbee.ai</p>
+  </div>
+  {% endif %}
+</div>
+
+<style>
+.billing-page { max-width: 700px; margin: 0 auto; padding: 2rem 1rem; }
+.billing-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+.billing-header h1 { font-size: 1.75rem; }
+.btn-link { color: var(--blue, #2563eb); text-decoration: none; font-weight: 600; }
+.billing-section { margin-bottom: 2rem; }
+.billing-section h2 { font-size: 1.1rem; margin-bottom: 0.75rem; color: var(--muted, #94a3b8); }
+.current-plan { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.plan-badge { padding: 0.3rem 0.8rem; border-radius: 6px; font-weight: 600; text-transform: capitalize; }
+.plan-free { background: var(--border, #243055); }
+.plan-pro { background: #1e3a5f; color: #93c5fd; }
+.plan-business { background: #1e3f3a; color: #6ee7b7; }
+.plan-status { padding: 0.3rem 0.8rem; border-radius: 6px; font-size: 0.85rem; }
+.status-active, .status-trialing { background: #14532d; color: #86efac; }
+.status-past_due { background: #78350f; color: #fcd34d; }
+.status-canceled { background: #7f1d1d; color: #fca5a5; }
+.period { color: var(--soft, #64748b); font-size: 0.9rem; }
+.usage-grid { display: grid; grid-template-columns: 1fr; gap: 0.5rem; }
+.usage-item { background: var(--card, #121a33); border: 1px solid var(--border, #243055); border-radius: 8px; padding: 1rem; }
+.usage-label { color: var(--soft, #64748b); font-size: 0.85rem; }
+.usage-value { font-size: 1.5rem; font-weight: 600; margin-top: 0.25rem; }
+.limits-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; }
+.limit-item { display: flex; justify-content: space-between; background: var(--card, #121a33); border: 1px solid var(--border, #243055); border-radius: 8px; padding: 0.6rem 1rem; }
+.limit-label { color: var(--soft, #64748b); }
+.limit-value { font-weight: 600; }
+.upgrade-options { display: flex; flex-direction: column; gap: 1rem; }
+.upgrade-card { background: var(--card, #121a33); border: 1px solid var(--border, #243055); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+.upgrade-name { font-weight: 600; }
+.btn-primary { background: var(--blue, #2563eb); color: white; padding: 0.5rem 1rem; border-radius: 6px; text-decoration: none; font-weight: 600; }
+.btn-primary:hover { background: #1d4ed8; }
+.muted { color: var(--soft, #64748b); }
+</style>
+{% endblock %}

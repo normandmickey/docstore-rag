@@ -1,0 +1,22 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}Payment Successful — Ragbee{% endblock %}
+
+{% block content %}
+<div class="success-page">
+  <div class="success-icon">✅</div>
+  <h1>Payment successful</h1>
+  <p>Your subscription is now active. Welcome to Ragbee!</p>
+  <a href="{% url 'dashboard' %}" class="btn-primary">Go to dashboard</a>
+</div>
+
+<style>
+.success-page { max-width: 500px; margin: 4rem auto; text-align: center; }
+.success-icon { font-size: 3rem; margin-bottom: 1rem; }
+.success-page h1 { font-size: 1.75rem; margin-bottom: 0.5rem; }
+.success-page p { color: var(--muted, #94a3b8); margin-bottom: 2rem; }
+.btn-primary { background: var(--blue, #2563eb); color: white; padding: 0.7rem 1.5rem; border-radius: 8px; text-decoration: none; font-weight: 600; }
+.btn-primary:hover { background: #1d4ed8; }
+</style>
+{% endblock %}

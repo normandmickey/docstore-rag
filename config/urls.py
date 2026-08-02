@@ -52,6 +52,7 @@ urlpatterns = [
     path('logout/', logout_view, name='logout'),
     path('signup/', signup, name='signup'),
     path('accounts/', include('allauth.urls')),
+    path('billing/', include('billing.urls')),
     path('dashboard/', dashboard, name='dashboard'),
     path('dashboard/get-started/', dashboard_get_started, name='dashboard_get_started'),
     path('dashboard/workspace/', dashboard_workspace, name='dashboard_workspace'),

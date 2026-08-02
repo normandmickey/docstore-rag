@@ -1,0 +1,127 @@
+{% extends "dashboard/base.html" %}
+{% load static %}
+
+{% block title %}Pricing — Ragbee{% endblock %}
+
+{% block content %}
+<div class="pricing-page">
+  <div class="pricing-header">
+    <h1>Choose your plan</h1>
+    <p>Start free, upgrade when you're ready.</p>
+  </div>
+
+  <div class="pricing-grid">
+    {% for plan in plans %}
+    <div class="pricing-card {% if plan.tier == 'pro' %}recommended{% endif %}">
+      <div class="plan-name">{{ plan.name }}</div>
+      <div class="plan-price">
+        <span class="amount">${{ plan.price }}</span>
+        <span class="period">/mo</span>
+      </div>
+      <ul class="plan-features">
+        {% if plan.limits.max_workspaces == 0 %}
+        <li>Unlimited workspaces</li>
+        {% else %}
+        <li>{{ plan.limits.max_workspaces }} workspace{{ plan.limits.max_workspaces|pluralize }}</li>
+        {% endif %}
+
+        {% if plan.limits.max_documents == 0 %}
+        <li>Unlimited documents</li>
+        {% else %}
+        <li>{{ plan.limits.max_documents }} documents</li>
+        {% endif %}
+
+        <li>{{ plan.limits.max_queries_per_month|floatformat:"0" }} queries/month</li>
+
+        {% if plan.limits.max_connectors == 0 %}
+        <li>All connectors</li>
+        {% else %}
+        <li>{{ plan.limits.max_connectors }} connector{{ plan.limits.max_connectors|pluralize }}</li>
+        {% endif %}
+
+        {% if plan.limits.max_chatbots == 0 %}
+        <li>Unlimited chatbots</li>
+        {% elif plan.limits.max_chatbots > 0 %}
+        <li>{{ plan.limits.max_chatbots }} chatbot{{ plan.limits.max_chatbots|pluralize }}</li>
+        {% else %}
+        <li class="muted">No chatbots</li>
+        {% endif %}
+
+        {% if plan.limits.max_support_channels == 0 %}
+        <li>Unlimited support channels</li>
+        {% elif plan.limits.max_support_channels > 0 %}
+        <li>{{ plan.limits.max_support_channels }} support channel{{ plan.limits.max_support_channels|pluralize }}</li>
+        {% else %}
+        <li class="muted">No support channels</li>
+        {% endif %}
+
+        {% if plan.limits.api_access %}
+        <li>API access</li>
+        {% else %}
+        <li class="muted">No API access</li>
+        {% endif %}
+
+        {% if plan.limits.voice_agent %}
+        <li>Voice agent</li>
+        {% else %}
+        <li class="muted">No voice agent</li>
+        {% endif %}
+      </ul>
+
+      <div class="plan-cta">
+        {% if plan.tier == 'free' %}
+          {% if request.user.is_authenticated %}
+          <a href="{% url 'billing' %}" class="btn btn-secondary">Current plan</a>
+          {% else %}
+          <a href="/signup/" class="btn btn-secondary">Get started</a>
+          {% endif %}
+        {% else %}
+          {% if request.user.is_authenticated %}
+          <a href="{% url 'checkout' plan.tier %}" class="btn btn-primary">Choose {{ plan.name }}</a>
+          {% else %}
+          <a href="/login/" class="btn btn-primary">Sign in to upgrade</a>
+          {% endif %}
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<style>
+.pricing-page { max-width: 1100px; margin: 0 auto; padding: 2rem 1rem; }
+.pricing-header { text-align: center; margin-bottom: 2.5rem; }
+.pricing-header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+.pricing-header p { color: var(--muted, #94a3b8); font-size: 1.1rem; }
+.pricing-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1.5rem; }
+.pricing-card {
+  background: var(--card, #121a33);
+  border: 1px solid var(--border, #243055);
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+}
+.pricing-card.recommended {
+  border-color: var(--blue, #2563eb);
+  box-shadow: 0 0 0 1px var(--blue, #2563eb);
+}
+.plan-name { font-size: 1.25rem; font-weight: 600; margin-bottom: 0.5rem; }
+.plan-price { margin-bottom: 1.5rem; }
+.plan-price .amount { font-size: 2.5rem; font-weight: 700; }
+.plan-price .period { color: var(--muted, #94a3b8); }
+.plan-features { list-style: none; padding: 0; margin: 0 0 1.5rem; flex: 1; }
+.plan-features li { padding: 0.4rem 0; border-bottom: 1px solid var(--border-soft, #334155); }
+.plan-features li.muted { color: var(--soft, #64748b); }
+.plan-cta { margin-top: auto; }
+.btn {
+  display: inline-block; width: 100%; text-align: center;
+  padding: 0.7rem 1rem; border-radius: 8px; text-decoration: none;
+  font-weight: 600; transition: background 0.2s;
+}
+.btn-primary { background: var(--blue, #2563eb); color: white; }
+.btn-primary:hover { background: #1d4ed8; }
+.btn-secondary { background: var(--border, #243055); color: var(--text, #eef2ff); }
+.btn-secondary:hover { background: var(--border-soft, #334155); }
+</style>
+{% endblock %}
