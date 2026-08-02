@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b1020">
   <link rel="manifest" href="/manifest.webmanifest">
-  <title>Docstore · A private knowledge layer for documents, support, voice, and bots</title>
+  <title>Ragbee · Private RAG for documents, support, and bots</title>
   <style>
     :root {
       --bg: #0b1020;
@@ -40,6 +40,7 @@
       display: inline-block; padding: 12px 16px; border-radius: 10px; font-weight: 700;
     }
     .button { background: var(--blue); color: white; }
+    .button:hover { background: #1d4ed8; }
     .button-secondary { background: rgba(255,255,255,0.02); border: 1px solid var(--border); color: var(--text); }
     .hero {
       display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 24px; align-items: stretch;
@@ -94,16 +95,35 @@
     .install-banner {
       margin-top: 18px; padding: 14px; border-radius: 12px; background: var(--card-2); border: 1px solid var(--border-soft); display: none;
     }
+    /* Pricing section */
+    .pricing-section { margin-top: 22px; }
+    .pricing-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 18px;
+    }
+    .pricing-card {
+      background: var(--card-2); border: 1px solid var(--border-soft); border-radius: 16px; padding: 24px;
+      display: flex; flex-direction: column;
+    }
+    .pricing-card.recommended { border-color: var(--blue); box-shadow: 0 0 0 1px var(--blue); }
+    .plan-name { font-size: 1.2rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .plan-price { margin-bottom: 1rem; }
+    .plan-price .amount { font-size: 2rem; font-weight: 800; }
+    .plan-price .period { color: var(--soft); }
+    .plan-features { list-style: none; padding: 0; margin: 0 0 1rem; flex: 1; }
+    .plan-features li { padding: 0.35rem 0; border-bottom: 1px solid var(--border-soft); font-size: 0.92rem; color: var(--muted); }
+    .plan-features li.muted { color: var(--soft); }
+    .plan-badge { display: inline-block; background: var(--blue); color: white; font-size: 0.75rem; padding: 2px 8px; border-radius: 999px; margin-bottom: 8px; }
     @media (max-width: 920px) {
-      .hero, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .hero, .grid-2, .grid-3, .pricing-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
   <div class="wrap">
     <div class="nav">
-      <div class="brand">Docstore</div>
+      <div class="brand">🐝 Ragbee</div>
       <div class="nav-links">
+        <a href="/billing/pricing/">Pricing</a>
         <a href="/privacy/">Privacy</a>
         <a href="/terms/">Terms</a>
         <a href="https://github.com/normandmickey/docstore-rag" target="_blank" rel="noopener noreferrer">GitHub</a>
@@ -112,18 +132,18 @@
           <a href="/logout/">Log out</a>
         {% else %}
           <a href="/login/">Log in</a>
-          <a class="button" href="/signup/">Get access</a>
+          <a class="button" href="/signup/">Get started</a>
         {% endif %}
       </div>
     </div>
 
     <div class="hero">
       <div class="card hero-copy">
-        <div class="pill">Private knowledge layer · Invite-only · Live</div>
-        <h1>Turn scattered documents into something your team can actually use.</h1>
+        <div class="pill">Private RAG platform · Free tier available</div>
+        <h1>Turn scattered documents into answers your team can trust.</h1>
         <p>
           Most teams have files everywhere and answers nowhere: PDFs in Drive, policies in docs, support knowledge buried in threads,
-          and too much context trapped in people’s heads. Docstore exists to turn that mess into one private, grounded knowledge layer
+          and too much context trapped in people's heads. Ragbee turns that mess into one private, grounded knowledge layer
           for documents, chat, support, voice, and bots.
         </p>
         <p>
@@ -133,10 +153,10 @@
         <div class="cta-row">
           {% if request.user.is_authenticated %}
             <a class="button" href="/dashboard/">Open dashboard</a>
-            <a class="button-secondary" href="/dashboard/connectors/">Explore connectors</a>
+            <a class="button-secondary" href="/billing/pricing/">View plans</a>
           {% else %}
-            <a class="button" href="/login/">Log in</a>
-            <a class="button-secondary" href="/signup/">Request access</a>
+            <a class="button" href="/signup/">Start free</a>
+            <a class="button-secondary" href="/billing/pricing/">See pricing</a>
           {% endif %}
         </div>
         <div class="status-box">
@@ -145,12 +165,13 @@
             Your dashboard gives you access to documents, chat, connectors, support, reports, and chatbot tooling.
           {% else %}
             <strong>Built for private workspaces, not public toy demos.</strong><br>
-            Docstore is designed for invite-based teams, tenant-aware separation, private storage, and grounded answers tied to real source material.
+            Ragbee is designed for tenant-aware teams, private storage, and grounded answers tied to real source material.
+            Start free — no credit card required.
           {% endif %}
         </div>
         <div id="install-banner" class="install-banner">
-          <strong>Install Docstore</strong>
-          <p id="install-help">Add Docstore to your home screen for a more app-like mobile experience.</p>
+          <strong>Install Ragbee</strong>
+          <p id="install-help">Add Ragbee to your home screen for a more app-like mobile experience.</p>
           <a id="install-button" class="button" href="#">Install</a>
         </div>
       </div>
@@ -158,7 +179,7 @@
       <div class="card">
         <div class="kicker">Product point of view</div>
         <p class="quote">
-          “Docstore is not just a place to upload files. It is a private knowledge product you can operate across chat, support, voice, and automation.”
+          "Ragbee is not just a place to upload files. It is a private knowledge product you can operate across chat, support, voice, and automation."
         </p>
         <div class="grid-2">
           <div class="mini-card">
@@ -181,11 +202,73 @@
       </div>
     </div>
 
+    <div class="card section pricing-section">
+      <h2>Simple pricing</h2>
+      <p class="section-intro">Start free, upgrade when you're ready. No credit card required to try it out.</p>
+      <div class="pricing-grid">
+        <div class="pricing-card">
+          <div class="plan-name">Free</div>
+          <div class="plan-price"><span class="amount">$0</span><span class="period">/mo</span></div>
+          <ul class="plan-features">
+            <li>1 workspace</li>
+            <li>25 documents</li>
+            <li>100 queries/month</li>
+            <li>1 connector</li>
+            <li class="muted">No chatbots</li>
+            <li class="muted">No API access</li>
+          </ul>
+          {% if request.user.is_authenticated %}
+          <a href="/billing/" class="button-secondary" style="text-align:center;">Current plan</a>
+          {% else %}
+          <a href="/signup/" class="button-secondary" style="text-align:center;">Get started</a>
+          {% endif %}
+        </div>
+        <div class="pricing-card recommended">
+          <div class="plan-badge">Most popular</div>
+          <div class="plan-name">Pro</div>
+          <div class="plan-price"><span class="amount">$29</span><span class="period">/mo</span></div>
+          <ul class="plan-features">
+            <li>5 workspaces</li>
+            <li>500 documents</li>
+            <li>5,000 queries/month</li>
+            <li>3 connectors</li>
+            <li>2 chatbots</li>
+            <li>2 support channels</li>
+            <li>API access</li>
+          </ul>
+          {% if request.user.is_authenticated %}
+          <a href="/billing/checkout/pro/" class="button" style="text-align:center;">Choose Pro</a>
+          {% else %}
+          <a href="/login/" class="button" style="text-align:center;">Sign in to upgrade</a>
+          {% endif %}
+        </div>
+        <div class="pricing-card">
+          <div class="plan-name">Business</div>
+          <div class="plan-price"><span class="amount">$99</span><span class="period">/mo</span></div>
+          <ul class="plan-features">
+            <li>Unlimited workspaces</li>
+            <li>10,000 documents</li>
+            <li>50,000 queries/month</li>
+            <li>All connectors</li>
+            <li>Unlimited chatbots</li>
+            <li>Unlimited support channels</li>
+            <li>API access</li>
+            <li>Voice agent</li>
+          </ul>
+          {% if request.user.is_authenticated %}
+          <a href="/billing/checkout/business/" class="button" style="text-align:center;">Choose Business</a>
+          {% else %}
+          <a href="/login/" class="button" style="text-align:center;">Sign in to upgrade</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
     <div class="card section">
-      <h2>Why Docstore exists</h2>
+      <h2>Why Ragbee exists</h2>
       <p class="section-intro">
         AI around documents usually breaks in one of two ways: either it stays trapped as a demo chat widget bolted onto uploads,
-        or it gets spread across too many disconnected tools to trust. Docstore takes a different approach. The idea is simple:
+        or it gets spread across too many disconnected tools to trust. Ragbee takes a different approach. The idea is simple:
         build one private system where documents can be ingested, organized, retrieved, synced, questioned, and delivered into the channels where people actually work.
       </p>
       <div class="grid-3">
@@ -291,7 +374,7 @@
         </div>
         <div class="usecase">
           <strong>Private RAG infrastructure</strong>
-          Use Docstore as a tenant-aware backend for apps, automations, and internal tools that need grounded document context.
+          Use Ragbee as a tenant-aware backend for apps, automations, and internal tools that need grounded document context.
         </div>
       </div>
     </div>
@@ -300,7 +383,7 @@
       <h2>Underlying technology and tools</h2>
       <p class="section-intro">
         The product story comes first, but the underlying stack matters because reliability, privacy, and delivery discipline matter.
-        Docstore is intentionally built on boring, inspectable infrastructure where possible, with AI components used where they actually add value.
+        Ragbee is intentionally built on boring, inspectable infrastructure where possible, with AI components used where they actually add value.
       </p>
       <div class="grid-3">
         <div class="stack-item">
@@ -328,52 +411,23 @@
           Celery handles background work, scheduled connector syncs, and ingestion workflows, while systemd-backed services keep the app, workers, bots, and voice agents running cleanly.
         </div>
       </div>
-      <div class="grid-2">
-        <div class="feature">
-          <strong>Why this stack</strong>
-          It keeps the product debuggable, deployable, and expandable. The goal is not maximum novelty. The goal is a system you can trust and grow.
-        </div>
-        <div class="feature">
-          <strong>What stays opinionated</strong>
-          Django and Postgres remain the product brain. Execution services stay separate. Storage stays private. Retrieval stays workspace-scoped.
-        </div>
-      </div>
-    </div>
-
-    <div class="card section">
-      <h2>How the product is structured</h2>
-      <div class="grid-3">
-        <div class="feature">
-          <strong>1. Bring knowledge in</strong>
-          Upload files, ingest URLs, or connect synced folders so documents enter the system in a trackable way.
-        </div>
-        <div class="feature">
-          <strong>2. Keep it tenant-aware</strong>
-          Tenants, workspaces, permissions, API keys, and connectors define who can access what and where knowledge should be used.
-        </div>
-        <div class="feature">
-          <strong>3. Deliver it where it matters</strong>
-          Use dashboard chat, support workflows, shipping lookups, reports, bots, support email, and voice agents as delivery surfaces on top of the same source material.
-        </div>
-      </div>
     </div>
 
     <div class="card section">
       <h2>Get started</h2>
       <p>
-        Docstore is currently invite-based. If you already have access, log in and open your dashboard. If you’re setting up a new workspace,
-        the easiest path is to upload a few documents, connect Google Drive, and start asking real questions against a live workspace.
+        Start free — no credit card required. Upload a few documents, connect Google Drive, and start asking real questions against a live workspace.
+        Upgrade to Pro or Business when you need more.
       </p>
       <div class="cta-row">
         {% if request.user.is_authenticated %}
           <a class="button" href="/dashboard/">Go to dashboard</a>
-          <a class="button-secondary" href="/roadmap/scaling/">Scaling roadmap</a>
-          <a class="button-secondary" href="/api/quickstart/">API Quickstart</a>
-          <a class="button-secondary" href="/dashboard/chatbots/">Explore chatbots</a>
+          <a class="button-secondary" href="/billing/pricing/">View plans</a>
           <a class="button-secondary" href="/dashboard/connectors/">Open connectors</a>
         {% else %}
-          <a class="button" href="/login/">Log in</a>
-          <a class="button-secondary" href="/signup/">Request access</a>
+          <a class="button" href="/signup/">Start free</a>
+          <a class="button-secondary" href="/billing/pricing/">See pricing</a>
+          <a class="button-secondary" href="/login/">Log in</a>
         {% endif %}
       </div>
       <div class="footer-note">

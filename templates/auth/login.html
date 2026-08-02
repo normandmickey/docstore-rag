@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Login · Docstore RAG</title>
+  <title>Login · Ragbee</title>
   <style>
     body { font-family: system-ui, sans-serif; background: #0b1020; color: #eef2ff; margin: 0; }
     .wrap { max-width: 460px; margin: 0 auto; padding: 64px 24px; }
@@ -16,14 +16,14 @@
 <body>
   <div class="wrap">
     <div class="card">
-      <h1>Login</h1>
+      <h1>Login · <span style="font-size:0.85em">🐝 Ragbee</span></h1>
       <form method="post">
         {% csrf_token %}
         {{ form.as_p }}
         <button type="submit">Sign in</button>
       </form>
       <p><a href="/accounts/password/reset/">Forgot password?</a></p>
-      <p><a href="/signup/">Create an account</a></p>
+      <p><a href="/signup/">Create an account</a> · <a href="/billing/pricing/">View plans</a></p>
     </div>
   </div>
 </body>
