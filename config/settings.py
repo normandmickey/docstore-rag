@@ -213,7 +213,7 @@ SOCIALACCOUNT_QUERY_EMAIL = True
 SOCIALACCOUNT_LOGIN_METHODS = {'email'}
 GOOGLE_SIGN_IN_CLIENT_ID = os.getenv('GOOGLE_SIGN_IN_CLIENT_ID', '')
 GOOGLE_SIGN_IN_CLIENT_SECRET = os.getenv('GOOGLE_SIGN_IN_CLIENT_SECRET', '')
-GOOGLE_SIGN_IN_REDIRECT_URI = os.getenv('GOOGLE_SIGN_IN_REDIRECT_URI', SITE_URL.rstrip('/') + '/accounts/google/login/callback/')
+GOOGLE_SIGN_IN_REDIRECT_URI = os.getenv('GOOGLE_SIGN_IN_REDIRECT_URI', os.getenv('SITE_URL', 'https://ragbee.ai').rstrip('/') + '/accounts/google/login/callback/')
 
 SOCIALACCOUNT_PROVIDERS = {
     'google': {
