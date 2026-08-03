@@ -136,7 +136,7 @@ SPECTACULAR_SETTINGS = {
 CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', os.getenv('REDIS_URL', 'redis://localhost:6379/0'))
 CELERY_RESULT_BACKEND = os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1')
 
-DEFAULT_EMBEDDING_MODEL = os.getenv('DEFAULT_EMBEDDING_MODEL', 'text-embedding-3-large')
+DEFAULT_EMBEDDING_MODEL = os.getenv('DEFAULT_EMBEDDING_MODEL', 'nomic-embed-text')
 DEFAULT_CHAT_MODEL = os.getenv('DEFAULT_CHAT_MODEL', 'gpt-4.1-mini')
 DEFAULT_WEB_CHAT_MODEL = os.getenv('DEFAULT_WEB_CHAT_MODEL', 'groq/compound')
 SPREADSHEET_TRANSFORM_MODEL = os.getenv('SPREADSHEET_TRANSFORM_MODEL', 'gpt-4.1-mini')
@@ -144,6 +144,9 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL', '')
 GROQ_API_KEY = os.getenv('GROQ_API_KEY', '')
 GROQ_BASE_URL = os.getenv('GROQ_BASE_URL', 'https://api.groq.com/openai/v1')
+# Local Ollama embeddings (OpenAI-compatible endpoint)
+OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL', 'http://localhost:11434/v1')
+OLLAMA_API_KEY = os.getenv('OLLAMA_API_KEY', 'ollama')  # placeholder, not required locally
 MS_GRAPH_TENANT_ID = os.getenv('MS_GRAPH_TENANT_ID', 'common')
 MS_GRAPH_CLIENT_ID = os.getenv('MS_GRAPH_CLIENT_ID', '')
 MS_GRAPH_CLIENT_SECRET = os.getenv('MS_GRAPH_CLIENT_SECRET', '')

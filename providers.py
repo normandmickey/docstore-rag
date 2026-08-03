@@ -16,6 +16,10 @@ def get_openai_client():
     return _build_client(settings.OPENAI_API_KEY, settings.OPENAI_BASE_URL)
 
 
+def get_ollama_client():
+    return _build_client(getattr(settings, 'OLLAMA_API_KEY', 'ollama'), getattr(settings, 'OLLAMA_BASE_URL', 'http://localhost:11434/v1'))
+
+
 def get_groq_client():
     if not getattr(settings, 'GROQ_API_KEY', ''):
         raise RuntimeError('GROQ_API_KEY is not configured')
@@ -30,7 +34,7 @@ def embed_texts(texts, model=None):
     if not texts:
         return []
 
-    client = get_openai_client()
+    client = get_ollama_client()
     vectors = []
     for start in range(0, len(texts), EMBED_BATCH_SIZE):
         batch = texts[start:start + EMBED_BATCH_SIZE]
