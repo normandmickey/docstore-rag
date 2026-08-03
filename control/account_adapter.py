@@ -1,6 +1,5 @@
 from allauth.account.adapter import DefaultAccountAdapter
 from allauth.socialaccount.adapter import DefaultSocialAccountAdapter
-from allauth.socialaccount.internal import flows
 from django.template.loader import render_to_string
 
 from control.agentmail import AgentMailClient
@@ -33,45 +32,7 @@ class DocstoreAccountAdapter(DefaultAccountAdapter):
 
 
 class DocstoreSocialAccountAdapter(DefaultSocialAccountAdapter):
-    """Handle Google sign-in: link to existing users, auto-signup new ones."""
-
-    def pre_social_login(self, request, sociallogin):
-        """If the Google email matches an existing user, log them in directly."""
-        from django.contrib.auth import get_user_model
-
-        User = get_user_model()
-        email = None
-        if sociallogin.email_addresses:
-            email = sociallogin.email_addresses[0].email
-        elif sociallogin.account.extra_data.get('email'):
-            email = sociallogin.account.extra_data['email']
-
-        if not email:
-            return
-
-        existing_user = User.objects.filter(email=email).first()
-        if not existing_user:
-            return
-
-        # Link the social account to the existing user if not already linked
-        from allauth.socialaccount.models import SocialAccount
-        account, created = SocialAccount.objects.get_or_create(
-            provider=sociallogin.account.provider,
-            uid=sociallogin.account.uid,
-            defaults={'user': existing_user},
-        )
-        if created:
-            account.user = existing_user
-            account.save()
-
-        # Connect the sociallogin to the existing user
-        sociallogin.account.user = existing_user
-        sociallogin.user = existing_user
-
-        # Complete login directly — bypasses the signup form
-        from allauth.socialaccount.helpers import complete_social_login
-        flows.signup.clear_pending_signup(request)
-        return complete_social_login(request, sociallogin)
+    """Handle Google sign-in: auto-link existing users, bootstrap workspace for new ones."""
 
     def save_user(self, request, sociallogin, form=None):
         """Create the user via allauth's default, then bootstrap workspace."""
