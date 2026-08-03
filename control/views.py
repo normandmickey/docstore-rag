@@ -1224,7 +1224,7 @@ def _run_proxi_web_turn(*, request, current_workspace, thread, raw_question: str
             },
         )
     except Exception as exc:
-        logger.exception('Proxi-Web support request failed')
+        logger.exception('Chat support request failed')
         return {
             'ok': False,
             'error': 'The AI service is temporarily unavailable. Please try again in a moment.',
@@ -1270,8 +1270,8 @@ def _run_proxi_web_turn(*, request, current_workspace, thread, raw_question: str
             'web_results': web_results,
         },
     )
-    if (thread.title or '').strip() in {'', 'New Proxi-Web chat'}:
-        thread.title = (question[:80] or 'New Proxi-Web chat').strip()
+    if (thread.title or '').strip() in {'', 'New Proxi-Web chat', 'New chat'}:
+        thread.title = (question[:80] or 'New chat').strip()
     thread.save(update_fields=['title', 'updated_at'])
 
     return {
@@ -1320,7 +1320,7 @@ def dashboard_proxi_web_send(request):
     )
     thread = threads.filter(id=thread_id).first() if thread_id.isdigit() else None
     if not thread:
-        return JsonResponse({'ok': False, 'error': 'Pick or create a Proxi-Web chat first.'}, status=400)
+        return JsonResponse({'ok': False, 'error': 'Pick or create a chat first.'}, status=400)
 
     payload = _run_proxi_web_turn(
         request=request,
@@ -1380,15 +1380,15 @@ def dashboard_proxi_web(request):
         base['proxi_threads'] = threads
 
         if request.method == 'POST' and request.POST.get('action') == 'create_proxi_thread':
-            title = (request.POST.get('title') or '').strip() or 'New Proxi-Web chat'
+            title = (request.POST.get('title') or '').strip() or 'New chat'
             thread = ProxiWebThread.objects.create(
                 tenant=current_workspace.tenant,
                 workspace=current_workspace,
                 user=request.user,
                 title=title,
             )
-            messages.success(request, 'Created a new Proxi-Web chat.')
-            return redirect(f'/dashboard/proxi-web/?thread={thread.id}')
+            messages.success(request, 'Created a new chat.')
+            return redirect(f'/dashboard/chat/?thread={thread.id}')
 
         if request.method == 'POST' and request.POST.get('action') == 'rename_proxi_thread':
             thread_id = (request.POST.get('thread_id') or '').strip()
@@ -1400,7 +1400,7 @@ def dashboard_proxi_web(request):
             thread.title = new_title or thread.title or 'Untitled chat'
             thread.save(update_fields=['title', 'updated_at'])
             messages.success(request, 'Chat renamed.')
-            return redirect(f'/dashboard/proxi-web/?thread={thread.id}')
+            return redirect(f'/dashboard/chat/?thread={thread.id}')
 
         if request.method == 'POST' and request.POST.get('action') == 'delete_proxi_thread':
             thread_id = (request.POST.get('thread_id') or '').strip()
@@ -1408,13 +1408,13 @@ def dashboard_proxi_web(request):
             thread = threads.filter(id=thread_id).first() if thread_id.isdigit() else None
             if not thread:
                 messages.error(request, 'Chat not found.')
-                return redirect('dashboard_proxi_web')
+                return redirect('dashboard_chat_v2')
             if confirm != 'delete':
                 messages.error(request, 'Delete not confirmed. Type DELETE to remove the chat.')
-                return redirect(f'/dashboard/proxi-web/?thread={thread.id}')
+                return redirect(f'/dashboard/chat/?thread={thread.id}')
             thread.delete()
-            messages.success(request, 'Proxi-Web chat deleted.')
-            return redirect('dashboard_proxi_web')
+            messages.success(request, 'Chat deleted.')
+            return redirect('dashboard_chat_v2')
 
         selected_thread_id = (request.GET.get('thread') or request.POST.get('thread_id') or '').strip()
         thread = None
@@ -1430,8 +1430,8 @@ def dashboard_proxi_web(request):
             use_web = (request.POST.get('use_web_search') or '').strip() == '1'
             thread = threads.filter(id=thread_id).first() if thread_id.isdigit() else thread
             if not thread:
-                messages.error(request, 'Pick or create a Proxi-Web chat first.')
-                return redirect('dashboard_proxi_web')
+                messages.error(request, 'Pick or create a chat first.')
+                return redirect('dashboard_chat_v2')
             payload = _run_proxi_web_turn(
                 request=request,
                 current_workspace=current_workspace,
@@ -1445,8 +1445,8 @@ def dashboard_proxi_web(request):
             if not payload.get('ok'):
                 messages.error(request, payload.get('error') or 'Ask something first.')
             else:
-                messages.success(request, 'Message added to Proxi-Web chat.')
-                return redirect(f'/dashboard/proxi-web/?thread={thread.id}')
+                messages.success(request, 'Message added to chat.')
+                return redirect(f'/dashboard/chat/?thread={thread.id}')
 
         if base['proxi_thread']:
             chronological_messages = list(base['proxi_thread'].messages.order_by('id'))
@@ -1458,7 +1458,7 @@ def dashboard_proxi_web(request):
                 base['proxi_web_results'] = latest_meta.get('web_results', [])
                 base['proxi_web_enabled'] = bool(latest_meta.get('use_web_search'))
 
-    return render(request, 'dashboard/proxi_web.html', base)
+    return render(request, 'dashboard/chat_new.html', base)
 
 
 def dashboard_connectors(request):

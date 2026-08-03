@@ -61,6 +61,7 @@ urlpatterns = [
     path('dashboard/chat/', dashboard_chat, name='dashboard_chat'),
     path('dashboard/proxi-web/', dashboard_proxi_web, name='dashboard_proxi_web'),
     path('dashboard/proxi-web/send/', dashboard_proxi_web_send, name='dashboard_proxi_web_send'),
+    path('dashboard/chat/', dashboard_proxi_web, name='dashboard_chat_v2'),
     path('dashboard/chatbots/', include('chatbots.urls')),
     path('documents/<int:document_id>/', document_detail, name='document_detail'),
     path('documents/<int:document_id>/facts/', document_facts, name='document_facts'),
