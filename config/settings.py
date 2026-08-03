@@ -26,6 +26,8 @@ INSTALLED_APPS = [
     'django.contrib.sites',
     'allauth',
     'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
     'pgvector.django',
     'control',
     'documents',
@@ -201,6 +203,30 @@ ACCOUNT_LOGIN_METHODS = {'username', 'email'}
 ACCOUNT_SIGNUP_FIELDS = ['email*', 'username*', 'password1*', 'password2*']
 ACCOUNT_ADAPTER = 'control.account_adapter.DocstoreAccountAdapter'
 ALLOW_PUBLIC_SIGNUPS = os.getenv('ALLOW_PUBLIC_SIGNUPS', '1') == '1'
+
+# --- Social Account (Google Sign-In) ---
+SOCIALACCOUNT_ADAPTER = 'control.account_adapter.DocstoreSocialAccountAdapter'
+SOCIALACCOUNT_AUTO_SIGNUP = True
+SOCIALACCOUNT_EMAIL_VERIFICATION = 'none'
+SOCIALACCOUNT_EMAIL_REQUIRED = True
+SOCIALACCOUNT_QUERY_EMAIL = True
+SOCIALACCOUNT_LOGIN_METHODS = {'email'}
+GOOGLE_SIGN_IN_CLIENT_ID = os.getenv('GOOGLE_SIGN_IN_CLIENT_ID', '')
+GOOGLE_SIGN_IN_CLIENT_SECRET = os.getenv('GOOGLE_SIGN_IN_CLIENT_SECRET', '')
+GOOGLE_SIGN_IN_REDIRECT_URI = os.getenv('GOOGLE_SIGN_IN_REDIRECT_URI', SITE_URL.rstrip('/') + '/accounts/google/login/callback/')
+
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': GOOGLE_SIGN_IN_CLIENT_ID,
+            'secret': GOOGLE_SIGN_IN_CLIENT_SECRET,
+        },
+        'SCOPE': ['openid', 'email', 'profile'],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        },
+    },
+}
 
 
 CELERY_TASK_DEFAULT_QUEUE = 'docstore'
