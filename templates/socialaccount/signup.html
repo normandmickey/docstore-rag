@@ -1,0 +1,12 @@
+{% extends "allauth/layouts/base.html" %}
+{% block head_title %}Sign up · Ragbee{% endblock %}
+{% block content %}
+<h1>Create account · <span class="google-logo">🐝 Ragbee</span></h1>
+<p>You're signing up with your Google account. Just a few details left:</p>
+<form method="post" action="{% url 'socialaccount_signup' %}">
+  {% csrf_token %}
+  {{ form.as_p }}
+  <button type="submit" style="padding:12px 16px;border:0;border-radius:10px;background:#2563eb;color:white;cursor:pointer;width:100%;">Complete sign up</button>
+</form>
+<p><a href="/login/">Already have an account?</a></p>
+{% endblock %}

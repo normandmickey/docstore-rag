@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block head_title %}Ragbee{% endblock %}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background: #0b1020; color: #eef2ff; margin: 0; }
+    .wrap { max-width: 460px; margin: 0 auto; padding: 64px 24px; }
+    .card { background: #121a33; border: 1px solid #243055; border-radius: 16px; padding: 28px; }
+    h1 { font-size: 1.4rem; margin: 0 0 1rem; }
+    p { color: #94a3b8; line-height: 1.5; }
+    a { color: #93c5fd; }
+    .google-logo { font-size: 0.85em; }
+    .messages { margin-bottom: 1rem; }
+    .messages ul { list-style: none; padding: 0; }
+    .messages li { padding: 8px 12px; border-radius: 8px; margin-bottom: 8px; font-size: 0.9rem; }
+    .messages .error { background: #7f1d1d; color: #fca5a5; }
+    .messages .info { background: #1e3a5f; color: #93c5fd; }
+    .messages .success { background: #14532d; color: #86efac; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      {% block content %}{% endblock %}
+    </div>
+  </div>
+</body>
+</html>
